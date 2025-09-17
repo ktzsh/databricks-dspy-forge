@@ -175,13 +175,44 @@ const WorkflowBuilder: React.FC = () => {
       <div className="flex flex-1">
         {/* Left Sidebar - Components */}
         <ComponentSidebar onAddNode={(nodeData) => {
+          const newNodeId = `node-${Date.now()}`;
           const newNode: Node = {
-            id: `node-${Date.now()}`,
+            id: newNodeId,
             type: nodeData.type,
             position: { x: 100, y: 100 },
             data: nodeData.data,
           };
-          setNodes((nds) => [...nds, newNode]);
+
+          // Auto-connect retriever nodes to signature field with context output
+          if (nodeData.type === 'retriever') {
+            // Create a signature field node with context output
+            const signatureNodeId = `node-${Date.now() + 1}`;
+            const signatureNode: Node = {
+              id: signatureNodeId,
+              type: 'signature_field',
+              position: { x: 400, y: 100 },
+              data: {
+                fields: [{ name: 'context', type: 'list[str]', required: true }],
+                isStart: false,
+                isEnd: false,
+                connection_mode: 'whole'
+              }
+            };
+
+            // Create edge connecting retriever to signature field
+            const edgeId = `edge-${Date.now()}`;
+            const newEdge: Edge = {
+              id: edgeId,
+              source: newNodeId,
+              target: signatureNodeId,
+              type: 'default'
+            };
+
+            setNodes((nds) => [...nds, newNode, signatureNode]);
+            setEdges((eds) => [...eds, newEdge]);
+          } else {
+            setNodes((nds) => [...nds, newNode]);
+          }
         }} />
 
         {/* Main Canvas */}

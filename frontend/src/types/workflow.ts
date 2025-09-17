@@ -24,13 +24,14 @@ export type ModuleType =
   | 'Predict' 
   | 'ChainOfThought' 
   | 'ReAct' 
-  | 'Retrieve' 
   | 'BestOfN' 
   | 'Refine';
 
+export type RetrieverType = 'UnstructuredRetrieve';
+
 export type LogicType = 'IfElse' | 'Merge' | 'FieldSelector';
 
-export type NodeType = 'signature_field' | 'module' | 'logic';
+export type NodeType = 'signature_field' | 'module' | 'logic' | 'retriever';
 
 export interface BaseNodeData {
   label?: string;
@@ -60,11 +61,23 @@ export interface LogicNodeData extends BaseNodeData {
   availableFields?: SignatureField[]; // Fields available from input
 }
 
+export interface RetrieverNodeData extends BaseNodeData {
+  retrieverType: RetrieverType;
+  catalogName: string; // Mandatory
+  schemaName: string; // Mandatory
+  indexName: string; // Mandatory
+  embeddingModel?: string; // Optional
+  queryType: 'HYBRID' | 'ANN'; // Default HYBRID
+  numResults: number; // Default 3
+  scoreThreshold?: number; // Default 0.0
+  parameters: Record<string, any>;
+}
+
 export interface WorkflowNode {
   id: string;
   type: NodeType;
   position: NodePosition;
-  data: SignatureFieldNodeData | ModuleNodeData | LogicNodeData;
+  data: SignatureFieldNodeData | ModuleNodeData | LogicNodeData | RetrieverNodeData;
 }
 
 export interface WorkflowEdge {

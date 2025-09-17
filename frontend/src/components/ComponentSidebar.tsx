@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, Brain, GitBranch, Filter } from 'lucide-react';
+import { Database, Brain, GitBranch, Filter, Search } from 'lucide-react';
 
 interface ComponentSidebarProps {
   onAddNode: (nodeData: { type: string; data: any }) => void;
@@ -67,13 +67,26 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           }
         },
         {
-          id: 'retrieve',
-          name: 'Retrieve',
-          icon: Database,
-          description: 'Information retrieval module',
+          id: 'best-of-n',
+          name: 'Best of N',
+          icon: Brain,
+          description: 'Best of N selection module',
           type: 'module',
           data: {
-            moduleType: 'Retrieve',
+            moduleType: 'BestOfN',
+            model: '',
+            instruction: '',
+            parameters: {}
+          }
+        },
+        {
+          id: 'refine',
+          name: 'Refine',
+          icon: Brain,
+          description: 'Refinement module',
+          type: 'module',
+          data: {
+            moduleType: 'Refine',
             model: '',
             instruction: '',
             parameters: {}
@@ -117,6 +130,29 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
             logicType: 'FieldSelector',
             selectedFields: [],
             fieldMappings: {},
+            parameters: {}
+          }
+        }
+      ]
+    },
+    {
+      category: 'Retrievers',
+      items: [
+        {
+          id: 'unstructured-retrieve',
+          name: 'Unstructured Retrieve',
+          icon: Search,
+          description: 'Databricks vector search retrieval',
+          type: 'retriever',
+          data: {
+            retrieverType: 'UnstructuredRetrieve',
+            catalogName: '',
+            schemaName: '',
+            indexName: '',
+            embeddingModel: '',
+            queryType: 'HYBRID',
+            numResults: 3,
+            scoreThreshold: 0.0,
             parameters: {}
           }
         }

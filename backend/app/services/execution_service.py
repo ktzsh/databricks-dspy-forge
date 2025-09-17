@@ -121,6 +121,8 @@ class WorkflowExecutionEngine:
                 outputs = await self._execute_module_node(node, inputs, context)
             elif node.type == NodeType.LOGIC:
                 outputs = await self._execute_logic_node(node, inputs, context)
+            elif node.type == NodeType.RETRIEVER:
+                outputs = await self._execute_retriever_node(node, inputs, context)
             
             context.set_node_output(node_id, outputs)
             
@@ -257,8 +259,7 @@ class WorkflowExecutionEngine:
             return result.__dict__
             
         elif module_type == DSPyModuleType.RETRIEVE:
-            # Retrieve module (placeholder)
-            # In real implementation, this would use a configured retriever
+            # Legacy retrieve module - now deprecated in favor of retriever nodes
             return {
                 'passages': [f"Retrieved passage for: {inputs.get('query', 'N/A')}"],
                 'scores': [0.95]
@@ -341,6 +342,71 @@ class WorkflowExecutionEngine:
                 outputs[output_name] = inputs[field_name]
         
         return outputs
+    
+    async def _execute_retriever_node(self, node: Any, inputs: Dict[str, Any], context: ExecutionContext) -> Dict[str, Any]:
+        """Execute a retriever node"""
+        retriever_type = node.data.get('retriever_type')
+        catalog_name = node.data.get('catalog_name', '')
+        schema_name = node.data.get('schema_name', '')
+        index_name = node.data.get('index_name', '')
+        embedding_model = node.data.get('embedding_model')
+        query_type = node.data.get('query_type', 'HYBRID')
+        num_results = node.data.get('num_results', 3)
+        score_threshold = node.data.get('score_threshold', 0.0)
+        parameters = node.data.get('parameters', {})
+        
+        # Validate mandatory fields
+        if not all([catalog_name, schema_name, index_name]):
+            raise ValueError("Retriever node requires catalog_name, schema_name, and index_name")
+        
+        # Extract query from inputs
+        query = inputs.get('query', inputs.get('question', ''))
+        if not query:
+            # Try to get the first string input as query
+            for key, value in inputs.items():
+                if isinstance(value, str) and value.strip():
+                    query = value
+                    break
+        
+        if not query:
+            raise ValueError("No query found in inputs for retriever")
+        
+        try:
+            # TODO: Implement actual Databricks vector search integration
+            # For now, return mock data that matches expected format
+            
+            # Simulate retrieval results
+            mock_passages = [
+                f"Mock retrieved passage 1 for query: {query}",
+                f"Mock retrieved passage 2 for query: {query}",
+                f"Mock retrieved passage 3 for query: {query}"
+            ][:num_results]
+            
+            # Filter by score threshold if provided
+            mock_scores = [0.95, 0.89, 0.82][:num_results]
+            if score_threshold > 0:
+                filtered_results = [(passage, score) for passage, score in zip(mock_passages, mock_scores) if score >= score_threshold]
+                mock_passages = [p for p, s in filtered_results]
+                mock_scores = [s for p, s in filtered_results]
+            
+            return {
+                'context': mock_passages,  # Return as list[str] as expected by signature field
+                'passages': mock_passages,  # Keep for backwards compatibility
+                'scores': mock_scores,
+                'query': query,
+                'retriever_config': {
+                    'catalog': catalog_name,
+                    'schema': schema_name,
+                    'index': index_name,
+                    'embedding_model': embedding_model,
+                    'query_type': query_type,
+                    'num_results': len(mock_passages),
+                    'score_threshold': score_threshold
+                }
+            }
+            
+        except Exception as e:
+            raise ValueError(f"Retrieval failed: {str(e)}")
     
     def _get_or_create_model(self, model_name: str, context: ExecutionContext) -> Any:
         """Get or create a model instance"""

@@ -7,7 +7,6 @@ const moduleTypes: ModuleType[] = [
   'Predict',
   'ChainOfThought',
   'ReAct',
-  'Retrieve',
   'BestOfN',
   'Refine'
 ];
@@ -16,7 +15,6 @@ const moduleIcons: Record<ModuleType, React.ReactNode> = {
   'Predict': <Brain size={16} className="text-green-600" />,
   'ChainOfThought': <Brain size={16} className="text-blue-600" />,
   'ReAct': <Brain size={16} className="text-purple-600" />,
-  'Retrieve': <Brain size={16} className="text-orange-600" />,
   'BestOfN': <Brain size={16} className="text-red-600" />,
   'Refine': <Brain size={16} className="text-indigo-600" />
 };

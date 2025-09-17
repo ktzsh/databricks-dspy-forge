@@ -31,20 +31,25 @@ class ModuleType(str, Enum):
     PREDICT = "Predict"
     CHAIN_OF_THOUGHT = "ChainOfThought"
     REACT = "ReAct"
-    RETRIEVE = "Retrieve"
     BEST_OF_N = "BestOfN"
     REFINE = "Refine"
+
+
+class RetrieverType(str, Enum):
+    UNSTRUCTURED_RETRIEVE = "UnstructuredRetrieve"
 
 
 class LogicType(str, Enum):
     IF_ELSE = "IfElse"
     MERGE = "Merge"
+    FIELD_SELECTOR = "FieldSelector"
 
 
 class NodeType(str, Enum):
     SIGNATURE_FIELD = "signature_field"
     MODULE = "module"
     LOGIC = "logic"
+    RETRIEVER = "retriever"
 
 
 class BaseNode(BaseModel):
@@ -79,6 +84,24 @@ class LogicNode(BaseNode):
     data: Dict[str, Any] = Field(default_factory=lambda: {
         "logic_type": None,
         "condition": None,
+        "parameters": {},
+        "selected_fields": [],
+        "field_mappings": {},
+        "available_fields": []
+    })
+
+
+class RetrieverNode(BaseNode):
+    type: Literal[NodeType.RETRIEVER] = NodeType.RETRIEVER
+    data: Dict[str, Any] = Field(default_factory=lambda: {
+        "retriever_type": None,
+        "catalog_name": "",
+        "schema_name": "", 
+        "index_name": "",
+        "embedding_model": None,
+        "query_type": "HYBRID",
+        "num_results": 3,
+        "score_threshold": 0.0,
         "parameters": {}
     })
 
@@ -96,7 +119,7 @@ class Workflow(BaseModel):
     id: str
     name: str
     description: Optional[str] = None
-    nodes: List[Union[SignatureFieldNode, ModuleNode, LogicNode]]
+    nodes: List[Union[SignatureFieldNode, ModuleNode, LogicNode, RetrieverNode]]
     edges: List[Edge]
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)

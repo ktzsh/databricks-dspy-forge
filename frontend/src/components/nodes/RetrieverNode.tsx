@@ -1,0 +1,328 @@
+import React, { useState } from 'react';
+import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
+import { Edit3, Database, Trash2, Settings } from 'lucide-react';
+import { RetrieverNodeData, RetrieverType } from '../../types/workflow';
+
+const retrieverTypes: RetrieverType[] = ['UnstructuredRetrieve'];
+
+const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected, id }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [retrieverType, setRetrieverType] = useState<RetrieverType>(data.retrieverType || 'UnstructuredRetrieve');
+  const [catalogName, setCatalogName] = useState(data.catalogName || '');
+  const [schemaName, setSchemaName] = useState(data.schemaName || '');
+  const [indexName, setIndexName] = useState(data.indexName || '');
+  const [embeddingModel, setEmbeddingModel] = useState(data.embeddingModel || '');
+  const [queryType, setQueryType] = useState<'HYBRID' | 'ANN'>(data.queryType || 'HYBRID');
+  const [numResults, setNumResults] = useState(data.numResults || 3);
+  const [scoreThreshold, setScoreThreshold] = useState(data.scoreThreshold || 0.0);
+  const [parameters, setParameters] = useState(data.parameters || {});
+  
+  const { deleteElements } = useReactFlow();
+
+  const handleSave = () => {
+    data.retrieverType = retrieverType;
+    data.catalogName = catalogName;
+    data.schemaName = schemaName;
+    data.indexName = indexName;
+    data.embeddingModel = embeddingModel;
+    data.queryType = queryType;
+    data.numResults = numResults;
+    data.scoreThreshold = scoreThreshold;
+    data.parameters = parameters;
+    setIsEditing(false);
+  };
+
+  const handleDelete = () => {
+    deleteElements({ nodes: [{ id }] });
+  };
+
+  const updateParameter = (key: string, value: any) => {
+    setParameters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const removeParameter = (key: string) => {
+    const newParams = { ...parameters };
+    delete newParams[key];
+    setParameters(newParams);
+  };
+
+  const addParameter = () => {
+    const key = `param_${Object.keys(parameters).length + 1}`;
+    updateParameter(key, '');
+  };
+
+  return (
+    <div className={`bg-orange-50 border-2 border-orange-200 rounded-lg shadow-sm min-w-[280px] ${selected ? 'ring-2 ring-blue-500 ring-opacity-50' : ''}`}>
+      {/* Handles */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="w-3 h-3 bg-orange-500"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="w-3 h-3 bg-orange-500"
+      />
+
+      {/* Header */}
+      <div className="flex items-center justify-between p-3 bg-orange-100 border-b border-orange-200">
+        <div className="flex items-center space-x-2">
+          <Database size={16} className="text-orange-600" />
+          <span className="font-medium text-orange-800">{retrieverType}</span>
+        </div>
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="p-1 hover:bg-orange-200 rounded"
+            title="Edit node"
+          >
+            <Edit3 size={14} className="text-orange-600" />
+          </button>
+          <button
+            onClick={handleDelete}
+            className="p-1 hover:bg-red-200 rounded"
+            title="Delete node"
+          >
+            <Trash2 size={14} className="text-red-600" />
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-3">
+        {isEditing ? (
+          <div className="space-y-3">
+            {/* Retriever Type Selection */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Retriever Type</label>
+              <select
+                value={retrieverType}
+                onChange={(e) => setRetrieverType(e.target.value as RetrieverType)}
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              >
+                {retrieverTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Mandatory Fields */}
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Catalog Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={catalogName}
+                  onChange={(e) => setCatalogName(e.target.value)}
+                  placeholder="Enter catalog name"
+                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Schema Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={schemaName}
+                  onChange={(e) => setSchemaName(e.target.value)}
+                  placeholder="Enter schema name"
+                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Index Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={indexName}
+                  onChange={(e) => setIndexName(e.target.value)}
+                  placeholder="Enter index name"
+                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Optional Embedding Model */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Embedding Model</label>
+              <input
+                type="text"
+                value={embeddingModel}
+                onChange={(e) => setEmbeddingModel(e.target.value)}
+                placeholder="e.g., text-embedding-ada-002"
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              />
+            </div>
+
+            {/* Query Type */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Query Type</label>
+              <select
+                value={queryType}
+                onChange={(e) => setQueryType(e.target.value as 'HYBRID' | 'ANN')}
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              >
+                <option value="HYBRID">HYBRID</option>
+                <option value="ANN">ANN</option>
+              </select>
+            </div>
+
+            {/* Number of Results */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Number of Results</label>
+              <input
+                type="number"
+                value={numResults}
+                onChange={(e) => setNumResults(parseInt(e.target.value) || 3)}
+                min="1"
+                max="100"
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              />
+            </div>
+
+            {/* Score Threshold */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Score Threshold</label>
+              <input
+                type="number"
+                value={scoreThreshold}
+                onChange={(e) => setScoreThreshold(parseFloat(e.target.value) || 0.0)}
+                min="0"
+                max="1"
+                step="0.1"
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              />
+            </div>
+
+            {/* Additional Parameters */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium">Additional Parameters</label>
+                <button
+                  onClick={addParameter}
+                  className="px-2 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600"
+                >
+                  Add
+                </button>
+              </div>
+              
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {Object.entries(parameters).map(([key, value]) => (
+                  <div key={key} className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={key}
+                      onChange={(e) => {
+                        const newKey = e.target.value;
+                        const newParams = { ...parameters };
+                        delete newParams[key];
+                        newParams[newKey] = value;
+                        setParameters(newParams);
+                      }}
+                      placeholder="Parameter name"
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={value as string}
+                      onChange={(e) => updateParameter(key, e.target.value)}
+                      placeholder="Value"
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                    />
+                    <button
+                      onClick={() => removeParameter(key)}
+                      className="p-1 text-red-500 hover:bg-red-50 rounded"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handleSave}
+              className="w-full px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
+            >
+              Save
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {/* Configuration Display */}
+            <div className="text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="font-medium">Catalog:</span>
+                <span className="text-gray-600">{catalogName || 'Not set'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium">Schema:</span>
+                <span className="text-gray-600">{schemaName || 'Not set'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium">Index:</span>
+                <span className="text-gray-600">{indexName || 'Not set'}</span>
+              </div>
+              {embeddingModel && (
+                <div className="flex justify-between">
+                  <span className="font-medium">Model:</span>
+                  <span className="text-gray-600">{embeddingModel}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="font-medium">Query Type:</span>
+                <span className="text-gray-600">{queryType}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium">Results:</span>
+                <span className="text-gray-600">{numResults}</span>
+              </div>
+              {scoreThreshold > 0 && (
+                <div className="flex justify-between">
+                  <span className="font-medium">Threshold:</span>
+                  <span className="text-gray-600">{scoreThreshold}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Additional Parameters Display */}
+            {Object.keys(parameters).length > 0 && (
+              <div className="text-sm">
+                <div className="font-medium mb-1 flex items-center">
+                  <Settings size={12} className="mr-1" />
+                  Parameters
+                </div>
+                <div className="space-y-1 max-h-20 overflow-y-auto">
+                  {Object.entries(parameters).map(([key, value]) => (
+                    <div key={key} className="flex justify-between">
+                      <span className="text-gray-600">{key}:</span>
+                      <span className="font-mono text-xs">{String(value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!catalogName && !schemaName && !indexName && (
+              <div className="text-sm text-gray-500 text-center py-2">
+                Configure retriever settings
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default RetrieverNode;
