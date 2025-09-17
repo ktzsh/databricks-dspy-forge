@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* React Flow custom styles */
+.react-flow__minimap {
+  background-color: #f8fafc;
+}
+
+.react-flow__controls {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.react-flow__controls button {
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.react-flow__controls button:hover {
+  background: #f1f5f9;
+}
+
+/* Custom node styles */
+.signature-field-node {
+  @apply bg-blue-50 border-2 border-blue-200 rounded-lg shadow-sm;
+}
+
+.module-node {
+  @apply bg-green-50 border-2 border-green-200 rounded-lg shadow-sm;
+}
+
+.logic-node {
+  @apply bg-purple-50 border-2 border-purple-200 rounded-lg shadow-sm;
+}
+
+.node-selected {
+  @apply ring-2 ring-blue-500 ring-opacity-50;
+}
+
+/* Sidebar styles */
+.component-sidebar {
+  @apply w-64 bg-gray-50 border-r border-gray-200 h-full overflow-y-auto;
+}
+
+.playground-sidebar {
+  @apply w-96 bg-white border-l border-gray-200 h-full overflow-y-auto;
+}

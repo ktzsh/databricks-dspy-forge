@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Workflows storage
+workflows/*.json
+
+# Coverage
+coverage/
+.coverage
+.pytest_cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Runtime
+.cache/
+.npm/
+.yarn/
