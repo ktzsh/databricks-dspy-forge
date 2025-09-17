@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
-import { Edit3, GitBranch, GitMerge, Trash2 } from 'lucide-react';
-import { LogicNodeData, LogicType } from '../../types/workflow';
+import React, { useState, useEffect } from 'react';
+import { Handle, Position, NodeProps, useReactFlow, useNodes, useEdges } from 'reactflow';
+import { Edit3, GitBranch, GitMerge, Trash2, Filter } from 'lucide-react';
+import { LogicNodeData, LogicType, SignatureField, SignatureFieldNodeData } from '../../types/workflow';
 
-const logicTypes: LogicType[] = ['IfElse', 'Merge'];
+const logicTypes: LogicType[] = ['IfElse', 'Merge', 'FieldSelector'];
 
 const logicIcons: Record<LogicType, React.ReactNode> = {
   'IfElse': <GitBranch size={16} className="text-purple-600" />,
-  'Merge': <GitMerge size={16} className="text-purple-600" />
+  'Merge': <GitMerge size={16} className="text-purple-600" />,
+  'FieldSelector': <Filter size={16} className="text-purple-600" />
 };
 
 const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) => {
@@ -15,12 +16,44 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
   const [logicType, setLogicType] = useState<LogicType>(data.logicType || 'IfElse');
   const [condition, setCondition] = useState(data.condition || '');
   const [parameters, setParameters] = useState(data.parameters || {});
+  const [selectedFields, setSelectedFields] = useState<string[]>(data.selectedFields || []);
+  const [fieldMappings, setFieldMappings] = useState<Record<string, string>>(data.fieldMappings || {});
+  const [availableFields, setAvailableFields] = useState<SignatureField[]>([]);
+  
   const { deleteElements } = useReactFlow();
+  const nodes = useNodes();
+  const edges = useEdges();
+
+  // Dynamically detect available fields from connected input nodes
+  useEffect(() => {
+    if (logicType === 'FieldSelector') {
+      const inputEdges = edges.filter(edge => edge.target === id);
+      const allFields: SignatureField[] = [];
+
+      inputEdges.forEach(edge => {
+        const sourceNode = nodes.find(node => node.id === edge.source);
+        if (sourceNode && sourceNode.type === 'signature_field') {
+          const nodeData = sourceNode.data as SignatureFieldNodeData;
+          const nodeFields = nodeData?.fields || [];
+          allFields.push(...nodeFields);
+        }
+      });
+
+      // Remove duplicates based on field name
+      const uniqueFields = allFields.filter((field, index, self) => 
+        index === self.findIndex(f => f.name === field.name)
+      );
+
+      setAvailableFields(uniqueFields);
+    }
+  }, [logicType, nodes, edges, id]);
 
   const handleSave = () => {
     data.logicType = logicType;
     data.condition = condition;
     data.parameters = parameters;
+    data.selectedFields = selectedFields;
+    data.fieldMappings = fieldMappings;
     setIsEditing(false);
   };
 
@@ -41,6 +74,28 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
   const addParameter = () => {
     const key = `param_${Object.keys(parameters).length + 1}`;
     updateParameter(key, '');
+  };
+
+  const toggleFieldSelection = (fieldName: string) => {
+    setSelectedFields(prev => 
+      prev.includes(fieldName) 
+        ? prev.filter(f => f !== fieldName)
+        : [...prev, fieldName]
+    );
+  };
+
+  const updateFieldMapping = (originalName: string, newName: string) => {
+    setFieldMappings(prev => ({
+      ...prev,
+      [originalName]: newName
+    }));
+  };
+
+  const removeFieldMapping = (fieldName: string) => {
+    setFieldMappings(prev => {
+      const { [fieldName]: removed, ...rest } = prev;
+      return rest;
+    });
   };
 
   return (
@@ -137,6 +192,59 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
               </div>
             )}
 
+            {/* Field Selection (for FieldSelector) */}
+            {logicType === 'FieldSelector' && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Field Selection</label>
+                {availableFields.length > 0 ? (
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {availableFields.map((field) => (
+                      <div key={field.name} className="border border-gray-200 rounded p-2">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedFields.includes(field.name)}
+                            onChange={() => toggleFieldSelection(field.name)}
+                            className="rounded"
+                          />
+                          <span className="text-sm font-medium">{field.name}</span>
+                          <span className="text-xs text-gray-500">({field.type})</span>
+                        </div>
+                        
+                        {selectedFields.includes(field.name) && (
+                          <div className="flex items-center space-x-2">
+                            <label className="text-xs text-gray-600">Rename to:</label>
+                            <input
+                              type="text"
+                              value={fieldMappings[field.name] || ''}
+                              onChange={(e) => updateFieldMapping(field.name, e.target.value)}
+                              placeholder="Optional new name"
+                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs"
+                            />
+                            {fieldMappings[field.name] && (
+                              <button
+                                onClick={() => removeFieldMapping(field.name)}
+                                className="text-red-500 hover:text-red-700 text-xs"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 p-2 border border-gray-200 rounded">
+                    {edges.some(edge => edge.target === id) 
+                      ? "No fields available from connected nodes. Ensure connected nodes have fields defined."
+                      : "No input fields detected. Connect this node to a SignatureField to see available fields."
+                    }
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Parameters */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -216,6 +324,32 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
               </div>
             )}
 
+            {/* Field Selection Display */}
+            {logicType === 'FieldSelector' && (
+              <div className="text-sm">
+                <div className="font-medium mb-1 flex items-center">
+                  <Filter size={12} className="mr-1" />
+                  Selected Fields
+                </div>
+                {selectedFields.length > 0 ? (
+                  <div className="space-y-1 max-h-20 overflow-y-auto">
+                    {selectedFields.map((fieldName) => (
+                      <div key={fieldName} className="flex justify-between items-center">
+                        <span className="text-gray-600">{fieldName}</span>
+                        {fieldMappings[fieldName] && (
+                          <span className="text-xs text-blue-600">
+                            → {fieldMappings[fieldName]}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-500">No fields selected</div>
+                )}
+              </div>
+            )}
+
             {/* Parameters Display */}
             {Object.keys(parameters).length > 0 && (
               <div className="text-sm">
@@ -231,7 +365,7 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
               </div>
             )}
 
-            {!condition && Object.keys(parameters).length === 0 && (
+            {!condition && Object.keys(parameters).length === 0 && selectedFields.length === 0 && (
               <div className="text-sm text-gray-500 text-center py-2">
                 No configuration
               </div>

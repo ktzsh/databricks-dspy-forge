@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, Brain, GitBranch } from 'lucide-react';
+import { Database, Brain, GitBranch, Filter } from 'lucide-react';
 
 interface ComponentSidebarProps {
   onAddNode: (nodeData: { type: string; data: any }) => void;
@@ -36,6 +36,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           data: {
             moduleType: 'Predict',
             model: '',
+            instruction: '',
             parameters: {}
           }
         },
@@ -48,6 +49,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           data: {
             moduleType: 'ChainOfThought',
             model: '',
+            instruction: '',
             parameters: {}
           }
         },
@@ -60,6 +62,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           data: {
             moduleType: 'ReAct',
             model: '',
+            instruction: '',
             parameters: {}
           }
         },
@@ -72,6 +75,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           data: {
             moduleType: 'Retrieve',
             model: '',
+            instruction: '',
             parameters: {}
           }
         }
@@ -100,6 +104,19 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           type: 'logic',
           data: {
             logicType: 'Merge',
+            parameters: {}
+          }
+        },
+        {
+          id: 'field-selector',
+          name: 'Field Selector',
+          icon: Filter,
+          description: 'Select specific fields from input',
+          type: 'logic',
+          data: {
+            logicType: 'FieldSelector',
+            selectedFields: [],
+            fieldMappings: {},
             parameters: {}
           }
         }

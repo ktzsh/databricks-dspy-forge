@@ -143,11 +143,31 @@ class WorkflowExecutionEngine:
             # Use workflow input data
             return context.input_data
         
-        # Combine outputs from dependency nodes
+        # Get inputs considering field-level connections
         inputs = {}
-        for dep_node_id in dependencies:
-            dep_outputs = context.get_node_output(dep_node_id)
-            inputs.update(dep_outputs)
+        
+        # Find edges that target this node
+        incoming_edges = [edge for edge in context.workflow.edges if edge.target == node_id]
+        
+        for edge in incoming_edges:
+            source_outputs = context.get_node_output(edge.source)
+            
+            if edge.sourceHandle and edge.targetHandle:
+                # Field-level connection
+                source_field = edge.sourceHandle.replace('source-', '')
+                target_field = edge.targetHandle.replace('target-', '')
+                
+                if source_field in source_outputs:
+                    inputs[target_field] = source_outputs[source_field]
+            else:
+                # Whole-node connection
+                inputs.update(source_outputs)
+        
+        # Fallback to legacy behavior for nodes without specific edges
+        if not incoming_edges:
+            for dep_node_id in dependencies:
+                dep_outputs = context.get_node_output(dep_node_id)
+                inputs.update(dep_outputs)
         
         return inputs
     
@@ -174,6 +194,7 @@ class WorkflowExecutionEngine:
         """Execute a DSPy module node"""
         module_type_str = node.data.get('module_type')
         model_name = node.data.get('model', '')
+        instruction = node.data.get('instruction', '')
         parameters = node.data.get('parameters', {})
         
         if not module_type_str:
@@ -191,25 +212,47 @@ class WorkflowExecutionEngine:
         # In a real implementation, this would be derived from connected signature nodes
         
         if module_type == DSPyModuleType.PREDICT:
-            # Simple predict module
-            class SimpleSignature(dspy.Signature):
-                """Basic prediction signature"""
-                input = dspy.InputField()
-                output = dspy.OutputField()
+            # Create dynamic signature with instruction
+            class DynamicSignature(dspy.Signature):
+                pass
             
-            predictor = dspy.Predict(SimpleSignature)
+            # Set instruction as docstring
+            if instruction:
+                DynamicSignature.__doc__ = instruction
+            else:
+                DynamicSignature.__doc__ = "Generate a response based on the input"
+            
+            # Add input fields dynamically
+            for key, value in inputs.items():
+                setattr(DynamicSignature, key, dspy.InputField())
+            
+            # Add a generic output field
+            setattr(DynamicSignature, 'output', dspy.OutputField())
+            
+            predictor = dspy.Predict(DynamicSignature)
             result = predictor(**inputs)
             return result.__dict__
             
         elif module_type == DSPyModuleType.CHAIN_OF_THOUGHT:
-            # Chain of thought module
-            class SimpleSignature(dspy.Signature):
-                """Chain of thought signature"""
-                input = dspy.InputField()
-                rationale = dspy.OutputField()
-                output = dspy.OutputField()
+            # Create dynamic signature with instruction
+            class DynamicSignature(dspy.Signature):
+                pass
             
-            cot = dspy.ChainOfThought(SimpleSignature)
+            # Set instruction as docstring
+            if instruction:
+                DynamicSignature.__doc__ = instruction
+            else:
+                DynamicSignature.__doc__ = "Think step by step to generate a response"
+            
+            # Add input fields dynamically
+            for key, value in inputs.items():
+                setattr(DynamicSignature, key, dspy.InputField())
+            
+            # Add rationale and output fields
+            setattr(DynamicSignature, 'rationale', dspy.OutputField(desc="Step-by-step reasoning"))
+            setattr(DynamicSignature, 'output', dspy.OutputField())
+            
+            cot = dspy.ChainOfThought(DynamicSignature)
             result = cot(**inputs)
             return result.__dict__
             
@@ -251,6 +294,10 @@ class WorkflowExecutionEngine:
         elif logic_type == DSPyLogicType.MERGE:
             # Simple merge - combine all inputs
             return inputs
+            
+        elif logic_type == DSPyLogicType.FIELD_SELECTOR:
+            # Field selection and filtering
+            return self._execute_field_selector(node, inputs)
         
         else:
             return inputs
@@ -275,6 +322,25 @@ class WorkflowExecutionEngine:
             return bool(eval(eval_string))
         except:
             return True  # Default to true if evaluation fails
+    
+    def _execute_field_selector(self, node: Any, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute field selection logic"""
+        selected_fields = node.data.get('selectedFields', [])
+        field_mappings = node.data.get('fieldMappings', {})
+        
+        if not selected_fields:
+            # If no fields are explicitly selected, pass through all inputs
+            return inputs
+        
+        # Filter inputs to only include selected fields
+        outputs = {}
+        for field_name in selected_fields:
+            if field_name in inputs:
+                # Use mapped name if provided, otherwise use original name
+                output_name = field_mappings.get(field_name, field_name)
+                outputs[output_name] = inputs[field_name]
+        
+        return outputs
     
     def _get_or_create_model(self, model_name: str, context: ExecutionContext) -> Any:
         """Get or create a model instance"""

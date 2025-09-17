@@ -25,12 +25,14 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
   const [isEditing, setIsEditing] = useState(false);
   const [moduleType, setModuleType] = useState<ModuleType>(data.moduleType || 'Predict');
   const [model, setModel] = useState(data.model || '');
+  const [instruction, setInstruction] = useState(data.instruction || '');
   const [parameters, setParameters] = useState(data.parameters || {});
   const { deleteElements } = useReactFlow();
 
   const handleSave = () => {
     data.moduleType = moduleType;
     data.model = model;
+    data.instruction = instruction;
     data.parameters = parameters;
     setIsEditing(false);
   };
@@ -122,6 +124,24 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
               />
             </div>
 
+            {/* Instruction */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Instruction <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                placeholder="Describe the task this module should perform..."
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                rows={3}
+                required
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                This will be used as the instruction for the DSPy signature
+              </div>
+            </div>
+
             {/* Parameters */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -185,6 +205,16 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
               </div>
             )}
 
+            {/* Instruction Display */}
+            {instruction && (
+              <div className="text-sm">
+                <span className="font-medium">Instruction:</span>
+                <div className="mt-1 p-2 bg-gray-50 rounded text-xs">
+                  {instruction}
+                </div>
+              </div>
+            )}
+
             {/* Parameters Display */}
             {Object.keys(parameters).length > 0 && (
               <div className="text-sm">
@@ -203,7 +233,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
               </div>
             )}
 
-            {!model && Object.keys(parameters).length === 0 && (
+            {!model && !instruction && Object.keys(parameters).length === 0 && (
               <div className="text-sm text-gray-500 text-center py-2">
                 No configuration
               </div>

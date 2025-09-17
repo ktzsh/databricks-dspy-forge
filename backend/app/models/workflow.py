@@ -59,7 +59,8 @@ class SignatureFieldNode(BaseNode):
     data: Dict[str, Any] = Field(default_factory=lambda: {
         "fields": [],
         "is_start": False,
-        "is_end": False
+        "is_end": False,
+        "connection_mode": "whole"  # "whole" or "field-level"
     })
 
 
@@ -68,6 +69,7 @@ class ModuleNode(BaseNode):
     data: Dict[str, Any] = Field(default_factory=lambda: {
         "module_type": None,
         "model": None,
+        "instruction": None,
         "parameters": {}
     })
 

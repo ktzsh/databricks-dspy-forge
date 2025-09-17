@@ -32,6 +32,7 @@ class DSPyLogicType(str, Enum):
     """Logic component types for workflow control flow"""
     IF_ELSE = "IfElse"
     MERGE = "Merge"
+    FIELD_SELECTOR = "FieldSelector"
     PARALLEL = "Parallel"
     SEQUENTIAL = "Sequential"
 
@@ -50,6 +51,7 @@ class ModuleDefinition(BaseModel):
     signature_input: str  # ID of input signature field node
     signature_output: str  # ID of output signature field node
     model: str = ""  # Language model name/identifier
+    instruction: str = ""  # Task instruction for DSPy signature
     parameters: Dict[str, Any] = {}
 
 
@@ -92,10 +94,14 @@ def dspy_type_to_python_type(dspy_type: DSPyFieldType) -> Type:
     return type_mapping.get(dspy_type, str)
 
 
-def create_dspy_signature(fields: List[SignatureFieldDefinition]) -> Type[dspy.Signature]:
-    """Dynamically create a DSPy signature from field definitions"""
+def create_dspy_signature(fields: List[SignatureFieldDefinition], instruction: str = "") -> Type[dspy.Signature]:
+    """Dynamically create a DSPy signature from field definitions and instruction"""
     
     class_attrs = {}
+    
+    # Add instruction as docstring if provided
+    if instruction:
+        class_attrs['__doc__'] = instruction
     
     for field in fields:
         python_type = dspy_type_to_python_type(field.type)

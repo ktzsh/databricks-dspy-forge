@@ -84,6 +84,10 @@ def validate_node(node: Any, workflow: Workflow) -> List[str]:
         model = node.data.get('model')
         if not model and module_type != DSPyModuleType.RETRIEVE:
             errors.append("Module must specify a model")
+            
+        instruction = node.data.get('instruction')
+        if not instruction:
+            errors.append("Module must specify an instruction")
     
     elif node.type == NodeType.LOGIC:
         # Validate logic component
@@ -95,6 +99,11 @@ def validate_node(node: Any, workflow: Workflow) -> List[str]:
             condition = node.data.get('condition')
             if not condition:
                 errors.append("If-Else logic must specify a condition")
+        elif logic_type == DSPyLogicType.FIELD_SELECTOR:
+            selected_fields = node.data.get('selectedFields', [])
+            if not selected_fields:
+                # This is a warning rather than an error - FieldSelector can pass through all fields
+                pass
     
     return errors
 

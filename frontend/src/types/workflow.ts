@@ -28,7 +28,7 @@ export type ModuleType =
   | 'BestOfN' 
   | 'Refine';
 
-export type LogicType = 'IfElse' | 'Merge';
+export type LogicType = 'IfElse' | 'Merge' | 'FieldSelector';
 
 export type NodeType = 'signature_field' | 'module' | 'logic';
 
@@ -40,11 +40,13 @@ export interface SignatureFieldNodeData extends BaseNodeData {
   fields: SignatureField[];
   isStart?: boolean;
   isEnd?: boolean;
+  connectionMode?: 'whole' | 'field-level'; // Toggle between connection modes
 }
 
 export interface ModuleNodeData extends BaseNodeData {
   moduleType: ModuleType;
   model?: string;
+  instruction?: string; // Task description for DSPy signature
   parameters: Record<string, any>;
 }
 
@@ -52,6 +54,10 @@ export interface LogicNodeData extends BaseNodeData {
   logicType: LogicType;
   condition?: string;
   parameters: Record<string, any>;
+  // FieldSelector specific data
+  selectedFields?: string[];
+  fieldMappings?: Record<string, string>; // old_name -> new_name
+  availableFields?: SignatureField[]; // Fields available from input
 }
 
 export interface WorkflowNode {

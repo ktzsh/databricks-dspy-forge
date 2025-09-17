@@ -10,6 +10,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
   const [fields, setFields] = useState<SignatureField[]>(data.fields || []);
   const [isStart, setIsStart] = useState(data.isStart || false);
   const [isEnd, setIsEnd] = useState(data.isEnd || false);
+  const [connectionMode, setConnectionMode] = useState<'whole' | 'field-level'>(data.connectionMode || 'whole');
   const { deleteElements } = useReactFlow();
 
   const addField = () => {
@@ -38,6 +39,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
     data.fields = fields;
     data.isStart = isStart;
     data.isEnd = isEnd;
+    data.connectionMode = connectionMode;
     setIsEditing(false);
   };
 
@@ -48,19 +50,50 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
   return (
     <div className={`signature-field-node min-w-[250px] ${selected ? 'node-selected' : ''}`}>
       {/* Handles */}
-      {!isStart && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="w-3 h-3 bg-blue-500"
-        />
-      )}
-      {!isEnd && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="w-3 h-3 bg-blue-500"
-        />
+      {connectionMode === 'whole' ? (
+        // Whole-node connection mode
+        <>
+          {!isStart && (
+            <Handle
+              type="target"
+              position={Position.Left}
+              className="w-3 h-3 bg-blue-500"
+            />
+          )}
+          {!isEnd && (
+            <Handle
+              type="source"
+              position={Position.Right}
+              className="w-3 h-3 bg-blue-500"
+            />
+          )}
+        </>
+      ) : (
+        // Field-level connection mode
+        <>
+          {!isStart && fields.map((field, index) => (
+            <Handle
+              key={`target-${field.name}`}
+              id={`target-${field.name}`}
+              type="target"
+              position={Position.Left}
+              style={{ top: `${120 + index * 40}px` }}
+              className="w-2 h-2 bg-blue-500"
+              title={`Input: ${field.name} (${field.type})`}
+            />
+          ))}
+          {!isEnd && fields.map((field, index) => (
+            <Handle
+              key={`source-${field.name}`}
+              id={`source-${field.name}`}
+              type="source"
+              position={Position.Right}
+              style={{ top: `${120 + index * 40}px` }}
+              className="w-2 h-2 bg-blue-500"
+              title={`Output: ${field.name} (${field.type})`}
+            />
+          ))}
+        </>
       )}
 
       {/* Header */}
@@ -111,6 +144,25 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
                 />
                 <span className="text-sm">End</span>
               </label>
+            </div>
+
+            {/* Connection Mode Settings */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Connection Mode</label>
+              <select
+                value={connectionMode}
+                onChange={(e) => setConnectionMode(e.target.value as 'whole' | 'field-level')}
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              >
+                <option value="whole">Whole Node (Simple)</option>
+                <option value="field-level">Field Level (Advanced)</option>
+              </select>
+              <div className="text-xs text-gray-500 mt-1">
+                {connectionMode === 'whole' 
+                  ? 'Connect entire signature as one unit'
+                  : 'Connect individual fields separately'
+                }
+              </div>
             </div>
 
             {/* Fields */}
@@ -185,12 +237,15 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
         ) : (
           <div className="space-y-2">
             {/* Node Type Indicators */}
-            <div className="flex space-x-2">
+            <div className="flex space-x-2 flex-wrap">
               {isStart && (
                 <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">Start</span>
               )}
               {isEnd && (
                 <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">End</span>
+              )}
+              {connectionMode === 'field-level' && (
+                <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">Field-Level</span>
               )}
             </div>
 
@@ -199,7 +254,12 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
               <div className="space-y-1">
                 {fields.map((field, index) => (
                   <div key={index} className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{field.name}</span>
+                    <div className="flex items-center space-x-2">
+                      {connectionMode === 'field-level' && (
+                        <div className="w-2 h-2 bg-blue-500 rounded-full" title="Individual connection handle"></div>
+                      )}
+                      <span className="font-medium">{field.name}</span>
+                    </div>
                     <span className="text-gray-500">{field.type}</span>
                   </div>
                 ))}
