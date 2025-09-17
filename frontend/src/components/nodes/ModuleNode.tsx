@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
-import { Edit3, Brain, Settings } from 'lucide-react';
+import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
+import { Edit3, Brain, Settings, Trash2 } from 'lucide-react';
 import { ModuleNodeData, ModuleType } from '../../types/workflow';
 
 const moduleTypes: ModuleType[] = [
@@ -21,17 +21,22 @@ const moduleIcons: Record<ModuleType, React.ReactNode> = {
   'Refine': <Brain size={16} className="text-indigo-600" />
 };
 
-const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected }) => {
+const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [moduleType, setModuleType] = useState<ModuleType>(data.moduleType || 'Predict');
   const [model, setModel] = useState(data.model || '');
   const [parameters, setParameters] = useState(data.parameters || {});
+  const { deleteElements } = useReactFlow();
 
   const handleSave = () => {
     data.moduleType = moduleType;
     data.model = model;
     data.parameters = parameters;
     setIsEditing(false);
+  };
+
+  const handleDelete = () => {
+    deleteElements({ nodes: [{ id }] });
   };
 
   const updateParameter = (key: string, value: any) => {
@@ -69,12 +74,22 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected }) => 
           {moduleIcons[moduleType] || <Brain size={16} className="text-green-600" />}
           <span className="font-medium text-green-800">{moduleType}</span>
         </div>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="p-1 hover:bg-green-200 rounded"
-        >
-          <Edit3 size={14} className="text-green-600" />
-        </button>
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="p-1 hover:bg-green-200 rounded"
+            title="Edit node"
+          >
+            <Edit3 size={14} className="text-green-600" />
+          </button>
+          <button
+            onClick={handleDelete}
+            className="p-1 hover:bg-red-200 rounded"
+            title="Delete node"
+          >
+            <Trash2 size={14} className="text-red-600" />
+          </button>
+        </div>
       </div>
 
       {/* Content */}

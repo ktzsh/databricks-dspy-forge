@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -26,11 +26,47 @@ const WorkflowBuilder: React.FC = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [workflowName, setWorkflowName] = useState('Untitled Workflow');
   const [isPlaygroundOpen, setIsPlaygroundOpen] = useState(true);
+  const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
+
+  // Handle node selection
+  const onSelectionChange = useCallback(
+    ({ nodes: selectedNodes }: { nodes: Node[] }) => {
+      setSelectedNodes(selectedNodes);
+    },
+    []
+  );
+
+  // Handle keyboard events for deletion
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (selectedNodes.length > 0) {
+          const selectedNodeIds = selectedNodes.map(node => node.id);
+          
+          // Remove selected nodes
+          setNodes((nds) => nds.filter(node => !selectedNodeIds.includes(node.id)));
+          
+          // Remove edges connected to deleted nodes
+          setEdges((eds) => eds.filter(edge => 
+            !selectedNodeIds.includes(edge.source) && 
+            !selectedNodeIds.includes(edge.target)
+          ));
+          
+          setSelectedNodes([]);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedNodes, setNodes, setEdges]);
 
   const handleSaveWorkflow = async () => {
     const workflow = {
@@ -138,10 +174,13 @@ const WorkflowBuilder: React.FC = () => {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onSelectionChange={onSelectionChange}
             nodeTypes={nodeTypes}
             fitView
             snapToGrid
             snapGrid={[20, 20]}
+            deleteKeyCode={null}
+            multiSelectionKeyCode={['Control', 'Meta']}
           >
             <Controls />
             <MiniMap />

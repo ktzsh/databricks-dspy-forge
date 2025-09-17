@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
-import { Plus, X, Edit3, Database } from 'lucide-react';
+import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
+import { Plus, X, Edit3, Database, Trash2 } from 'lucide-react';
 import { SignatureFieldNodeData, SignatureField, FieldType } from '../../types/workflow';
 
 const fieldTypes: FieldType[] = ['str', 'int', 'bool', 'float', 'list[str]', 'list[int]', 'dict', 'Any'];
 
-const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data, selected }) => {
+const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data, selected, id }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [fields, setFields] = useState<SignatureField[]>(data.fields || []);
   const [isStart, setIsStart] = useState(data.isStart || false);
   const [isEnd, setIsEnd] = useState(data.isEnd || false);
+  const { deleteElements } = useReactFlow();
 
   const addField = () => {
     const newField: SignatureField = {
@@ -40,6 +41,10 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
     setIsEditing(false);
   };
 
+  const handleDelete = () => {
+    deleteElements({ nodes: [{ id }] });
+  };
+
   return (
     <div className={`signature-field-node min-w-[250px] ${selected ? 'node-selected' : ''}`}>
       {/* Handles */}
@@ -64,12 +69,22 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
           <Database size={16} className="text-blue-600" />
           <span className="font-medium text-blue-800">Signature Field</span>
         </div>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="p-1 hover:bg-blue-200 rounded"
-        >
-          <Edit3 size={14} className="text-blue-600" />
-        </button>
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="p-1 hover:bg-blue-200 rounded"
+            title="Edit node"
+          >
+            <Edit3 size={14} className="text-blue-600" />
+          </button>
+          <button
+            onClick={handleDelete}
+            className="p-1 hover:bg-red-200 rounded"
+            title="Delete node"
+          >
+            <Trash2 size={14} className="text-red-600" />
+          </button>
+        </div>
       </div>
 
       {/* Content */}

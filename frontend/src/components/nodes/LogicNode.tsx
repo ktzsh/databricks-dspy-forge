@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
-import { Edit3, GitBranch, GitMerge } from 'lucide-react';
+import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
+import { Edit3, GitBranch, GitMerge, Trash2 } from 'lucide-react';
 import { LogicNodeData, LogicType } from '../../types/workflow';
 
 const logicTypes: LogicType[] = ['IfElse', 'Merge'];
@@ -10,17 +10,22 @@ const logicIcons: Record<LogicType, React.ReactNode> = {
   'Merge': <GitMerge size={16} className="text-purple-600" />
 };
 
-const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected }) => {
+const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [logicType, setLogicType] = useState<LogicType>(data.logicType || 'IfElse');
   const [condition, setCondition] = useState(data.condition || '');
   const [parameters, setParameters] = useState(data.parameters || {});
+  const { deleteElements } = useReactFlow();
 
   const handleSave = () => {
     data.logicType = logicType;
     data.condition = condition;
     data.parameters = parameters;
     setIsEditing(false);
+  };
+
+  const handleDelete = () => {
+    deleteElements({ nodes: [{ id }] });
   };
 
   const updateParameter = (key: string, value: any) => {
@@ -79,12 +84,22 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected }) => {
           {logicIcons[logicType] || <GitBranch size={16} className="text-purple-600" />}
           <span className="font-medium text-purple-800">{logicType}</span>
         </div>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="p-1 hover:bg-purple-200 rounded"
-        >
-          <Edit3 size={14} className="text-purple-600" />
-        </button>
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="p-1 hover:bg-purple-200 rounded"
+            title="Edit node"
+          >
+            <Edit3 size={14} className="text-purple-600" />
+          </button>
+          <button
+            onClick={handleDelete}
+            className="p-1 hover:bg-red-200 rounded"
+            title="Delete node"
+          >
+            <Trash2 size={14} className="text-red-600" />
+          </button>
+        </div>
       </div>
 
       {/* Content */}
