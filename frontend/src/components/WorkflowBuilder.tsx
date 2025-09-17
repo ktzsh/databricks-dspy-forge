@@ -27,37 +27,55 @@ const WorkflowBuilder: React.FC = () => {
   const [workflowName, setWorkflowName] = useState('Untitled Workflow');
   const [isPlaygroundOpen, setIsPlaygroundOpen] = useState(true);
   const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
+  const [selectedEdges, setSelectedEdges] = useState<Edge[]>([]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
 
-  // Handle node selection
+  // Handle selection changes (both nodes and edges)
   const onSelectionChange = useCallback(
-    ({ nodes: selectedNodes }: { nodes: Node[] }) => {
-      setSelectedNodes(selectedNodes);
+    ({ nodes: selectedNodes, edges: selectedEdges }: { nodes: Node[]; edges: Edge[] }) => {
+      setSelectedNodes(selectedNodes || []);
+      setSelectedEdges(selectedEdges || []);
     },
     []
   );
 
-  // Handle keyboard events for deletion
+  // Handle keyboard events for deletion (Delete key only, not Backspace)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        if (selectedNodes.length > 0) {
-          const selectedNodeIds = selectedNodes.map(node => node.id);
+      // Only handle Delete key, not Backspace to prevent accidental deletions
+      if (event.key === 'Delete') {
+        if (selectedNodes.length > 0 || selectedEdges.length > 0) {
+          event.preventDefault(); // Prevent any default browser behavior
           
-          // Remove selected nodes
-          setNodes((nds) => nds.filter(node => !selectedNodeIds.includes(node.id)));
+          // Delete selected nodes and their connected edges
+          if (selectedNodes.length > 0) {
+            const selectedNodeIds = selectedNodes.map(node => node.id);
+            
+            // Remove selected nodes
+            setNodes((nds) => nds.filter(node => !selectedNodeIds.includes(node.id)));
+            
+            // Remove edges connected to deleted nodes
+            setEdges((eds) => eds.filter(edge => 
+              !selectedNodeIds.includes(edge.source) && 
+              !selectedNodeIds.includes(edge.target)
+            ));
+          }
           
-          // Remove edges connected to deleted nodes
-          setEdges((eds) => eds.filter(edge => 
-            !selectedNodeIds.includes(edge.source) && 
-            !selectedNodeIds.includes(edge.target)
-          ));
+          // Delete selected edges
+          if (selectedEdges.length > 0) {
+            const selectedEdgeIds = selectedEdges.map(edge => edge.id);
+            
+            // Remove selected edges
+            setEdges((eds) => eds.filter(edge => !selectedEdgeIds.includes(edge.id)));
+          }
           
+          // Clear selections
           setSelectedNodes([]);
+          setSelectedEdges([]);
         }
       }
     };
@@ -66,7 +84,7 @@ const WorkflowBuilder: React.FC = () => {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedNodes, setNodes, setEdges]);
+  }, [selectedNodes, selectedEdges, setNodes, setEdges]);
 
   const handleSaveWorkflow = async () => {
     const workflow = {
