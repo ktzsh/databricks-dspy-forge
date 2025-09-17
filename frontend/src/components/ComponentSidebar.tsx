@@ -142,7 +142,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           id: 'unstructured-retrieve',
           name: 'Unstructured Retrieve',
           icon: Search,
-          description: 'Databricks vector search retrieval',
+          description: 'Databricks Vector Search',
           type: 'retriever',
           data: {
             retrieverType: 'UnstructuredRetrieve',
@@ -153,6 +153,18 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
             queryType: 'HYBRID',
             numResults: 3,
             scoreThreshold: 0.0,
+            parameters: {}
+          }
+        },
+        {
+          id: 'structured-retrieve',
+          name: 'Structured Retrieve',
+          icon: Database,
+          description: 'Databricks Genie Space',
+          type: 'retriever',
+          data: {
+            retrieverType: 'StructuredRetrieve',
+            genieSpaceId: '',
             parameters: {}
           }
         }

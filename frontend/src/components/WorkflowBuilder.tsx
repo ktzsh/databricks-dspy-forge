@@ -183,16 +183,30 @@ const WorkflowBuilder: React.FC = () => {
             data: nodeData.data,
           };
 
-          // Auto-connect retriever nodes to signature field with context output
+          // Auto-connect retriever nodes to signature field with appropriate output
           if (nodeData.type === 'retriever') {
-            // Create a signature field node with context output
+            // Create different signature fields based on retriever type
             const signatureNodeId = `node-${Date.now() + 1}`;
+            let signatureFields;
+            
+            if (nodeData.data.retrieverType === 'StructuredRetrieve') {
+              // StructuredRetrieve outputs specialized fields
+              signatureFields = [
+                { name: 'context', type: 'str', required: true, description: 'SQL results in markdown format' },
+                { name: 'sql_query', type: 'str', required: true, description: 'Generated SQL query' },
+                { name: 'query_description', type: 'str', required: true, description: 'Description of the generated SQL query' }
+              ];
+            } else {
+              // UnstructuredRetrieve outputs list of context strings
+              signatureFields = [{ name: 'context', type: 'list[str]', required: true }];
+            }
+            
             const signatureNode: Node = {
               id: signatureNodeId,
               type: 'signature_field',
               position: { x: 400, y: 100 },
               data: {
-                fields: [{ name: 'context', type: 'list[str]', required: true }],
+                fields: signatureFields,
                 isStart: false,
                 isEnd: false,
                 connection_mode: 'whole'

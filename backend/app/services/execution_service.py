@@ -346,18 +346,7 @@ class WorkflowExecutionEngine:
     async def _execute_retriever_node(self, node: Any, inputs: Dict[str, Any], context: ExecutionContext) -> Dict[str, Any]:
         """Execute a retriever node"""
         retriever_type = node.data.get('retriever_type')
-        catalog_name = node.data.get('catalog_name', '')
-        schema_name = node.data.get('schema_name', '')
-        index_name = node.data.get('index_name', '')
-        embedding_model = node.data.get('embedding_model')
-        query_type = node.data.get('query_type', 'HYBRID')
-        num_results = node.data.get('num_results', 3)
-        score_threshold = node.data.get('score_threshold', 0.0)
         parameters = node.data.get('parameters', {})
-        
-        # Validate mandatory fields
-        if not all([catalog_name, schema_name, index_name]):
-            raise ValueError("Retriever node requires catalog_name, schema_name, and index_name")
         
         # Extract query from inputs
         query = inputs.get('query', inputs.get('question', ''))
@@ -372,41 +361,94 @@ class WorkflowExecutionEngine:
             raise ValueError("No query found in inputs for retriever")
         
         try:
-            # TODO: Implement actual Databricks vector search integration
-            # For now, return mock data that matches expected format
-            
-            # Simulate retrieval results
-            mock_passages = [
-                f"Mock retrieved passage 1 for query: {query}",
-                f"Mock retrieved passage 2 for query: {query}",
-                f"Mock retrieved passage 3 for query: {query}"
-            ][:num_results]
-            
-            # Filter by score threshold if provided
-            mock_scores = [0.95, 0.89, 0.82][:num_results]
-            if score_threshold > 0:
-                filtered_results = [(passage, score) for passage, score in zip(mock_passages, mock_scores) if score >= score_threshold]
-                mock_passages = [p for p, s in filtered_results]
-                mock_scores = [s for p, s in filtered_results]
-            
-            return {
-                'context': mock_passages,  # Return as list[str] as expected by signature field
-                'passages': mock_passages,  # Keep for backwards compatibility
-                'scores': mock_scores,
-                'query': query,
-                'retriever_config': {
-                    'catalog': catalog_name,
-                    'schema': schema_name,
-                    'index': index_name,
-                    'embedding_model': embedding_model,
-                    'query_type': query_type,
-                    'num_results': len(mock_passages),
-                    'score_threshold': score_threshold
-                }
-            }
-            
+            if retriever_type == 'UnstructuredRetrieve':
+                return await self._execute_unstructured_retrieve(node, query, context)
+            elif retriever_type == 'StructuredRetrieve':
+                return await self._execute_structured_retrieve(node, query, context)
+            else:
+                raise ValueError(f"Unknown retriever type: {retriever_type}")
+                
         except Exception as e:
             raise ValueError(f"Retrieval failed: {str(e)}")
+    
+    async def _execute_unstructured_retrieve(self, node: Any, query: str, context: ExecutionContext) -> Dict[str, Any]:
+        """Execute UnstructuredRetrieve node"""
+        catalog_name = node.data.get('catalog_name', '')
+        schema_name = node.data.get('schema_name', '')
+        index_name = node.data.get('index_name', '')
+        embedding_model = node.data.get('embedding_model')
+        query_type = node.data.get('query_type', 'HYBRID')
+        num_results = node.data.get('num_results', 3)
+        score_threshold = node.data.get('score_threshold', 0.0)
+        
+        # Validate mandatory fields
+        if not all([catalog_name, schema_name, index_name]):
+            raise ValueError("UnstructuredRetrieve requires catalog_name, schema_name, and index_name")
+        
+        # TODO: Implement actual Databricks vector search integration
+        # Simulate retrieval results
+        mock_passages = [
+            f"Mock retrieved passage 1 for query: {query}",
+            f"Mock retrieved passage 2 for query: {query}",
+            f"Mock retrieved passage 3 for query: {query}"
+        ][:num_results]
+        
+        # Filter by score threshold if provided
+        mock_scores = [0.95, 0.89, 0.82][:num_results]
+        if score_threshold > 0:
+            filtered_results = [(passage, score) for passage, score in zip(mock_passages, mock_scores) if score >= score_threshold]
+            mock_passages = [p for p, s in filtered_results]
+            mock_scores = [s for p, s in filtered_results]
+        
+        return {
+            'context': mock_passages,  # Return as list[str] as expected by signature field
+            'passages': mock_passages,  # Keep for backwards compatibility
+            'scores': mock_scores,
+            'query': query,
+            'retriever_config': {
+                'catalog': catalog_name,
+                'schema': schema_name,
+                'index': index_name,
+                'embedding_model': embedding_model,
+                'query_type': query_type,
+                'num_results': len(mock_passages),
+                'score_threshold': score_threshold
+            }
+        }
+    
+    async def _execute_structured_retrieve(self, node: Any, query: str, context: ExecutionContext) -> Dict[str, Any]:
+        """Execute StructuredRetrieve node"""
+        genie_space_id = node.data.get('genie_space_id', '')
+        
+        # Validate mandatory fields
+        if not genie_space_id:
+            raise ValueError("StructuredRetrieve requires genie_space_id")
+        
+        # TODO: Implement actual Genie integration for SQL generation and execution
+        # Simulate SQL generation and execution results
+        mock_sql_query = f"SELECT * FROM sales_data WHERE description LIKE '%{query}%' ORDER BY date DESC LIMIT 10;"
+        mock_query_description = f"Searching for sales records related to '{query}', ordered by most recent first"
+        mock_sql_results = f"""
+| Date | Product | Sales | Region |
+|------|---------|-------|--------|
+| 2024-01-15 | Product A related to {query} | $1,500 | North |
+| 2024-01-14 | Product B matching {query} | $2,300 | South |
+| 2024-01-13 | Another item for {query} | $800 | East |
+
+**Total Records Found:** 3
+**Query Execution Time:** 0.45s
+        """.strip()
+        
+        return {
+            'context': mock_sql_results,  # SQL results in markdown format
+            'sql_query': mock_sql_query,  # Generated SQL query
+            'query_description': mock_query_description,  # Description of the generated SQL query
+            'query': query,
+            'retriever_config': {
+                'genie_space_id': genie_space_id,
+                'retriever_type': 'StructuredRetrieve'
+            }
+        }
     
     def _get_or_create_model(self, model_name: str, context: ExecutionContext) -> Any:
         """Get or create a model instance"""

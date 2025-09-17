@@ -27,7 +27,7 @@ export type ModuleType =
   | 'BestOfN' 
   | 'Refine';
 
-export type RetrieverType = 'UnstructuredRetrieve';
+export type RetrieverType = 'UnstructuredRetrieve' | 'StructuredRetrieve';
 
 export type LogicType = 'IfElse' | 'Merge' | 'FieldSelector';
 
@@ -63,13 +63,16 @@ export interface LogicNodeData extends BaseNodeData {
 
 export interface RetrieverNodeData extends BaseNodeData {
   retrieverType: RetrieverType;
-  catalogName: string; // Mandatory
-  schemaName: string; // Mandatory
-  indexName: string; // Mandatory
-  embeddingModel?: string; // Optional
-  queryType: 'HYBRID' | 'ANN'; // Default HYBRID
-  numResults: number; // Default 3
-  scoreThreshold?: number; // Default 0.0
+  // UnstructuredRetrieve specific fields
+  catalogName?: string; // Mandatory for UnstructuredRetrieve
+  schemaName?: string; // Mandatory for UnstructuredRetrieve
+  indexName?: string; // Mandatory for UnstructuredRetrieve
+  embeddingModel?: string; // Optional for UnstructuredRetrieve
+  queryType?: 'HYBRID' | 'ANN'; // Default HYBRID for UnstructuredRetrieve
+  numResults?: number; // Default 3 for UnstructuredRetrieve
+  scoreThreshold?: number; // Default 0.0 for UnstructuredRetrieve
+  // StructuredRetrieve specific fields
+  genieSpaceId?: string; // Mandatory for StructuredRetrieve
   parameters: Record<string, any>;
 }
 

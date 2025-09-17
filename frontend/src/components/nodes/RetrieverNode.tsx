@@ -3,11 +3,12 @@ import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { Edit3, Database, Trash2, Settings } from 'lucide-react';
 import { RetrieverNodeData, RetrieverType } from '../../types/workflow';
 
-const retrieverTypes: RetrieverType[] = ['UnstructuredRetrieve'];
+const retrieverTypes: RetrieverType[] = ['UnstructuredRetrieve', 'StructuredRetrieve'];
 
 const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected, id }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [retrieverType, setRetrieverType] = useState<RetrieverType>(data.retrieverType || 'UnstructuredRetrieve');
+  // UnstructuredRetrieve fields
   const [catalogName, setCatalogName] = useState(data.catalogName || '');
   const [schemaName, setSchemaName] = useState(data.schemaName || '');
   const [indexName, setIndexName] = useState(data.indexName || '');
@@ -15,12 +16,15 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
   const [queryType, setQueryType] = useState<'HYBRID' | 'ANN'>(data.queryType || 'HYBRID');
   const [numResults, setNumResults] = useState(data.numResults || 3);
   const [scoreThreshold, setScoreThreshold] = useState(data.scoreThreshold || 0.0);
+  // StructuredRetrieve fields
+  const [genieSpaceId, setGenieSpaceId] = useState(data.genieSpaceId || '');
   const [parameters, setParameters] = useState(data.parameters || {});
   
   const { deleteElements } = useReactFlow();
 
   const handleSave = () => {
     data.retrieverType = retrieverType;
+    // Save UnstructuredRetrieve fields
     data.catalogName = catalogName;
     data.schemaName = schemaName;
     data.indexName = indexName;
@@ -28,6 +32,8 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
     data.queryType = queryType;
     data.numResults = numResults;
     data.scoreThreshold = scoreThreshold;
+    // Save StructuredRetrieve fields
+    data.genieSpaceId = genieSpaceId;
     data.parameters = parameters;
     setIsEditing(false);
   };
@@ -107,102 +113,125 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
               </select>
             </div>
 
-            {/* Mandatory Fields */}
-            <div className="space-y-2">
+            {/* Conditional Fields based on Retriever Type */}
+            {retrieverType === 'UnstructuredRetrieve' && (
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Catalog Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={catalogName}
+                    onChange={(e) => setCatalogName(e.target.value)}
+                    placeholder="Enter catalog name"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Schema Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={schemaName}
+                    onChange={(e) => setSchemaName(e.target.value)}
+                    placeholder="Enter schema name"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Index Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={indexName}
+                    onChange={(e) => setIndexName(e.target.value)}
+                    placeholder="Enter index name"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            {retrieverType === 'StructuredRetrieve' && (
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Catalog Name <span className="text-red-500">*</span>
+                  Genie Space ID <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  value={catalogName}
-                  onChange={(e) => setCatalogName(e.target.value)}
-                  placeholder="Enter catalog name"
+                  value={genieSpaceId}
+                  onChange={(e) => setGenieSpaceId(e.target.value)}
+                  placeholder="Enter Genie Space ID"
                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                   required
                 />
               </div>
+            )}
 
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Schema Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={schemaName}
-                  onChange={(e) => setSchemaName(e.target.value)}
-                  placeholder="Enter schema name"
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                  required
-                />
-              </div>
+            {/* UnstructuredRetrieve specific options */}
+            {retrieverType === 'UnstructuredRetrieve' && (
+              <>
+                {/* Optional Embedding Model */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Embedding Model</label>
+                  <input
+                    type="text"
+                    value={embeddingModel}
+                    onChange={(e) => setEmbeddingModel(e.target.value)}
+                    placeholder="e.g., text-embedding-ada-002"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Index Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={indexName}
-                  onChange={(e) => setIndexName(e.target.value)}
-                  placeholder="Enter index name"
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                  required
-                />
-              </div>
-            </div>
+                {/* Query Type */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Query Type</label>
+                  <select
+                    value={queryType}
+                    onChange={(e) => setQueryType(e.target.value as 'HYBRID' | 'ANN')}
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="HYBRID">HYBRID</option>
+                    <option value="ANN">ANN</option>
+                  </select>
+                </div>
 
-            {/* Optional Embedding Model */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Embedding Model</label>
-              <input
-                type="text"
-                value={embeddingModel}
-                onChange={(e) => setEmbeddingModel(e.target.value)}
-                placeholder="e.g., text-embedding-ada-002"
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              />
-            </div>
+                {/* Number of Results */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Number of Results</label>
+                  <input
+                    type="number"
+                    value={numResults}
+                    onChange={(e) => setNumResults(parseInt(e.target.value) || 3)}
+                    min="1"
+                    max="100"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                  />
+                </div>
 
-            {/* Query Type */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Query Type</label>
-              <select
-                value={queryType}
-                onChange={(e) => setQueryType(e.target.value as 'HYBRID' | 'ANN')}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="HYBRID">HYBRID</option>
-                <option value="ANN">ANN</option>
-              </select>
-            </div>
-
-            {/* Number of Results */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Number of Results</label>
-              <input
-                type="number"
-                value={numResults}
-                onChange={(e) => setNumResults(parseInt(e.target.value) || 3)}
-                min="1"
-                max="100"
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              />
-            </div>
-
-            {/* Score Threshold */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Score Threshold</label>
-              <input
-                type="number"
-                value={scoreThreshold}
-                onChange={(e) => setScoreThreshold(parseFloat(e.target.value) || 0.0)}
-                min="0"
-                max="1"
-                step="0.1"
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              />
-            </div>
+                {/* Score Threshold */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Score Threshold</label>
+                  <input
+                    type="number"
+                    value={scoreThreshold}
+                    onChange={(e) => setScoreThreshold(parseFloat(e.target.value) || 0.0)}
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                  />
+                </div>
+              </>
+            )}
 
             {/* Additional Parameters */}
             <div>
@@ -261,36 +290,47 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
           <div className="space-y-2">
             {/* Configuration Display */}
             <div className="text-sm space-y-1">
-              <div className="flex justify-between">
-                <span className="font-medium">Catalog:</span>
-                <span className="text-gray-600">{catalogName || 'Not set'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Schema:</span>
-                <span className="text-gray-600">{schemaName || 'Not set'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Index:</span>
-                <span className="text-gray-600">{indexName || 'Not set'}</span>
-              </div>
-              {embeddingModel && (
-                <div className="flex justify-between">
-                  <span className="font-medium">Model:</span>
-                  <span className="text-gray-600">{embeddingModel}</span>
-                </div>
+              {retrieverType === 'UnstructuredRetrieve' && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Catalog:</span>
+                    <span className="text-gray-600">{catalogName || 'Not set'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Schema:</span>
+                    <span className="text-gray-600">{schemaName || 'Not set'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Index:</span>
+                    <span className="text-gray-600">{indexName || 'Not set'}</span>
+                  </div>
+                  {embeddingModel && (
+                    <div className="flex justify-between">
+                      <span className="font-medium">Model:</span>
+                      <span className="text-gray-600">{embeddingModel}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="font-medium">Query Type:</span>
+                    <span className="text-gray-600">{queryType}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Results:</span>
+                    <span className="text-gray-600">{numResults}</span>
+                  </div>
+                  {scoreThreshold > 0 && (
+                    <div className="flex justify-between">
+                      <span className="font-medium">Threshold:</span>
+                      <span className="text-gray-600">{scoreThreshold}</span>
+                    </div>
+                  )}
+                </>
               )}
-              <div className="flex justify-between">
-                <span className="font-medium">Query Type:</span>
-                <span className="text-gray-600">{queryType}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Results:</span>
-                <span className="text-gray-600">{numResults}</span>
-              </div>
-              {scoreThreshold > 0 && (
+              
+              {retrieverType === 'StructuredRetrieve' && (
                 <div className="flex justify-between">
-                  <span className="font-medium">Threshold:</span>
-                  <span className="text-gray-600">{scoreThreshold}</span>
+                  <span className="font-medium">Genie Space ID:</span>
+                  <span className="text-gray-600">{genieSpaceId || 'Not set'}</span>
                 </div>
               )}
             </div>
@@ -313,9 +353,15 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
               </div>
             )}
 
-            {!catalogName && !schemaName && !indexName && (
+            {retrieverType === 'UnstructuredRetrieve' && !catalogName && !schemaName && !indexName && (
               <div className="text-sm text-gray-500 text-center py-2">
                 Configure retriever settings
+              </div>
+            )}
+            
+            {retrieverType === 'StructuredRetrieve' && !genieSpaceId && (
+              <div className="text-sm text-gray-500 text-center py-2">
+                Configure Genie Space ID
               </div>
             )}
           </div>

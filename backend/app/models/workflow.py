@@ -37,6 +37,7 @@ class ModuleType(str, Enum):
 
 class RetrieverType(str, Enum):
     UNSTRUCTURED_RETRIEVE = "UnstructuredRetrieve"
+    STRUCTURED_RETRIEVE = "StructuredRetrieve"
 
 
 class LogicType(str, Enum):
@@ -95,13 +96,16 @@ class RetrieverNode(BaseNode):
     type: Literal[NodeType.RETRIEVER] = NodeType.RETRIEVER
     data: Dict[str, Any] = Field(default_factory=lambda: {
         "retriever_type": None,
-        "catalog_name": "",
-        "schema_name": "", 
-        "index_name": "",
+        # UnstructuredRetrieve fields
+        "catalog_name": None,
+        "schema_name": None, 
+        "index_name": None,
         "embedding_model": None,
         "query_type": "HYBRID",
         "num_results": 3,
         "score_threshold": 0.0,
+        # StructuredRetrieve fields
+        "genie_space_id": None,
         "parameters": {}
     })
 
