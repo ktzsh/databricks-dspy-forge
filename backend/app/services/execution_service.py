@@ -234,15 +234,23 @@ class WorkflowExecutionEngine:
                     module_var_name = module_instance[0]
                     result_counter += 1
                     
+                    # Get model name for this module
+                    model_name = node.data.get('model', 'default')
+                    
                     # Get inputs for this module
                     input_fields = self._get_expected_input_fields(node, context)
                     if not input_fields:
                         input_fields = start_fields
                     
-                    # Generate module call with simple numbering
+                    # Generate module call with dspy.context and simple numbering
                     result_var = f"result_{result_counter}"
                     input_args = ", ".join([f"{field}={field}" for field in input_fields])
-                    code_lines.append(f"        {result_var} = self.{module_var_name}({input_args})")
+                    
+                    if model_name and model_name != 'default':
+                        code_lines.append(f"        with dspy.context(lm=dspy.LM('databricks/{model_name}')):")
+                        code_lines.append(f"            {result_var} = self.{module_var_name}({input_args})")
+                    else:
+                        code_lines.append(f"        {result_var} = self.{module_var_name}({input_args})")
                     
                     # Extract outputs
                     output_fields = self._get_expected_output_fields(node, context)
