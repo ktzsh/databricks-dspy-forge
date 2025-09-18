@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_file: Optional[str] = "./logs/app.log"
     
+    # Debug settings
+    debug_compiler: bool = True
+    artifacts_path: str = "./artifacts"
+    
     # Workflow storage configuration
     storage_backend: Literal["local", "databricks"] = "local"
     

@@ -173,7 +173,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
   ];
 
   return (
-    <div className="component-sidebar">
+    <div className="h-full">
       <div className="p-4">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Components</h2>
         

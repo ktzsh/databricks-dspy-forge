@@ -33,7 +33,7 @@ const WorkflowBuilder: React.FC = () => {
   const [isWorkflowListOpen, setIsWorkflowListOpen] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<Edge[]>([]);
-  const { toasts, removeToast, showSuccess, showError, showWarning } = useToast();
+  const { toasts, removeToast, showSuccess, showError } = useToast();
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -285,9 +285,10 @@ const WorkflowBuilder: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Components */}
-        <ComponentSidebar onAddNode={(nodeData) => {
+        <div className="w-80 border-r border-gray-200 bg-gray-50 flex-shrink-0 overflow-y-auto">
+          <ComponentSidebar onAddNode={(nodeData) => {
           const newNodeId = `node-${Date.now()}`;
           const newNode: Node = {
             id: newNodeId,
@@ -341,9 +342,10 @@ const WorkflowBuilder: React.FC = () => {
             setNodes((nds) => [...nds, newNode]);
           }
         }} />
+        </div>
 
         {/* Main Canvas */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative overflow-hidden">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -366,13 +368,16 @@ const WorkflowBuilder: React.FC = () => {
 
         {/* Right Sidebar - Playground */}
         {isPlaygroundOpen && (
-          <PlaygroundSidebar
-            onClose={() => setIsPlaygroundOpen(false)}
-            onExecute={(inputData) => {
-              console.log('Executing with input:', inputData);
-              // TODO: Implement execution
-            }}
-          />
+          <div className="w-96 border-l border-gray-200 bg-gray-50 flex-shrink-0 overflow-y-auto">
+            <PlaygroundSidebar
+              workflowId={workflowId}
+              onClose={() => setIsPlaygroundOpen(false)}
+              onExecute={(inputData) => {
+                console.log('Executing with input:', inputData);
+                // TODO: Implement execution
+              }}
+            />
+          </div>
         )}
       </div>
       

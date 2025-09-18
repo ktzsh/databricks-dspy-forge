@@ -5,11 +5,18 @@ from pydantic import BaseModel
 from app.models.workflow import WorkflowExecution
 from app.services.workflow_service import workflow_service
 from app.services.execution_service import execution_engine
+from app.core.logging import get_logger
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 class ExecutionRequest(BaseModel):
+    input_data: Dict[str, Any]
+
+
+class PlaygroundExecutionRequest(BaseModel):
+    workflow_id: str
     input_data: Dict[str, Any]
 
 
@@ -17,7 +24,7 @@ class ExecutionRequest(BaseModel):
 async def run_workflow(workflow_id: str, execution_request: ExecutionRequest, background_tasks: BackgroundTasks):
     """Execute a workflow with given input data"""
     # Get workflow
-    workflow = workflow_service.get_workflow(workflow_id)
+    workflow = await workflow_service.get_workflow(workflow_id)
     if not workflow:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -114,7 +121,7 @@ async def cancel_execution(execution_id: str):
 @router.post("/validate/{workflow_id}")
 async def validate_workflow_for_execution(workflow_id: str):
     """Validate if a workflow can be executed"""
-    workflow = workflow_service.get_workflow(workflow_id)
+    workflow = await workflow_service.get_workflow(workflow_id)
     if not workflow:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -148,4 +155,64 @@ async def validate_workflow_for_execution(workflow_id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to validate workflow: {str(e)}"
+        )
+
+
+@router.post("/playground")
+async def execute_workflow_playground(request: PlaygroundExecutionRequest):
+    """Execute a workflow from the playground interface"""
+    try:
+        logger.info(f"Playground execution request for workflow: {request.workflow_id}")
+        logger.debug(f"Input data: {request.input_data}")
+        
+        # Get workflow
+        workflow = await workflow_service.get_workflow(request.workflow_id)
+        if not workflow:
+            logger.error(f"Workflow not found: {request.workflow_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow not found"
+            )
+        
+        logger.debug(f"Workflow nodes: {[n.id for n in workflow.nodes]}")
+        logger.debug(f"Workflow edges: {[(e.source, e.target) for e in workflow.edges]}")
+        
+        # Execute workflow directly
+        logger.debug("Executing workflow")
+        execution = await execution_engine.execute_workflow(workflow, request.input_data)
+        
+        logger.info(f"Execution completed with status: {execution.status}")
+        if execution.error:
+            logger.error(f"Execution error details: {execution.error}")
+        if execution.result:
+            logger.debug(f"Execution result: {execution.result}")
+        
+        # Check if execution failed and return 500 error
+        if execution.status == "failed":
+            logger.error(f"Workflow execution failed for {request.workflow_id}: {execution.error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Workflow execution failed: {execution.error}"
+            )
+        
+        # Prepare successful response
+        response = {
+            "success": True,
+            "execution_id": execution.execution_id,
+            "status": execution.status,
+            "result": execution.result,
+            "error": None
+        }
+        
+        logger.info(f"Playground execution completed successfully for workflow: {request.workflow_id}")
+        return response
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.error(f"Playground execution failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Playground execution failed: {str(e)}"
         )

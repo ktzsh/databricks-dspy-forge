@@ -3,8 +3,12 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 import asyncio
 import dspy
+import os
+import inspect
 
 from app.models.workflow import Workflow, WorkflowExecution, NodeType
+from app.core.config import settings
+from app.core.logging import get_logger
 from app.core.dspy_types import (
     create_dspy_signature, 
     get_module_class, 
@@ -24,6 +28,8 @@ from app.utils.workflow_utils import (
     get_node_dependents
 )
 
+logger = get_logger(__name__)
+
 
 class ExecutionContext:
     """Context for workflow execution"""
@@ -33,6 +39,7 @@ class ExecutionContext:
         self.node_outputs: Dict[str, Dict[str, Any]] = {}
         self.execution_trace: List[Dict[str, Any]] = []
         self.models: Dict[str, Any] = {}
+        self.node_counts: Dict[str, int] = {}  # Track count of each module type
         
     def set_node_output(self, node_id: str, output: Dict[str, Any]):
         """Set output for a node"""
@@ -59,6 +66,115 @@ class WorkflowExecutionEngine:
     
     def __init__(self):
         self.active_executions: Dict[str, WorkflowExecution] = {}
+    
+    
+    def _save_workflow_code(self, workflow_id: str, workflow_code: str):
+        """Save optimized workflow code to artifacts directory when debug_compiler is enabled"""
+        if not settings.debug_compiler:
+            return
+            
+        try:
+            # Create artifacts directory if it doesn't exist
+            artifacts_dir = os.path.join(settings.artifacts_path, "workflows", workflow_id)
+            os.makedirs(artifacts_dir, exist_ok=True)
+            
+            # Save the workflow code
+            filename = "workflow.py"
+            filepath = os.path.join(artifacts_dir, filename)
+            
+            with open(filepath, 'w') as f:
+                f.write(f"# DSPy Workflow: {workflow_id}\n")
+                f.write(f"# Generated at: {datetime.now().isoformat()}\n\n")
+                f.write(workflow_code)
+            
+            logger.info(f"Workflow code saved to: {filepath}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save workflow code: {str(e)}")
+    
+    def _generate_workflow_code(self, context: ExecutionContext) -> str:
+        """Generate optimized workflow code from execution context"""
+        code_lines = ["import dspy", ""]
+        
+        # Extract all modules from the workflow
+        module_nodes = [node for node in context.workflow.nodes if node.type == NodeType.MODULE]
+        signatures_created = set()
+        node_counts = {}
+        
+        # Generate unique signatures first
+        for node in module_nodes:
+            module_type_str = node.data.get('module_type', 'Unknown')
+            instruction = node.data.get('instruction', '')
+            
+            # Get input and output fields from connected signature nodes
+            input_fields = self._get_expected_input_fields(node, context)
+            if not input_fields:
+                input_fields = ['input']
+            output_fields = self._get_expected_output_fields(node, context)
+            if not output_fields:
+                output_fields = ['output']
+            
+            # Create signature key for deduplication
+            signature_key = (module_type_str, tuple(input_fields), tuple(output_fields), instruction)
+            
+            if signature_key not in signatures_created:
+                signatures_created.add(signature_key)
+                
+                # Generate unique signature name
+                signature_name = f"{module_type_str}Signature"
+                if len([s for s in signatures_created if s[0] == module_type_str]) > 1:
+                    signature_name += f"_{len([s for s in signatures_created if s[0] == module_type_str])}"
+                
+                # Add signature class
+                code_lines.append(f"class {signature_name}(dspy.Signature):")
+                if instruction:
+                    code_lines.append(f'    """{instruction}"""')
+                
+                for field_name in input_fields:
+                    code_lines.append(f"    {field_name} = dspy.InputField()")
+                
+                if module_type_str == "ChainOfThought":
+                    code_lines.append(f"    rationale = dspy.OutputField(desc='Step-by-step reasoning')")
+                    
+                for field_name in output_fields:
+                    code_lines.append(f"    {field_name} = dspy.OutputField()")
+                
+                code_lines.append("")
+        
+        code_lines.append("# Module instances")
+        
+        # Generate module instances
+        for node in module_nodes:
+            module_type_str = node.data.get('module_type', 'Unknown')
+            node_counts[module_type_str] = node_counts.get(module_type_str, 0) + 1
+            node_index = node_counts[module_type_str]
+            
+            # Find matching signature
+            instruction = node.data.get('instruction', '')
+            input_fields = self._get_expected_input_fields(node, context)
+            if not input_fields:
+                input_fields = ['input']
+            output_fields = self._get_expected_output_fields(node, context)
+            if not output_fields:
+                output_fields = ['output']
+            
+            signature_key = (module_type_str, tuple(input_fields), tuple(output_fields), instruction)
+            signature_index = list(signatures_created).index(signature_key) + 1
+            
+            signature_name = f"{module_type_str}Signature"
+            if len([s for s in signatures_created if s[0] == module_type_str]) > 1:
+                signature_name += f"_{signature_index}"
+            
+            # Add module instantiation with cleaner naming
+            module_var_name = f"{module_type_str.lower()}_{node_index}"
+            
+            if module_type_str == "Predict":
+                code_lines.append(f"{module_var_name} = dspy.Predict({signature_name})")
+            elif module_type_str == "ChainOfThought":
+                code_lines.append(f"{module_var_name} = dspy.ChainOfThought({signature_name})")
+        
+        return '\n'.join(code_lines)
+    
     
     async def execute_workflow(self, workflow: Workflow, input_data: Dict[str, Any]) -> WorkflowExecution:
         """Execute a workflow with given input data"""
@@ -95,6 +211,11 @@ class WorkflowExecutionEngine:
             
             execution.result = final_outputs
             execution.status = "completed"
+            
+            # Generate workflow code if debug_compiler is enabled
+            if settings.debug_compiler:
+                workflow_code = self._generate_workflow_code(context)
+                self._save_workflow_code(workflow.id, workflow_code)
             
         except Exception as e:
             execution.error = str(e)
@@ -178,19 +299,73 @@ class WorkflowExecutionEngine:
         fields = node.data.get('fields', [])
         outputs = {}
         
-        # Validate and pass through inputs
+        # Check if this is a start node or end node
+        is_start = node.data.get('is_start', False) or node.data.get('isStart', False)
+        is_end = node.data.get('is_end', False) or node.data.get('isEnd', False)
+        
+        # For start nodes, validate that required fields are present
+        # For end nodes, just pass through whatever is available
         for field_data in fields:
             field_name = field_data.get('name')
             field_type = field_data.get('type', 'str')
             required = field_data.get('required', True)
             
             if field_name in inputs:
-                # TODO: Add type validation here
+                # Field is available, pass it through
                 outputs[field_name] = inputs[field_name]
-            elif required:
-                raise ValueError(f"Required field '{field_name}' not found in inputs")
+            elif required and is_start:
+                # Only enforce required fields for start nodes
+                raise ValueError(f"Required field '{field_name}' not found in inputs for start node")
+            elif is_end:
+                # For end nodes, if field is not in inputs, it might be generated by modules
+                # Don't fail, just continue - the field might not be needed
+                continue
+        
+        # If no outputs were generated for an end node, pass through all inputs
+        if is_end and not outputs:
+            outputs = inputs.copy()
         
         return outputs
+    
+    def _get_expected_input_fields(self, node: Any, context: ExecutionContext) -> List[str]:
+        """Get expected input field names from connected signature field nodes"""
+        input_fields = []
+        
+        # Find incoming edges to this node
+        incoming_edges = [edge for edge in context.workflow.edges if edge.target == node.id]
+        
+        for edge in incoming_edges:
+            # Find the source node
+            source_node = next((n for n in context.workflow.nodes if n.id == edge.source), None)
+            if source_node and source_node.type == NodeType.SIGNATURE_FIELD:
+                # Get field names from the source signature field
+                fields = source_node.data.get('fields', [])
+                for field_data in fields:
+                    field_name = field_data.get('name')
+                    if field_name and field_name not in input_fields:
+                        input_fields.append(field_name)
+        
+        return input_fields
+    
+    def _get_expected_output_fields(self, node: Any, context: ExecutionContext) -> List[str]:
+        """Get expected output field names from connected signature field nodes"""
+        output_fields = []
+        
+        # Find outgoing edges from this node
+        outgoing_edges = [edge for edge in context.workflow.edges if edge.source == node.id]
+        
+        for edge in outgoing_edges:
+            # Find the target node
+            target_node = next((n for n in context.workflow.nodes if n.id == edge.target), None)
+            if target_node and target_node.type == NodeType.SIGNATURE_FIELD:
+                # Get field names from the target signature field
+                fields = target_node.data.get('fields', [])
+                for field_data in fields:
+                    field_name = field_data.get('name')
+                    if field_name and field_name not in output_fields:
+                        output_fields.append(field_name)
+        
+        return output_fields
     
     async def _execute_module_node(self, node: Any, inputs: Dict[str, Any], context: ExecutionContext) -> Dict[str, Any]:
         """Execute a DSPy module node"""
@@ -214,6 +389,10 @@ class WorkflowExecutionEngine:
         # In a real implementation, this would be derived from connected signature nodes
         
         if module_type == DSPyModuleType.PREDICT:
+            # Track node count for indexing
+            context.node_counts[module_type_str] = context.node_counts.get(module_type_str, 0) + 1
+            node_index = context.node_counts[module_type_str]
+            
             # Create dynamic signature with instruction
             class DynamicSignature(dspy.Signature):
                 pass
@@ -224,18 +403,32 @@ class WorkflowExecutionEngine:
             else:
                 DynamicSignature.__doc__ = "Generate a response based on the input"
             
+            # Get input and output fields from connected signature nodes
+            input_fields = self._get_expected_input_fields(node, context)
+            if not input_fields:
+                input_fields = ['input']
+            output_fields = self._get_expected_output_fields(node, context)
+            if not output_fields:
+                output_fields = ['output']
+            
             # Add input fields dynamically
-            for key, value in inputs.items():
+            for key in input_fields:
                 setattr(DynamicSignature, key, dspy.InputField())
             
-            # Add a generic output field
-            setattr(DynamicSignature, 'output', dspy.OutputField())
+            # Add output fields dynamically
+            for field_name in output_fields:
+                setattr(DynamicSignature, field_name, dspy.OutputField())
+            
             
             predictor = dspy.Predict(DynamicSignature)
             result = predictor(**inputs)
             return result.__dict__
             
         elif module_type == DSPyModuleType.CHAIN_OF_THOUGHT:
+            # Track node count for indexing
+            context.node_counts[module_type_str] = context.node_counts.get(module_type_str, 0) + 1
+            node_index = context.node_counts[module_type_str]
+            
             # Create dynamic signature with instruction
             class DynamicSignature(dspy.Signature):
                 pass
@@ -246,13 +439,25 @@ class WorkflowExecutionEngine:
             else:
                 DynamicSignature.__doc__ = "Think step by step to generate a response"
             
+            # Get input and output fields from connected signature nodes
+            input_fields = self._get_expected_input_fields(node, context)
+            if not input_fields:
+                input_fields = ['input']
+            output_fields = self._get_expected_output_fields(node, context)
+            if not output_fields:
+                output_fields = ['output']
+            
             # Add input fields dynamically
-            for key, value in inputs.items():
+            for key in input_fields:
                 setattr(DynamicSignature, key, dspy.InputField())
             
-            # Add rationale and output fields
+            # Add rationale field for chain of thought
             setattr(DynamicSignature, 'rationale', dspy.OutputField(desc="Step-by-step reasoning"))
-            setattr(DynamicSignature, 'output', dspy.OutputField())
+            
+            # Add expected output fields
+            for field_name in output_fields:
+                setattr(DynamicSignature, field_name, dspy.OutputField())
+            
             
             cot = dspy.ChainOfThought(DynamicSignature)
             result = cot(**inputs)

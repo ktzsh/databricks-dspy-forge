@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Edit3, Copy, Trash2, Download, Calendar, Clock } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Edit3, Copy, Trash2, Download, Calendar, Clock } from 'lucide-react';
 import { WorkflowNode, WorkflowEdge } from '../types/workflow';
 import { useToast } from '../hooks/useToast';
 
@@ -25,11 +25,7 @@ const WorkflowList: React.FC<WorkflowListProps> = ({ onLoadWorkflow, onClose }) 
   const [deleteConfirm, setDeleteConfirm] = useState<{workflowId: string, workflowName: string} | null>(null);
   const { showSuccess, showError } = useToast();
 
-  useEffect(() => {
-    fetchWorkflows();
-  }, []);
-
-  const fetchWorkflows = async () => {
+  const fetchWorkflows = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/v1/workflows/');
@@ -45,7 +41,11 @@ const WorkflowList: React.FC<WorkflowListProps> = ({ onLoadWorkflow, onClose }) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
+
+  useEffect(() => {
+    fetchWorkflows();
+  }, [fetchWorkflows]);
 
   const handleLoadWorkflow = (workflow: SavedWorkflow) => {
     onLoadWorkflow(workflow);
