@@ -25,7 +25,7 @@ def validate_workflow(workflow: Workflow) -> List[str]:
     # Check for at least one start node
     start_nodes = [
         node for node in workflow.nodes 
-        if node.type == NodeType.SIGNATURE_FIELD and node.data.get('is_start', False)
+        if node.type == NodeType.SIGNATURE_FIELD and (node.data.get('is_start', False) or node.data.get('isStart', False))
     ]
     
     if not start_nodes:
@@ -34,7 +34,7 @@ def validate_workflow(workflow: Workflow) -> List[str]:
     # Check for at least one end node
     end_nodes = [
         node for node in workflow.nodes 
-        if node.type == NodeType.SIGNATURE_FIELD and node.data.get('is_end', False)
+        if node.type == NodeType.SIGNATURE_FIELD and (node.data.get('is_end', False) or node.data.get('isEnd', False))
     ]
     
     if not end_nodes:
@@ -80,14 +80,20 @@ def validate_node(node: Any, workflow: Workflow) -> List[str]:
         module_type = node.data.get('module_type')
         if not module_type:
             errors.append("Module must specify a module type")
-        
-        model = node.data.get('model')
-        if not model and module_type != DSPyModuleType.RETRIEVE:
-            errors.append("Module must specify a model")
-            
-        instruction = node.data.get('instruction')
-        if not instruction:
-            errors.append("Module must specify an instruction")
+        else:
+            try:
+                # Validate module_type is a valid enum value
+                DSPyModuleType(module_type)
+                
+                model = node.data.get('model')
+                if not model and module_type != DSPyModuleType.RETRIEVE:
+                    errors.append("Module must specify a model")
+                    
+                instruction = node.data.get('instruction')
+                if not instruction:
+                    errors.append("Module must specify an instruction")
+            except ValueError:
+                errors.append(f"Invalid module type: {module_type}")
     
     elif node.type == NodeType.LOGIC:
         # Validate logic component
@@ -219,7 +225,7 @@ def find_start_nodes(workflow: Workflow) -> List[str]:
     
     for node in workflow.nodes:
         if (node.type == NodeType.SIGNATURE_FIELD and 
-            node.data.get('is_start', False)):
+            (node.data.get('is_start', False) or node.data.get('isStart', False))):
             start_nodes.append(node.id)
     
     return start_nodes
@@ -231,7 +237,7 @@ def find_end_nodes(workflow: Workflow) -> List[str]:
     
     for node in workflow.nodes:
         if (node.type == NodeType.SIGNATURE_FIELD and 
-            node.data.get('is_end', False)):
+            (node.data.get('is_end', False) or node.data.get('isEnd', False))):
             end_nodes.append(node.id)
     
     return end_nodes

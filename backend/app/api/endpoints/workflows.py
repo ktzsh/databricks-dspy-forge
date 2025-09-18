@@ -5,8 +5,10 @@ from pydantic import BaseModel
 from app.models.workflow import Workflow
 from app.services.workflow_service import workflow_service
 from app.utils.workflow_utils import WorkflowValidationError
+from app.core.logging import get_logger
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 class WorkflowCreateRequest(BaseModel):
@@ -27,15 +29,22 @@ class WorkflowUpdateRequest(BaseModel):
 async def create_workflow(workflow_request: WorkflowCreateRequest):
     """Create a new workflow"""
     try:
+        logger.info(f"Creating workflow: {workflow_request.name}")
         workflow_data = workflow_request.model_dump()
+        logger.debug(f"Workflow data: {workflow_data}")
+        
         workflow = workflow_service.create_workflow(workflow_data)
+        logger.info(f"Successfully created workflow with ID: {workflow.id}")
         return workflow
     except WorkflowValidationError as e:
+        logger.warning(f"Workflow validation failed: {str(e)}")
+        logger.debug(f"Failed workflow data: {workflow_request.model_dump()}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Failed to create workflow: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create workflow: {str(e)}"
@@ -71,9 +80,12 @@ async def get_workflow(workflow_id: str):
 async def update_workflow(workflow_id: str, workflow_request: WorkflowUpdateRequest):
     """Update an existing workflow"""
     try:
+        logger.info(f"Updating workflow: {workflow_id}")
+        
         # Get existing workflow
         existing_workflow = workflow_service.get_workflow(workflow_id)
         if not existing_workflow:
+            logger.warning(f"Workflow not found for update: {workflow_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Workflow not found"
@@ -83,15 +95,19 @@ async def update_workflow(workflow_id: str, workflow_request: WorkflowUpdateRequ
         workflow_data = existing_workflow.model_dump()
         update_data = workflow_request.model_dump(exclude_unset=True)
         workflow_data.update(update_data)
+        logger.debug(f"Updated workflow data: {workflow_data}")
         
         workflow = workflow_service.update_workflow(workflow_id, workflow_data)
+        logger.info(f"Successfully updated workflow: {workflow_id}")
         return workflow
     except WorkflowValidationError as e:
+        logger.warning(f"Workflow validation failed during update: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Failed to update workflow {workflow_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update workflow: {str(e)}"

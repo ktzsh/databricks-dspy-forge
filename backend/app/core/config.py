@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     debug: bool = False
     api_prefix: str = "/api/v1"
     
+    # Logging settings
+    log_level: str = "INFO"
+    log_file: Optional[str] = "./logs/app.log"
+    
     # Workflow storage
     workflows_storage_path: str = "./workflows"
     

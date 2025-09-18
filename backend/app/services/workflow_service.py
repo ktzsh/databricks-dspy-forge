@@ -7,12 +7,15 @@ from datetime import datetime
 from app.models.workflow import Workflow
 from app.core.config import settings
 from app.utils.workflow_utils import validate_workflow, WorkflowValidationError
+from app.core.logging import get_logger
 
 
 class WorkflowService:
     def __init__(self):
         self.storage_path = settings.workflows_storage_path
+        self.logger = get_logger(__name__)
         os.makedirs(self.storage_path, exist_ok=True)
+        self.logger.info(f"Workflow storage initialized at: {self.storage_path}")
 
     def _get_workflow_file_path(self, workflow_id: str) -> str:
         """Get the file path for a workflow"""
@@ -20,28 +23,38 @@ class WorkflowService:
 
     def create_workflow(self, workflow_data: dict) -> Workflow:
         """Create a new workflow"""
-        # Generate ID if not provided
-        if 'id' not in workflow_data or not workflow_data['id']:
-            workflow_data['id'] = str(uuid.uuid4())
-        
-        # Set timestamps
-        workflow_data['created_at'] = datetime.now()
-        workflow_data['updated_at'] = datetime.now()
-        
-        # Create workflow object
-        workflow = Workflow(**workflow_data)
-        
-        # Validate workflow
-        errors = validate_workflow(workflow)
-        if errors:
-            raise WorkflowValidationError(f"Workflow validation failed: {'; '.join(errors)}")
-        
-        # Save to file
-        file_path = self._get_workflow_file_path(workflow.id)
-        with open(file_path, 'w') as f:
-            json.dump(workflow.model_dump(), f, indent=2, default=str)
-        
-        return workflow
+        try:
+            # Generate ID if not provided
+            if 'id' not in workflow_data or not workflow_data['id']:
+                workflow_data['id'] = str(uuid.uuid4())
+            
+            self.logger.debug(f"Creating workflow with ID: {workflow_data['id']}")
+            
+            # Set timestamps
+            workflow_data['created_at'] = datetime.now()
+            workflow_data['updated_at'] = datetime.now()
+            
+            # Create workflow object
+            workflow = Workflow(**workflow_data)
+            
+            # Validate workflow
+            self.logger.debug(f"Validating workflow: {workflow.id}")
+            errors = validate_workflow(workflow)
+            if errors:
+                self.logger.warning(f"Workflow validation failed for {workflow.id}: {errors}")
+                raise WorkflowValidationError(f"Workflow validation failed: {'; '.join(errors)}")
+            
+            # Save to file
+            file_path = self._get_workflow_file_path(workflow.id)
+            self.logger.debug(f"Saving workflow to: {file_path}")
+            with open(file_path, 'w') as f:
+                json.dump(workflow.model_dump(), f, indent=2, default=str)
+            
+            self.logger.info(f"Successfully created workflow: {workflow.id}")
+            return workflow
+        except Exception as e:
+            self.logger.error(f"Failed to create workflow: {str(e)}", exc_info=True)
+            raise
 
     def get_workflow(self, workflow_id: str) -> Optional[Workflow]:
         """Get a workflow by ID"""

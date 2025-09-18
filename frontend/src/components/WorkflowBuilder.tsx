@@ -15,8 +15,10 @@ import { Play, Save, Settings } from 'lucide-react';
 
 import ComponentSidebar from './ComponentSidebar';
 import PlaygroundSidebar from './PlaygroundSidebar';
+import ToastContainer from './ToastContainer';
 import { nodeTypes } from './nodes';
 import { WorkflowNode, WorkflowEdge } from '../types/workflow';
+import { useToast } from '../hooks/useToast';
 
 const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
@@ -28,6 +30,7 @@ const WorkflowBuilder: React.FC = () => {
   const [isPlaygroundOpen, setIsPlaygroundOpen] = useState(true);
   const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<Edge[]>([]);
+  const { toasts, removeToast, showSuccess, showError, showWarning } = useToast();
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -89,12 +92,27 @@ const WorkflowBuilder: React.FC = () => {
   const handleSaveWorkflow = async () => {
     const workflow = {
       name: workflowName,
-      nodes: nodes.map(node => ({
-        id: node.id,
-        type: node.type || 'signature_field',
-        position: node.position,
-        data: node.data
-      })) as WorkflowNode[],
+      nodes: nodes.map(node => {
+        // Convert frontend camelCase to backend snake_case
+        let nodeData = { ...node.data };
+        
+        if (node.type === 'module' && nodeData.moduleType) {
+          nodeData.module_type = nodeData.moduleType;
+          delete nodeData.moduleType;
+        }
+        
+        if (node.type === 'logic' && nodeData.logicType) {
+          nodeData.logic_type = nodeData.logicType;
+          delete nodeData.logicType;
+        }
+        
+        return {
+          id: node.id,
+          type: node.type || 'signature_field',
+          position: node.position,
+          data: nodeData
+        };
+      }) as WorkflowNode[],
       edges: edges.map(edge => ({
         id: edge.id,
         source: edge.source,
@@ -115,11 +133,21 @@ const WorkflowBuilder: React.FC = () => {
       });
 
       if (response.ok) {
-        console.log('Workflow saved successfully');
+        showSuccess('Workflow Saved', 'Your workflow has been saved successfully!');
       } else {
-        console.error('Failed to save workflow');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.detail || 'Failed to save workflow';
+        
+        if (response.status === 422) {
+          // Validation error
+          showError('Validation Error', errorMessage);
+        } else {
+          // Other server errors
+          showError('Save Failed', errorMessage);
+        }
       }
     } catch (error) {
+      showError('Network Error', 'Unable to save workflow. Please check your connection and try again.');
       console.error('Error saving workflow:', error);
     }
   };
@@ -136,6 +164,7 @@ const WorkflowBuilder: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-4">

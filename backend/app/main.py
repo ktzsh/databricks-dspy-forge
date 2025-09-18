@@ -5,7 +5,14 @@ from fastapi.responses import FileResponse
 import os
 
 from app.core.config import settings
+from app.core.logging import setup_logging
 from app.api.routes import router as api_router
+
+# Initialize logging
+setup_logging(
+    level=settings.log_level,
+    log_file=settings.log_file
+)
 
 
 def create_app() -> FastAPI:
