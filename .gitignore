@@ -1,3 +1,6 @@
+# Custom
+backend/artifacts/
+
 # Dependencies
 node_modules/
 __pycache__/

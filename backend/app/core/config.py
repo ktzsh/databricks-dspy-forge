@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, Literal
 
 
 class Settings(BaseSettings):
@@ -11,12 +11,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_file: Optional[str] = "./logs/app.log"
     
-    # Workflow storage
-    workflows_storage_path: str = "./workflows"
+    # Workflow storage configuration
+    storage_backend: Literal["local", "databricks"] = "local"
     
-    # MLflow settings
-    mlflow_tracking_uri: Optional[str] = None
-    mlflow_experiment_name: str = "dspy-workflows"
+    # Local storage settings
+    local_storage_path: str = "./artifacts/workflows"
+    
+    # Databricks storage settings
+    databricks_volume_path: Optional[str] = None
     
     # Databricks settings
     databricks_host: Optional[str] = None

@@ -11,11 +11,12 @@ import ReactFlow, {
   Background,
   BackgroundVariant,
 } from 'reactflow';
-import { Play, Save, Settings } from 'lucide-react';
+import { Play, Save, Settings, FolderOpen } from 'lucide-react';
 
 import ComponentSidebar from './ComponentSidebar';
 import PlaygroundSidebar from './PlaygroundSidebar';
 import ToastContainer from './ToastContainer';
+import WorkflowList from './WorkflowList';
 import { nodeTypes } from './nodes';
 import { WorkflowNode, WorkflowEdge } from '../types/workflow';
 import { useToast } from '../hooks/useToast';
@@ -27,7 +28,9 @@ const WorkflowBuilder: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [workflowName, setWorkflowName] = useState('Untitled Workflow');
+  const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [isPlaygroundOpen, setIsPlaygroundOpen] = useState(true);
+  const [isWorkflowListOpen, setIsWorkflowListOpen] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<Edge[]>([]);
   const { toasts, removeToast, showSuccess, showError, showWarning } = useToast();
@@ -89,6 +92,50 @@ const WorkflowBuilder: React.FC = () => {
     };
   }, [selectedNodes, selectedEdges, setNodes, setEdges]);
 
+  const handleLoadWorkflow = useCallback((workflow: any) => {
+    // Convert backend data to frontend format
+    const loadedNodes = workflow.nodes.map((node: any) => ({
+      id: node.id,
+      type: node.type || 'signature_field',
+      position: node.position || { x: 100, y: 100 },
+      data: {
+        ...node.data,
+        // Convert snake_case back to camelCase for frontend
+        ...(node.data.module_type && { moduleType: node.data.module_type }),
+        ...(node.data.logic_type && { logicType: node.data.logic_type }),
+      }
+    }));
+
+    const loadedEdges = workflow.edges.map((edge: any) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
+      type: edge.type || 'default'
+    }));
+
+    // Update state
+    setNodes(loadedNodes);
+    setEdges(loadedEdges);
+    setWorkflowName(workflow.name);
+    setWorkflowId(workflow.id);
+
+    // Clear selections
+    setSelectedNodes([]);
+    setSelectedEdges([]);
+  }, [setNodes, setEdges]);
+
+  const handleNewWorkflow = useCallback(() => {
+    setNodes([]);
+    setEdges([]);
+    setWorkflowName('Untitled Workflow');
+    setWorkflowId(null);
+    setSelectedNodes([]);
+    setSelectedEdges([]);
+    showSuccess('New Workflow', 'Started a new workflow');
+  }, [setNodes, setEdges, showSuccess]);
+
   const handleSaveWorkflow = async () => {
     const workflow = {
       name: workflowName,
@@ -124,16 +171,35 @@ const WorkflowBuilder: React.FC = () => {
     };
 
     try {
-      const response = await fetch('/api/v1/workflows/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(workflow),
-      });
+      let response;
+      
+      if (workflowId) {
+        // Update existing workflow
+        response = await fetch(`/api/v1/workflows/${workflowId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(workflow),
+        });
+      } else {
+        // Create new workflow
+        response = await fetch('/api/v1/workflows/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(workflow),
+        });
+      }
 
       if (response.ok) {
-        showSuccess('Workflow Saved', 'Your workflow has been saved successfully!');
+        const savedWorkflow = await response.json();
+        setWorkflowId(savedWorkflow.id);
+        showSuccess(
+          'Workflow Saved', 
+          workflowId ? 'Your workflow has been updated successfully!' : 'Your workflow has been saved successfully!'
+        );
       } else {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.detail || 'Failed to save workflow';
@@ -174,21 +240,39 @@ const WorkflowBuilder: React.FC = () => {
             onChange={(e) => setWorkflowName(e.target.value)}
             className="text-lg font-semibold bg-transparent border-none focus:outline-none focus:bg-gray-50 px-2 py-1 rounded"
           />
+          {workflowId && (
+            <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+              Loaded
+            </span>
+          )}
         </div>
         <div className="flex items-center space-x-2">
           <button
-            onClick={handleRunWorkflow}
-            className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            onClick={handleNewWorkflow}
+            className="flex items-center space-x-2 px-3 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
           >
-            <Play size={16} />
-            <span>Run</span>
+            <span>New</span>
+          </button>
+          <button
+            onClick={() => setIsWorkflowListOpen(true)}
+            className="flex items-center space-x-2 px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+          >
+            <FolderOpen size={16} />
+            <span>Load</span>
           </button>
           <button
             onClick={handleSaveWorkflow}
             className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
             <Save size={16} />
-            <span>Save</span>
+            <span>{workflowId ? 'Update' : 'Save'}</span>
+          </button>
+          <button
+            onClick={handleRunWorkflow}
+            className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+          >
+            <Play size={16} />
+            <span>Run</span>
           </button>
           <button
             onClick={handleDeploy}
@@ -291,6 +375,14 @@ const WorkflowBuilder: React.FC = () => {
           />
         )}
       </div>
+      
+      {/* Workflow List Modal */}
+      {isWorkflowListOpen && (
+        <WorkflowList
+          onLoadWorkflow={handleLoadWorkflow}
+          onClose={() => setIsWorkflowListOpen(false)}
+        />
+      )}
     </div>
   );
 };

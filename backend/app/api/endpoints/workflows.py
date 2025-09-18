@@ -33,7 +33,7 @@ async def create_workflow(workflow_request: WorkflowCreateRequest):
         workflow_data = workflow_request.model_dump()
         logger.debug(f"Workflow data: {workflow_data}")
         
-        workflow = workflow_service.create_workflow(workflow_data)
+        workflow = await workflow_service.create_workflow(workflow_data)
         logger.info(f"Successfully created workflow with ID: {workflow.id}")
         return workflow
     except WorkflowValidationError as e:
@@ -55,7 +55,7 @@ async def create_workflow(workflow_request: WorkflowCreateRequest):
 async def list_workflows():
     """List all workflows"""
     try:
-        workflows = workflow_service.list_workflows()
+        workflows = await workflow_service.list_workflows()
         return workflows
     except Exception as e:
         raise HTTPException(
@@ -67,7 +67,7 @@ async def list_workflows():
 @router.get("/{workflow_id}", response_model=Workflow)
 async def get_workflow(workflow_id: str):
     """Get a specific workflow by ID"""
-    workflow = workflow_service.get_workflow(workflow_id)
+    workflow = await workflow_service.get_workflow(workflow_id)
     if not workflow:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -83,7 +83,7 @@ async def update_workflow(workflow_id: str, workflow_request: WorkflowUpdateRequ
         logger.info(f"Updating workflow: {workflow_id}")
         
         # Get existing workflow
-        existing_workflow = workflow_service.get_workflow(workflow_id)
+        existing_workflow = await workflow_service.get_workflow(workflow_id)
         if not existing_workflow:
             logger.warning(f"Workflow not found for update: {workflow_id}")
             raise HTTPException(
@@ -97,7 +97,7 @@ async def update_workflow(workflow_id: str, workflow_request: WorkflowUpdateRequ
         workflow_data.update(update_data)
         logger.debug(f"Updated workflow data: {workflow_data}")
         
-        workflow = workflow_service.update_workflow(workflow_id, workflow_data)
+        workflow = await workflow_service.update_workflow(workflow_id, workflow_data)
         logger.info(f"Successfully updated workflow: {workflow_id}")
         return workflow
     except WorkflowValidationError as e:
@@ -117,7 +117,7 @@ async def update_workflow(workflow_id: str, workflow_request: WorkflowUpdateRequ
 @router.delete("/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_workflow(workflow_id: str):
     """Delete a workflow"""
-    success = workflow_service.delete_workflow(workflow_id)
+    success = await workflow_service.delete_workflow(workflow_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -129,7 +129,7 @@ async def delete_workflow(workflow_id: str):
 async def duplicate_workflow(workflow_id: str, new_name: str = None):
     """Duplicate an existing workflow"""
     try:
-        workflow = workflow_service.duplicate_workflow(workflow_id, new_name)
+        workflow = await workflow_service.duplicate_workflow(workflow_id, new_name)
         if not workflow:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -146,7 +146,7 @@ async def duplicate_workflow(workflow_id: str, new_name: str = None):
 @router.post("/{workflow_id}/validate")
 async def validate_workflow_endpoint(workflow_id: str):
     """Validate a workflow"""
-    workflow = workflow_service.get_workflow(workflow_id)
+    workflow = await workflow_service.get_workflow(workflow_id)
     if not workflow:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -164,4 +164,18 @@ async def validate_workflow_endpoint(workflow_id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to validate workflow: {str(e)}"
+        )
+
+
+@router.get("/_health")
+async def storage_health():
+    """Get storage backend health status"""
+    try:
+        health_data = await workflow_service.get_storage_health()
+        status_code = status.HTTP_200_OK if health_data.get("status") == "healthy" else status.HTTP_503_SERVICE_UNAVAILABLE
+        return health_data
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get storage health: {str(e)}"
         )
