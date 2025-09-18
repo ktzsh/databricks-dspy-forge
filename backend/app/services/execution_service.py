@@ -98,8 +98,36 @@ class WorkflowExecutionEngine:
         
         # Extract all modules from the workflow
         module_nodes = [node for node in context.workflow.nodes if node.type == NodeType.MODULE]
+        signature_field_nodes = [node for node in context.workflow.nodes if node.type == NodeType.SIGNATURE_FIELD]
         signatures_created = set()
         node_counts = {}
+        module_instances = []
+        
+        # Find start and end nodes
+        start_nodes = [node for node in signature_field_nodes if node.data.get('is_start', False) or node.data.get('isStart', False)]
+        end_nodes = [node for node in signature_field_nodes if node.data.get('is_end', False) or node.data.get('isEnd', False)]
+        
+        # Get overall input and output fields
+        start_fields = []
+        for start_node in start_nodes:
+            fields = start_node.data.get('fields', [])
+            for field_data in fields:
+                field_name = field_data.get('name')
+                if field_name:
+                    start_fields.append(field_name)
+        
+        end_fields = []
+        for end_node in end_nodes:
+            fields = end_node.data.get('fields', [])
+            for field_data in fields:
+                field_name = field_data.get('name')
+                if field_name:
+                    end_fields.append(field_name)
+        
+        if not start_fields:
+            start_fields = ['input']
+        if not end_fields:
+            end_fields = ['output']
         
         # Generate unique signatures first
         for node in module_nodes:
@@ -120,30 +148,42 @@ class WorkflowExecutionEngine:
             if signature_key not in signatures_created:
                 signatures_created.add(signature_key)
                 
-                # Generate unique signature name
-                signature_name = f"{module_type_str}Signature"
-                if len([s for s in signatures_created if s[0] == module_type_str]) > 1:
-                    signature_name += f"_{len([s for s in signatures_created if s[0] == module_type_str])}"
+                # Generate unique signature name with simple numbering
+                existing_sigs_of_type = len([s for s in signatures_created if s[0] == module_type_str])
+                signature_name = f"{module_type_str}Signature_{existing_sigs_of_type}"
                 
                 # Add signature class
                 code_lines.append(f"class {signature_name}(dspy.Signature):")
                 if instruction:
                     code_lines.append(f'    """{instruction}"""')
                 
+                # Add input fields with descriptions
                 for field_name in input_fields:
-                    code_lines.append(f"    {field_name} = dspy.InputField()")
+                    field_desc = self._get_field_description(node, field_name, context, is_input=True)
+                    if field_desc:
+                        code_lines.append(f"    {field_name} = dspy.InputField(desc='{field_desc}')")
+                    else:
+                        code_lines.append(f"    {field_name} = dspy.InputField()")
                 
                 if module_type_str == "ChainOfThought":
                     code_lines.append(f"    rationale = dspy.OutputField(desc='Step-by-step reasoning')")
                     
+                # Add output fields with descriptions
                 for field_name in output_fields:
-                    code_lines.append(f"    {field_name} = dspy.OutputField()")
+                    field_desc = self._get_field_description(node, field_name, context, is_input=False)
+                    if field_desc:
+                        code_lines.append(f"    {field_name} = dspy.OutputField(desc='{field_desc}')")
+                    else:
+                        code_lines.append(f"    {field_name} = dspy.OutputField()")
                 
                 code_lines.append("")
         
-        code_lines.append("# Module instances")
+        # Generate CompoundProgram class
+        code_lines.append("class CompoundProgram(dspy.Module):")
+        code_lines.append("    def __init__(self):")
+        code_lines.append("        super().__init__()")
         
-        # Generate module instances
+        # Generate module instances in __init__
         for node in module_nodes:
             module_type_str = node.data.get('module_type', 'Unknown')
             node_counts[module_type_str] = node_counts.get(module_type_str, 0) + 1
@@ -161,17 +201,71 @@ class WorkflowExecutionEngine:
             signature_key = (module_type_str, tuple(input_fields), tuple(output_fields), instruction)
             signature_index = list(signatures_created).index(signature_key) + 1
             
-            signature_name = f"{module_type_str}Signature"
-            if len([s for s in signatures_created if s[0] == module_type_str]) > 1:
-                signature_name += f"_{signature_index}"
+            signature_name = f"{module_type_str}Signature_{signature_index}"
             
             # Add module instantiation with cleaner naming
             module_var_name = f"{module_type_str.lower()}_{node_index}"
+            module_instances.append((module_var_name, node.id))
             
             if module_type_str == "Predict":
-                code_lines.append(f"{module_var_name} = dspy.Predict({signature_name})")
+                code_lines.append(f"        self.{module_var_name} = dspy.Predict({signature_name})")
             elif module_type_str == "ChainOfThought":
-                code_lines.append(f"{module_var_name} = dspy.ChainOfThought({signature_name})")
+                code_lines.append(f"        self.{module_var_name} = dspy.ChainOfThought({signature_name})")
+        
+        code_lines.append("")
+        
+        # Generate forward method
+        code_lines.append("    def forward(self, " + ", ".join(start_fields) + "):")
+        
+        # Get execution order
+        execution_order = get_execution_order(context.workflow)
+        
+        # Generate forward logic based on execution order
+        result_counter = 0
+        for node_id in execution_order:
+            node = next((n for n in context.workflow.nodes if n.id == node_id), None)
+            if not node:
+                continue
+                
+            if node.type == NodeType.MODULE:
+                # Find the module instance
+                module_instance = next((inst for inst in module_instances if inst[1] == node_id), None)
+                if module_instance:
+                    module_var_name = module_instance[0]
+                    result_counter += 1
+                    
+                    # Get inputs for this module
+                    input_fields = self._get_expected_input_fields(node, context)
+                    if not input_fields:
+                        input_fields = start_fields
+                    
+                    # Generate module call with simple numbering
+                    result_var = f"result_{result_counter}"
+                    input_args = ", ".join([f"{field}={field}" for field in input_fields])
+                    code_lines.append(f"        {result_var} = self.{module_var_name}({input_args})")
+                    
+                    # Extract outputs
+                    output_fields = self._get_expected_output_fields(node, context)
+                    if output_fields:
+                        for field in output_fields:
+                            code_lines.append(f"        {field} = {result_var}.{field}")
+        
+        # Return final prediction
+        return_args = ", ".join([f"{field}={field}" for field in end_fields])
+        code_lines.append(f"        return dspy.Prediction({return_args})")
+        
+        code_lines.append("")
+        
+        # Generate main method
+        code_lines.append("if __name__ == '__main__':")
+        code_lines.append("    # Initialize the compound program")
+        code_lines.append("    program = CompoundProgram()")
+        code_lines.append("")
+        code_lines.append("    # Example input")
+        example_input = {field: f"example_{field}" for field in start_fields}
+        input_str = ", ".join([f"{k}='{v}'" for k, v in example_input.items()])
+        code_lines.append(f"    result = program({input_str})")
+        code_lines.append("    print('Result:', result)")
         
         return '\n'.join(code_lines)
     
@@ -367,6 +461,32 @@ class WorkflowExecutionEngine:
         
         return output_fields
     
+    def _get_field_description(self, node: Any, field_name: str, context: ExecutionContext, is_input: bool = True) -> str:
+        """Get field description from connected signature field nodes"""
+        if is_input:
+            # Find incoming edges to this node
+            edges = [edge for edge in context.workflow.edges if edge.target == node.id]
+        else:
+            # Find outgoing edges from this node
+            edges = [edge for edge in context.workflow.edges if edge.source == node.id]
+        
+        for edge in edges:
+            # Find the connected signature field node
+            if is_input:
+                sig_node = next((n for n in context.workflow.nodes if n.id == edge.source), None)
+            else:
+                sig_node = next((n for n in context.workflow.nodes if n.id == edge.target), None)
+            
+            if sig_node and sig_node.type == NodeType.SIGNATURE_FIELD:
+                # Get field descriptions from the signature field
+                fields = sig_node.data.get('fields', [])
+                for field_data in fields:
+                    if field_data.get('name') == field_name:
+                        # Get description from the field data
+                        desc = field_data.get('description', '')
+                        return desc
+        return ''
+    
     async def _execute_module_node(self, node: Any, inputs: Dict[str, Any], context: ExecutionContext) -> Dict[str, Any]:
         """Execute a DSPy module node"""
         module_type_str = node.data.get('module_type')
@@ -411,13 +531,21 @@ class WorkflowExecutionEngine:
             if not output_fields:
                 output_fields = ['output']
             
-            # Add input fields dynamically
+            # Add input fields dynamically with descriptions
             for key in input_fields:
-                setattr(DynamicSignature, key, dspy.InputField())
+                field_desc = self._get_field_description(node, key, context, is_input=True)
+                if field_desc:
+                    setattr(DynamicSignature, key, dspy.InputField(desc=field_desc))
+                else:
+                    setattr(DynamicSignature, key, dspy.InputField())
             
-            # Add output fields dynamically
+            # Add output fields dynamically with descriptions
             for field_name in output_fields:
-                setattr(DynamicSignature, field_name, dspy.OutputField())
+                field_desc = self._get_field_description(node, field_name, context, is_input=False)
+                if field_desc:
+                    setattr(DynamicSignature, field_name, dspy.OutputField(desc=field_desc))
+                else:
+                    setattr(DynamicSignature, field_name, dspy.OutputField())
             
             
             predictor = dspy.Predict(DynamicSignature)
@@ -447,16 +575,24 @@ class WorkflowExecutionEngine:
             if not output_fields:
                 output_fields = ['output']
             
-            # Add input fields dynamically
+            # Add input fields dynamically with descriptions
             for key in input_fields:
-                setattr(DynamicSignature, key, dspy.InputField())
+                field_desc = self._get_field_description(node, key, context, is_input=True)
+                if field_desc:
+                    setattr(DynamicSignature, key, dspy.InputField(desc=field_desc))
+                else:
+                    setattr(DynamicSignature, key, dspy.InputField())
             
             # Add rationale field for chain of thought
             setattr(DynamicSignature, 'rationale', dspy.OutputField(desc="Step-by-step reasoning"))
             
-            # Add expected output fields
+            # Add expected output fields with descriptions
             for field_name in output_fields:
-                setattr(DynamicSignature, field_name, dspy.OutputField())
+                field_desc = self._get_field_description(node, field_name, context, is_input=False)
+                if field_desc:
+                    setattr(DynamicSignature, field_name, dspy.OutputField(desc=field_desc))
+                else:
+                    setattr(DynamicSignature, field_name, dspy.OutputField())
             
             
             cot = dspy.ChainOfThought(DynamicSignature)
