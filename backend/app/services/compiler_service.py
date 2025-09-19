@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Any, List, Set
+from typing import Dict, Any, List, Set, Tuple
 from datetime import datetime
 
 from app.models.workflow import Workflow, NodeType
@@ -33,7 +33,11 @@ class WorkflowCompilerService:
             Generated DSPy code as string
         """
         try:
-            code_lines = ["import dspy", ""]
+            code_lines = [
+                "import dspy",
+                "from typing import Any, List, Dict",
+                ""
+            ]
             
             # Extract all modules from the workflow
             module_nodes = [node for node in workflow.nodes if node.type == NodeType.MODULE]
@@ -167,24 +171,26 @@ class WorkflowCompilerService:
                 if instruction:
                     code_lines.append(f'    """{instruction}"""')
                 
-                # Add input fields with descriptions
+                # Add input fields with types and descriptions
                 for field_name in input_fields:
-                    field_desc = self._get_field_description(node, field_name, workflow, is_input=True)
+                    field_type, field_desc = self._get_field_info(node, field_name, workflow, is_input=True)
+                    python_type = self._convert_ui_type_to_python(field_type)
                     if field_desc:
-                        code_lines.append(f"    {field_name} = dspy.InputField(desc='{field_desc}')")
+                        code_lines.append(f"    {field_name}: {python_type} = dspy.InputField(desc='{field_desc}')")
                     else:
-                        code_lines.append(f"    {field_name} = dspy.InputField()")
+                        code_lines.append(f"    {field_name}: {python_type} = dspy.InputField()")
                 
                 if module_type_str == "ChainOfThought":
                     code_lines.append(f"    rationale = dspy.OutputField(desc='Step-by-step reasoning')")
                     
-                # Add output fields with descriptions
+                # Add output fields with types and descriptions  
                 for field_name in output_fields:
-                    field_desc = self._get_field_description(node, field_name, workflow, is_input=False)
+                    field_type, field_desc = self._get_field_info(node, field_name, workflow, is_input=False)
+                    python_type = self._convert_ui_type_to_python(field_type)
                     if field_desc:
-                        code_lines.append(f"    {field_name} = dspy.OutputField(desc='{field_desc}')")
+                        code_lines.append(f"    {field_name}: {python_type} = dspy.OutputField(desc='{field_desc}')")
                     else:
-                        code_lines.append(f"    {field_name} = dspy.OutputField()")
+                        code_lines.append(f"    {field_name}: {python_type} = dspy.OutputField()")
                 
                 code_lines.append("")
         
@@ -328,8 +334,8 @@ class WorkflowCompilerService:
         
         return output_fields
     
-    def _get_field_description(self, node: Any, field_name: str, workflow: Workflow, is_input: bool = True) -> str:
-        """Get field description from connected signature field nodes"""
+    def _get_field_info(self, node: Any, field_name: str, workflow: Workflow, is_input: bool = True) -> Tuple[str, str]:
+        """Get field type and description from connected signature field nodes"""
         if is_input:
             # Find incoming edges to this node
             edges = [edge for edge in workflow.edges if edge.target == node.id]
@@ -345,14 +351,35 @@ class WorkflowCompilerService:
                 sig_node = next((n for n in workflow.nodes if n.id == edge.target), None)
             
             if sig_node and sig_node.type == NodeType.SIGNATURE_FIELD:
-                # Get field descriptions from the signature field
+                # Get field info from the signature field
                 fields = sig_node.data.get('fields', [])
                 for field_data in fields:
                     if field_data.get('name') == field_name:
-                        # Get description from the field data
-                        desc = field_data.get('description', '')
-                        return desc
-        return ''
+                        # Get type and description from the field data
+                        field_type = field_data.get('type', 'str')
+                        field_desc = field_data.get('description', '')
+                        return field_type, field_desc
+        return 'str', ''
+    
+    def _get_field_description(self, node: Any, field_name: str, workflow: Workflow, is_input: bool = True) -> str:
+        """Get field description from connected signature field nodes (backwards compatibility)"""
+        _, description = self._get_field_info(node, field_name, workflow, is_input)
+        return description
+    
+    def _convert_ui_type_to_python(self, ui_type: str) -> str:
+        """Convert UI field type to Python type annotation"""
+        type_mapping = {
+            'str': 'str',
+            'int': 'int', 
+            'bool': 'bool',
+            'float': 'float',
+            'list[str]': 'List[str]',
+            'list[int]': 'List[int]',
+            'dict': 'Dict',
+            'list[dict[str, Any]]': 'List[Dict[str, Any]]',
+            'Any': 'Any'
+        }
+        return type_mapping.get(ui_type, 'str')
 
 
 # Global compiler service instance
