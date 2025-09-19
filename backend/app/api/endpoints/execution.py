@@ -129,8 +129,8 @@ async def validate_workflow_for_execution(workflow_id: str):
         )
     
     try:
-        from app.utils.workflow_utils import validate_workflow
-        errors = validate_workflow(workflow)
+        from app.services.validation_service import validation_service
+        errors = validation_service.validate_for_execution(workflow)
         
         # Additional execution-specific validation
         execution_errors = []

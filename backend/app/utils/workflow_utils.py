@@ -1,8 +1,7 @@
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List
 import networkx as nx
-from collections import defaultdict, deque
 
-from app.models.workflow import Workflow, SignatureFieldNode, ModuleNode, LogicNode, NodeType
+from app.models.workflow import Workflow, NodeType
 from app.core.dspy_types import (
     SignatureFieldDefinition, 
     ModuleDefinition, 
@@ -11,107 +10,12 @@ from app.core.dspy_types import (
     DSPyModuleType,
     DSPyLogicType
 )
-
-
-class WorkflowValidationError(Exception):
-    """Raised when workflow validation fails"""
-    pass
+from app.services.validation_service import validation_service, WorkflowValidationError
 
 
 def validate_workflow(workflow: Workflow) -> List[str]:
-    """Validate workflow structure and return list of errors"""
-    errors = []
-    
-    # Check for at least one start node
-    start_nodes = [
-        node for node in workflow.nodes 
-        if node.type == NodeType.SIGNATURE_FIELD and (node.data.get('is_start', False) or node.data.get('isStart', False))
-    ]
-    
-    if not start_nodes:
-        errors.append("Workflow must have at least one start node")
-    
-    # Check for at least one end node
-    end_nodes = [
-        node for node in workflow.nodes 
-        if node.type == NodeType.SIGNATURE_FIELD and (node.data.get('is_end', False) or node.data.get('isEnd', False))
-    ]
-    
-    if not end_nodes:
-        errors.append("Workflow must have at least one end node")
-    
-    # Build graph for connectivity check
-    graph = build_workflow_graph(workflow)
-    
-    # Check if workflow is connected
-    if not nx.is_weakly_connected(graph):
-        errors.append("Workflow must be connected (no isolated nodes)")
-    
-    # Check for cycles (DSPy workflows should be DAGs)
-    if not nx.is_directed_acyclic_graph(graph):
-        errors.append("Workflow cannot contain cycles")
-    
-    # Validate individual nodes
-    for node in workflow.nodes:
-        node_errors = validate_node(node, workflow)
-        errors.extend([f"Node {node.id}: {error}" for error in node_errors])
-    
-    return errors
-
-
-def validate_node(node: Any, workflow: Workflow) -> List[str]:
-    """Validate individual node"""
-    errors = []
-    
-    if node.type == NodeType.SIGNATURE_FIELD:
-        # Validate signature field
-        fields = node.data.get('fields', [])
-        if not fields:
-            errors.append("Signature field must have at least one field")
-        
-        for field in fields:
-            if not field.get('name'):
-                errors.append("Field must have a name")
-            if not field.get('type'):
-                errors.append("Field must have a type")
-    
-    elif node.type == NodeType.MODULE:
-        # Validate module
-        module_type = node.data.get('module_type')
-        if not module_type:
-            errors.append("Module must specify a module type")
-        else:
-            try:
-                # Validate module_type is a valid enum value
-                DSPyModuleType(module_type)
-                
-                model = node.data.get('model')
-                if not model and module_type != DSPyModuleType.RETRIEVE:
-                    errors.append("Module must specify a model")
-                    
-                instruction = node.data.get('instruction')
-                if not instruction:
-                    errors.append("Module must specify an instruction")
-            except ValueError:
-                errors.append(f"Invalid module type: {module_type}")
-    
-    elif node.type == NodeType.LOGIC:
-        # Validate logic component
-        logic_type = node.data.get('logic_type')
-        if not logic_type:
-            errors.append("Logic component must specify a logic type")
-        
-        if logic_type == DSPyLogicType.IF_ELSE:
-            condition = node.data.get('condition')
-            if not condition:
-                errors.append("If-Else logic must specify a condition")
-        elif logic_type == DSPyLogicType.FIELD_SELECTOR:
-            selected_fields = node.data.get('selectedFields', [])
-            if not selected_fields:
-                # This is a warning rather than an error - FieldSelector can pass through all fields
-                pass
-    
-    return errors
+    """Validate workflow structure and return list of errors - delegates to validation service"""
+    return validation_service.validate_workflow(workflow)
 
 
 def build_workflow_graph(workflow: Workflow) -> nx.DiGraph:

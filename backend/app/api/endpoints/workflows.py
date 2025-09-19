@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from app.models.workflow import Workflow
 from app.services.workflow_service import workflow_service
-from app.utils.workflow_utils import WorkflowValidationError
+from app.services.validation_service import WorkflowValidationError
 from app.core.logging import get_logger
 
 router = APIRouter()
@@ -154,8 +154,8 @@ async def validate_workflow_endpoint(workflow_id: str):
         )
     
     try:
-        from app.utils.workflow_utils import validate_workflow
-        errors = validate_workflow(workflow)
+        from app.services.validation_service import validation_service
+        errors = validation_service.validate_workflow(workflow)
         return {
             "valid": len(errors) == 0,
             "errors": errors

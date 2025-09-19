@@ -4,7 +4,7 @@ from datetime import datetime
 
 from app.models.workflow import Workflow
 from app.storage.factory import get_storage_backend
-from app.utils.workflow_utils import validate_workflow, WorkflowValidationError
+from app.services.validation_service import validation_service, WorkflowValidationError
 from app.core.logging import get_logger
 
 
@@ -31,7 +31,7 @@ class WorkflowService:
             
             # Validate workflow
             self.logger.debug(f"Validating workflow: {workflow.id}")
-            errors = validate_workflow(workflow)
+            errors = validation_service.validate_workflow(workflow)
             if errors:
                 self.logger.warning(f"Workflow validation failed for {workflow.id}: {errors}")
                 raise WorkflowValidationError(f"Workflow validation failed: {'; '.join(errors)}")
@@ -86,7 +86,7 @@ class WorkflowService:
             workflow = Workflow(**workflow_data)
             
             # Validate workflow
-            errors = validate_workflow(workflow)
+            errors = validation_service.validate_workflow(workflow)
             if errors:
                 raise WorkflowValidationError(f"Workflow validation failed: {'; '.join(errors)}")
             
