@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Play, Upload, MessageSquare, Loader2, AlertCircle } from 'lucide-react';
+import { X, Play, MessageSquare, Loader2, AlertCircle } from 'lucide-react';
 
 interface PlaygroundSidebarProps {
   workflowId: string | null;
@@ -9,7 +9,6 @@ interface PlaygroundSidebarProps {
 
 const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, onClose, onExecute }) => {
   const [inputText, setInputText] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
   const [chatHistory, setChatHistory] = useState<Array<{ 
     role: 'user' | 'assistant' | 'system'; 
     content: string;
@@ -19,10 +18,6 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, onClo
   }>>([]);
   const [isExecuting, setIsExecuting] = useState(false);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const uploadedFiles = Array.from(event.target.files || []);
-    setFiles(prev => [...prev, ...uploadedFiles]);
-  };
 
   const handleExecute = async () => {
     if (!inputText.trim() || isExecuting) return;
@@ -57,8 +52,7 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, onClo
       const inputData = {
         input: userInput,
         query: userInput,
-        text: userInput,
-        files: files.map(f => f.name)
+        text: userInput
       };
 
       // Call the playground execution endpoint
@@ -141,12 +135,9 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, onClo
     }
 
     // Call the original onExecute for any additional handling
-    onExecute({ text: userInput, files: files.map(f => f.name) });
+    onExecute({ text: userInput });
   };
 
-  const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
-  };
 
   return (
     <div className="h-full flex flex-col">
@@ -221,40 +212,9 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, onClo
           </div>
         </div>
 
-        {/* File Upload Area */}
-        {files.length > 0 && (
-          <div className="p-4 border-t border-gray-200 flex-shrink-0">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Uploaded Files</h3>
-            <div className="space-y-2">
-              {files.map((file, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <span className="text-sm text-gray-600 truncate">{file.name}</span>
-                  <button
-                    onClick={() => removeFile(index)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Input Area */}
         <div className="p-4 border-t border-gray-200 bg-white flex-shrink-0">
-          <div className="flex items-center space-x-2 mb-3">
-            <label className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
-              <Upload size={16} className="text-gray-500" />
-              <span className="text-sm text-gray-600">Upload Files</span>
-              <input
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-            </label>
-          </div>
           
           <div className="flex space-x-2">
             <textarea

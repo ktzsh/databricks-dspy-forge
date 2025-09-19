@@ -3,7 +3,7 @@ import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { Plus, X, Edit3, Database, Trash2 } from 'lucide-react';
 import { SignatureFieldNodeData, SignatureField, FieldType } from '../../types/workflow';
 
-const fieldTypes: FieldType[] = ['str', 'int', 'bool', 'float', 'list[str]', 'list[int]', 'dict', 'Any'];
+const fieldTypes: FieldType[] = ['str', 'int', 'bool', 'float', 'list[str]', 'list[int]', 'dict', 'list[dict[str, Any]]', 'Any'];
 
 const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data, selected, id }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -13,7 +13,13 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
   const [connectionMode, setConnectionMode] = useState<'whole' | 'field-level'>(data.connectionMode || 'whole');
   const { deleteElements } = useReactFlow();
 
+  // Check if this is the default start node
+  const isDefaultStartNode = id === 'default-start-node';
+
   const addField = () => {
+    // Don't allow adding fields to default start node
+    if (isDefaultStartNode) return;
+    
     const newField: SignatureField = {
       name: `field_${fields.length + 1}`,
       type: 'str',
@@ -24,10 +30,30 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
   };
 
   const removeField = (index: number) => {
+    // Don't allow removing fields from default start node
+    if (isDefaultStartNode) return;
+    
     setFields(fields.filter((_, i) => i !== index));
   };
 
   const updateField = (index: number, updatedField: Partial<SignatureField>) => {
+    // For default start node, only allow updating descriptions
+    if (isDefaultStartNode) {
+      const field = fields[index];
+      if (field && (field.name === 'question' || field.name === 'history')) {
+        // Only allow description changes
+        const allowedUpdates: Partial<SignatureField> = {};
+        if (updatedField.description !== undefined) {
+          allowedUpdates.description = updatedField.description;
+        }
+        const updatedFields = fields.map((field, i) => 
+          i === index ? { ...field, ...allowedUpdates } : field
+        );
+        setFields(updatedFields);
+      }
+      return;
+    }
+    
     const updatedFields = fields.map((field, i) => 
       i === index ? { ...field, ...updatedField } : field
     );
@@ -37,13 +63,21 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
   const handleSave = () => {
     // Update the node data
     data.fields = fields;
-    data.isStart = isStart;
-    data.isEnd = isEnd;
+    
+    // For default start node, don't allow changing start/end status
+    if (!isDefaultStartNode) {
+      data.isStart = isStart;
+      data.isEnd = isEnd;
+    }
+    
     data.connectionMode = connectionMode;
     setIsEditing(false);
   };
 
   const handleDelete = () => {
+    // Don't allow deleting the default start node
+    if (isDefaultStartNode) return;
+    
     deleteElements({ nodes: [{ id }] });
   };
 
@@ -110,13 +144,15 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
           >
             <Edit3 size={14} className="text-blue-600" />
           </button>
-          <button
-            onClick={handleDelete}
-            className="p-1 hover:bg-red-200 rounded"
-            title="Delete node"
-          >
-            <Trash2 size={14} className="text-red-600" />
-          </button>
+          {!isDefaultStartNode && (
+            <button
+              onClick={handleDelete}
+              className="p-1 hover:bg-red-200 rounded"
+              title="Delete node"
+            >
+              <Trash2 size={14} className="text-red-600" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -125,26 +161,34 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
         {isEditing ? (
           <div className="space-y-3">
             {/* Node Type Settings */}
-            <div className="flex space-x-4">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={isStart}
-                  onChange={(e) => setIsStart(e.target.checked)}
-                  className="rounded"
-                />
-                <span className="text-sm">Start</span>
-              </label>
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={isEnd}
-                  onChange={(e) => setIsEnd(e.target.checked)}
-                  className="rounded"
-                />
-                <span className="text-sm">End</span>
-              </label>
-            </div>
+            {!isDefaultStartNode && (
+              <div className="flex space-x-4">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={isStart}
+                    onChange={(e) => setIsStart(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-sm">Start</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={isEnd}
+                    onChange={(e) => setIsEnd(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-sm">End</span>
+                </label>
+              </div>
+            )}
+            
+            {isDefaultStartNode && (
+              <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                ℹ️ This is the default input field and cannot be modified except for descriptions.
+              </div>
+            )}
 
             {/* Connection Mode Settings */}
             <div>
@@ -169,13 +213,15 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Fields</label>
-                <button
-                  onClick={addField}
-                  className="flex items-center space-x-1 px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-                >
-                  <Plus size={12} />
-                  <span>Add</span>
-                </button>
+                {!isDefaultStartNode && (
+                  <button
+                    onClick={addField}
+                    className="flex items-center space-x-1 px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                  >
+                    <Plus size={12} />
+                    <span>Add</span>
+                  </button>
+                )}
               </div>
 
               {fields.map((field, index) => (
@@ -187,19 +233,23 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
                       onChange={(e) => updateField(index, { name: e.target.value })}
                       placeholder="Field name"
                       className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                      disabled={isDefaultStartNode}
                     />
-                    <button
-                      onClick={() => removeField(index)}
-                      className="p-1 text-red-500 hover:bg-red-50 rounded"
-                    >
-                      <X size={12} />
-                    </button>
+                    {!isDefaultStartNode && (
+                      <button
+                        onClick={() => removeField(index)}
+                        className="p-1 text-red-500 hover:bg-red-50 rounded"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
                   </div>
 
                   <select
                     value={field.type}
                     onChange={(e) => updateField(index, { type: e.target.value as FieldType })}
                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    disabled={isDefaultStartNode}
                   >
                     {fieldTypes.map(type => (
                       <option key={type} value={type}>{type}</option>

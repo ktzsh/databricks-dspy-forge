@@ -6,6 +6,7 @@ export type FieldType =
   | 'list[str]' 
   | 'list[int]' 
   | 'dict' 
+  | 'list[dict[str, Any]]'
   | 'Any';
 
 export interface SignatureField {

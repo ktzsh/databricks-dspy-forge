@@ -11,7 +11,7 @@ import ReactFlow, {
   Background,
   BackgroundVariant,
 } from 'reactflow';
-import { Play, Save, Settings, FolderOpen } from 'lucide-react';
+import { Save, Settings, FolderOpen } from 'lucide-react';
 
 import ComponentSidebar from './ComponentSidebar';
 import PlaygroundSidebar from './PlaygroundSidebar';
@@ -21,7 +21,33 @@ import { nodeTypes } from './nodes';
 import { WorkflowNode, WorkflowEdge } from '../types/workflow';
 import { useToast } from '../hooks/useToast';
 
-const initialNodes: Node[] = [];
+// Create the default start node (reusable function)
+const createDefaultStartNode = (): Node => ({
+  id: 'default-start-node',
+  type: 'signature_field',
+  position: { x: 100, y: 100 },
+  data: {
+    label: 'Input',
+    fields: [
+      {
+        name: 'question',
+        type: 'str',
+        description: 'The user question or query',
+        required: true
+      },
+      {
+        name: 'history',
+        type: 'list[dict[str, Any]]',
+        description: 'Previous conversation history',
+        required: false
+      }
+    ],
+    isStart: true,
+    connectionMode: 'whole'
+  }
+});
+
+const initialNodes: Node[] = [createDefaultStartNode()];
 const initialEdges: Edge[] = [];
 
 const WorkflowBuilder: React.FC = () => {
@@ -34,6 +60,18 @@ const WorkflowBuilder: React.FC = () => {
   const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<Edge[]>([]);
   const { toasts, removeToast, showSuccess, showError } = useToast();
+
+  // Function to ensure default start node exists and is the only start node
+  const ensureDefaultStartNode = useCallback((nodes: Node[]) => {
+    // Remove any existing start nodes
+    const nonStartNodes = nodes.filter((node: Node) => 
+      !(node.data as any).isStart && !(node.data as any).is_start
+    );
+    
+    // Add the default start node
+    const defaultStart = createDefaultStartNode();
+    return [defaultStart, ...nonStartNodes];
+  }, []);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -61,14 +99,19 @@ const WorkflowBuilder: React.FC = () => {
           if (selectedNodes.length > 0) {
             const selectedNodeIds = selectedNodes.map(node => node.id);
             
-            // Remove selected nodes
-            setNodes((nds) => nds.filter(node => !selectedNodeIds.includes(node.id)));
+            // Filter out the default start node from deletion
+            const deletableNodeIds = selectedNodeIds.filter(id => id !== 'default-start-node');
             
-            // Remove edges connected to deleted nodes
-            setEdges((eds) => eds.filter(edge => 
-              !selectedNodeIds.includes(edge.source) && 
-              !selectedNodeIds.includes(edge.target)
-            ));
+            if (deletableNodeIds.length > 0) {
+              // Remove selected nodes (except default start node)
+              setNodes((nds) => nds.filter(node => !deletableNodeIds.includes(node.id)));
+              
+              // Remove edges connected to deleted nodes
+              setEdges((eds) => eds.filter(edge => 
+                !deletableNodeIds.includes(edge.source) && 
+                !deletableNodeIds.includes(edge.target)
+              ));
+            }
           }
           
           // Delete selected edges
@@ -115,8 +158,11 @@ const WorkflowBuilder: React.FC = () => {
       type: edge.type || 'default'
     }));
 
+    // Ensure default start node is present and is the only start node
+    const nodesWithDefaultStart = ensureDefaultStartNode(loadedNodes);
+
     // Update state
-    setNodes(loadedNodes);
+    setNodes(nodesWithDefaultStart);
     setEdges(loadedEdges);
     setWorkflowName(workflow.name);
     setWorkflowId(workflow.id);
@@ -124,16 +170,17 @@ const WorkflowBuilder: React.FC = () => {
     // Clear selections
     setSelectedNodes([]);
     setSelectedEdges([]);
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, ensureDefaultStartNode]);
 
   const handleNewWorkflow = useCallback(() => {
-    setNodes([]);
+    const defaultStart = createDefaultStartNode();
+    setNodes([defaultStart]);
     setEdges([]);
     setWorkflowName('Untitled Workflow');
     setWorkflowId(null);
     setSelectedNodes([]);
     setSelectedEdges([]);
-    showSuccess('New Workflow', 'Started a new workflow');
+    showSuccess('New Workflow', 'Started a new workflow with default input field');
   }, [setNodes, setEdges, showSuccess]);
 
   const handleSaveWorkflow = async () => {
@@ -218,10 +265,6 @@ const WorkflowBuilder: React.FC = () => {
     }
   };
 
-  const handleRunWorkflow = async () => {
-    // TODO: Implement workflow execution
-    console.log('Running workflow...');
-  };
 
   const handleDeploy = async () => {
     // TODO: Implement deployment
@@ -266,13 +309,6 @@ const WorkflowBuilder: React.FC = () => {
           >
             <Save size={16} />
             <span>{workflowId ? 'Update' : 'Save'}</span>
-          </button>
-          <button
-            onClick={handleRunWorkflow}
-            className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-          >
-            <Play size={16} />
-            <span>Run</span>
           </button>
           <button
             onClick={handleDeploy}
