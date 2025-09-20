@@ -11,7 +11,7 @@ import ReactFlow, {
   Background,
   BackgroundVariant,
 } from 'reactflow';
-import { Save, Settings, FolderOpen } from 'lucide-react';
+import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash } from 'lucide-react';
 
 import ComponentSidebar from './ComponentSidebar';
 import PlaygroundSidebar from './PlaygroundSidebar';
@@ -59,6 +59,9 @@ const WorkflowBuilder: React.FC = () => {
   const [isWorkflowListOpen, setIsWorkflowListOpen] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<Edge[]>([]);
+  const [lastExecutionResults, setLastExecutionResults] = useState<any>(null);
+  const [showNodeExecutionModal, setShowNodeExecutionModal] = useState(false);
+  const [selectedNodeExecution, setSelectedNodeExecution] = useState<any>(null);
   const { toasts, removeToast, showSuccess, showError } = useToast();
 
   // Function to ensure default start node exists and is the only start node
@@ -86,6 +89,25 @@ const WorkflowBuilder: React.FC = () => {
     },
     []
   );
+
+  // Handle node click to show execution details
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    // Only show execution details if we have results and the node was executed
+    if (lastExecutionResults && lastExecutionResults.execution_trace) {
+      const nodeExecution = lastExecutionResults.execution_trace.find(
+        (trace: any) => trace.node_id === node.id
+      );
+      
+      if (nodeExecution) {
+        setSelectedNodeExecution({
+          node,
+          execution: nodeExecution,
+          nodeOutput: lastExecutionResults.node_outputs[node.id]
+        });
+        setShowNodeExecutionModal(true);
+      }
+    }
+  }, [lastExecutionResults]);
 
   // Handle keyboard events for deletion (Delete key only, not Backspace)
   useEffect(() => {
@@ -389,6 +411,7 @@ const WorkflowBuilder: React.FC = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onSelectionChange={onSelectionChange}
+            onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
             fitView
             snapToGrid
@@ -413,6 +436,9 @@ const WorkflowBuilder: React.FC = () => {
                 console.log('Executing with input:', inputData);
                 // TODO: Implement execution
               }}
+              onExecutionResults={(results) => {
+                setLastExecutionResults(results);
+              }}
             />
           </div>
         )}
@@ -424,6 +450,91 @@ const WorkflowBuilder: React.FC = () => {
           onLoadWorkflow={handleLoadWorkflow}
           onClose={() => setIsWorkflowListOpen(false)}
         />
+      )}
+
+      {/* Node Execution Details Modal */}
+      {showNodeExecutionModal && selectedNodeExecution && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <Hash size={16} className="text-gray-500" />
+                  <span className="font-medium text-gray-900">
+                    {selectedNodeExecution.node.id}
+                  </span>
+                </div>
+                <div className="text-sm text-gray-500">
+                  {selectedNodeExecution.node.type}
+                </div>
+                <div className="flex items-center space-x-1 text-sm text-gray-500">
+                  <Clock size={12} />
+                  <span>{selectedNodeExecution.execution.execution_time.toFixed(3)}s</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowNodeExecutionModal(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Inputs Section */}
+                <div>
+                  <div className="flex items-center space-x-2 mb-3">
+                    <ArrowRight size={16} className="text-blue-500" />
+                    <h3 className="font-medium text-gray-900">Inputs</h3>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+                      {JSON.stringify(selectedNodeExecution.execution.inputs, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+
+                {/* Outputs Section */}
+                <div>
+                  <div className="flex items-center space-x-2 mb-3">
+                    <ArrowRight size={16} className="text-green-500" style={{ transform: 'rotate(180deg)' }} />
+                    <h3 className="font-medium text-gray-900">Outputs</h3>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+                      {JSON.stringify(selectedNodeExecution.execution.outputs, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Details */}
+              <div className="mt-6">
+                <div className="flex items-center space-x-2 mb-3">
+                  <FileText size={16} className="text-purple-500" />
+                  <h3 className="font-medium text-gray-900">Execution Details</h3>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Node Type:</span>
+                    <span className="font-medium">{selectedNodeExecution.execution.node_type}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Execution Time:</span>
+                    <span className="font-medium">{selectedNodeExecution.execution.execution_time.toFixed(3)}s</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Timestamp:</span>
+                    <span className="font-medium">{new Date(selectedNodeExecution.execution.timestamp).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
