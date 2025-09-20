@@ -1,183 +1,201 @@
 # DSPy Workflow Builder
 
-A modern drag-and-drop interface for building, running, and deploying DSPy programs. Create complex AI workflows using visual components representing DSPy signatures, modules, and logic.
+A modern, visual drag-and-drop interface for building, executing, and deploying DSPy programs with integrated Databricks support. Create complex AI workflows using canvas-based components representing DSPy signatures, modules, and logic flows.
 
-## Features
+## 🚀 Features
 
-- **Visual Workflow Builder**: Drag-and-drop interface for creating DSPy workflows
-- **Signature-Based Components**: Design components around DSPy's signature approach
-- **Flexible Type System**: Support for str, int, bool, list[str], dict, and custom Pydantic models
-- **DSPy Module Integration**: Predict, ChainOfThought, ReAct, Retrieve, BestOfN, Refine
-- **Logic Components**: If-Else, Merge for workflow control flow
-- **Real-time Playground**: Test workflows with text and file inputs
-- **Workflow Management**: Save, load, and version workflows
-- **Execution Engine**: Run workflows with MLflow tracing
-- **Deployment Ready**: Compile to deployable DSPy programs
+### Visual Workflow Design
+- **Drag-and-Drop Canvas**: Intuitive React Flow-based interface for visual workflow creation
+- **Component Library**: Pre-built nodes for DSPy signatures, modules, logic, and retrievers
+- **Real-time Validation**: Live validation of workflow structure and connections
+- **Interactive Playground**: Test workflows instantly with text and file inputs
 
-## Project Structure
+### DSPy Integration
+- **Core Modules**: Support for Predict, ChainOfThought, ReAct, Retrieve, BestOfN, Refine
+- **Signature System**: Visual definition of input/output schemas with rich type support
+- **Logic Components**: If-Else conditions and Merge operations for complex flows
+- **Code Generation**: Automatic compilation to optimized DSPy programs
+
+### Databricks Platform Integration
+- **Vector Search**: Built-in UnstructuredRetrieve and StructuredRetrieve with Databricks indexes
+- **Unity Catalog**: Workflow storage using Databricks Unity Catalog volumes
+- **MLflow Tracking**: Execution tracing and experiment management
+- **Deployment Pipeline**: One-click deployment to Databricks endpoints
+
+### Type System & Validation
+- **Rich Types**: str, int, bool, float, list[str], list[int], dict, Any, and custom Pydantic models
+- **Field Properties**: Required/optional fields with descriptions and validation
+- **Connection Validation**: Type-safe connections between workflow components
+- **Runtime Validation**: Input/output validation during execution
+
+## 🏗️ Architecture
 
 ```
 dspy-workflow-builder/
-├── backend/               # FastAPI backend
+├── backend/                    # FastAPI Backend
 │   ├── app/
-│   │   ├── api/          # API endpoints
-│   │   ├── core/         # Core configuration and DSPy types
-│   │   ├── models/       # Pydantic models
-│   │   ├── services/     # Business logic services
-│   │   └── utils/        # Utility functions
+│   │   ├── api/               # REST API endpoints
+│   │   │   └── endpoints/     # Workflow, execution, deployment APIs
+│   │   ├── components/        # Node template system
+│   │   │   ├── module_templates.py
+│   │   │   └── retriever_templates.py
+│   │   ├── core/              # Core configuration and DSPy types
+│   │   │   ├── config.py      # Settings with Databricks config
+│   │   │   └── dspy_types.py  # DSPy signature and module definitions
+│   │   ├── models/            # Pydantic data models
+│   │   ├── services/          # Business logic
+│   │   │   ├── execution_service.py    # Workflow execution engine
+│   │   │   ├── compiler_service.py     # DSPy code generation
+│   │   │   └── validation_service.py   # Workflow validation
+│   │   ├── storage/           # Storage backends
+│   │   │   ├── local.py       # Local file storage
+│   │   │   └── databricks.py  # Databricks Unity Catalog storage
+│   │   └── utils/             # Utility functions
 │   └── requirements.txt
-├── frontend/             # React frontend
-│   ├── public/
+├── frontend/                   # React Frontend
 │   ├── src/
-│   │   ├── components/   # React components
-│   │   ├── types/        # TypeScript types
-│   │   └── utils/        # Utility functions
+│   │   ├── components/        # React components
+│   │   │   ├── WorkflowBuilder.tsx     # Main canvas interface
+│   │   │   ├── ComponentSidebar.tsx    # Draggable component library
+│   │   │   ├── PlaygroundSidebar.tsx   # Testing interface
+│   │   │   └── nodes/                  # Custom node components
+│   │   ├── types/             # TypeScript definitions
+│   │   └── hooks/             # React hooks for state management
 │   └── package.json
 └── README.md
 ```
 
-## Quick Start
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.9+
+- Node.js 16+
+- Databricks Workspace
 
 ### Backend Setup
 
-1. Navigate to the backend directory:
+1. **Clone and navigate to backend**:
 ```bash
-cd backend
+git clone <repository>
+cd dspy-workflow-builder/backend
 ```
 
-2. Install dependencies:
+2. **Create virtual environment**:
+```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+3. **Install dependencies**:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Start the FastAPI server:
+4. **Configure environment** (create `.env` file):
+```env
+# Storage backend
+STORAGE_BACKEND=local  # or "databricks"
+LOCAL_STORAGE_PATH=./artifacts/workflows
+
+# Databricks
+DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
+DATABRICKS_TOKEN=your-access-token
+DATABRICKS_VOLUME_PATH=/Volumes/catalog/schema/volume/workflows
+```
+
+5. **Start the backend**:
 ```bash
 python -m app.main
 ```
 
-The backend will be available at `http://localhost:8000`
+Backend available at: `http://localhost:8000`
 
 ### Frontend Setup
 
-1. Navigate to the frontend directory:
+1. **Navigate to frontend**:
 ```bash
-cd frontend
+cd ../frontend
 ```
 
-2. Install dependencies:
+2. **Install dependencies**:
 ```bash
 npm install
 ```
 
-3. Start the development server:
+3. **Start development server**:
 ```bash
 npm start
 ```
 
-The frontend will be available at `http://localhost:3000`
+Frontend available at: `http://localhost:3000`
 
-## Core Concepts
+## 💡 Core Concepts
 
 ### Signature Fields
-Define input and output data structures with types:
-- **Types**: str, int, bool, float, list[str], list[int], dict, Any
-- **Properties**: name, description, required/optional
-- **Flow**: Can be marked as start or end nodes
+Define the data structures flowing through your workflow:
+- **Input Fields**: Define what data enters your workflow
+- **Output Fields**: Define what data exits your workflow
+- **Type System**: Support for primitive types, lists, dictionaries, and custom models
+- **Validation**: Required/optional fields with descriptions
 
 ### DSPy Modules
-Represent DSPy's core prompting techniques:
-- **Predict**: Basic prediction module
-- **ChainOfThought**: Reasoning with rationale
-- **ReAct**: Reasoning and acting with tools
-- **Retrieve**: Information retrieval
-- **BestOfN**: Multiple generations with selection
-- **Refine**: Iterative refinement
+Represent core DSPy prompting and reasoning techniques:
+- **Predict**: Basic prediction with language models
+- **ChainOfThought**: Step-by-step reasoning with rationale
+- **ReAct**: Reasoning and acting with tool integration
+- **Retrieve**: Information retrieval from knowledge bases
+- **BestOfN**: Generate multiple outputs and select the best
+- **Refine**: Iterative improvement of outputs
+
+### Retriever Components
+Integration with Databricks vector search:
+- **UnstructuredRetrieve**: Search through unstructured text documents
+- **StructuredRetrieve**: Query structured data with vector similarity
+- **Configuration**: Catalog, schema, index, embedding models, query types
 
 ### Logic Components
-Control workflow execution:
+Control flow for complex workflows:
 - **If-Else**: Conditional branching based on field values
-- **Merge**: Combine multiple execution paths
+- **Merge**: Combine outputs from multiple execution paths
 
-## Example Workflow
-
-Simple RAG (Retrieval-Augmented Generation) chain:
-
-```
-START → SignatureField(question: str) 
-      → Retrieve(embedding_model=sentence-transformers) 
-      → SignatureField(context: list[str], question: str) 
-      → ChainOfThought(lm_model=gpt-3.5-turbo) 
-      → SignatureField(answer: str) → END
-```
-
-## API Endpoints
+## 🔌 API Reference
 
 ### Workflows
-- `POST /api/v1/workflows/` - Create workflow
-- `GET /api/v1/workflows/` - List workflows
-- `GET /api/v1/workflows/{id}` - Get workflow
+- `POST /api/v1/workflows/` - Create new workflow
+- `GET /api/v1/workflows/` - List all workflows
+- `GET /api/v1/workflows/{id}` - Get workflow details
 - `PUT /api/v1/workflows/{id}` - Update workflow
 - `DELETE /api/v1/workflows/{id}` - Delete workflow
 
 ### Execution
-- `POST /api/v1/execution/run/{workflow_id}` - Execute workflow
+- `POST /api/v1/execution/playground` - Execute workflow in playground
+- `POST /api/v1/execution/run/{workflow_id}` - Execute saved workflow
 - `GET /api/v1/execution/status/{execution_id}` - Get execution status
-- `GET /api/v1/execution/trace/{execution_id}` - Get execution trace
+- `GET /api/v1/execution/trace/{execution_id}` - Get detailed execution trace
 
-### Deployment
-- `POST /api/v1/deployment/compile/{workflow_id}` - Compile workflow
+### Deployment (Planned)
+- `POST /api/v1/deployment/compile/{workflow_id}` - Compile to DSPy code
 - `POST /api/v1/deployment/deploy/{workflow_id}` - Deploy to Databricks
 - `POST /api/v1/deployment/optimize/{workflow_id}` - Optimize workflow
 
-## Configuration
+## 🛠️ Development
 
-Environment variables can be set in a `.env` file:
+### Technology Stack
+- **Backend**: FastAPI, DSPy, Pydantic, Databricks SDK
+- **Frontend**: React 18, TypeScript, React Flow, TailwindCSS
+- **Storage**: Local filesystem, Databricks Unity Catalog
+- **Execution**: DSPy with MLflow tracing
 
-```env
-# Workflow storage
-WORKFLOWS_STORAGE_PATH=./workflows
+## 📄 License
 
-# MLflow settings
-MLFLOW_TRACKING_URI=sqlite:///mlflow.db
-MLFLOW_EXPERIMENT_NAME=dspy-workflows
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-# Databricks settings (for deployment)
-DATABRICKS_HOST=your-databricks-host
-DATABRICKS_TOKEN=your-databricks-token
-```
+## 🤝 Support
 
-## Development Status
+- **Documentation**: [In-app help and tutorials]
+- **Issues**: [GitHub Issues](https://github.com/your-org/dspy-workflow-builder/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/dspy-workflow-builder/discussions)
 
-This project implements the core foundation for a DSPy workflow builder:
+---
 
-✅ **Completed**:
-- Project structure and setup
-- FastAPI backend with workflow CRUD operations
-- React frontend with React Flow integration
-- Custom node components for DSPy elements
-- Basic workflow execution engine
-- Component sidebar and playground interface
-
-🚧 **In Progress**:
-- MLflow tracing integration
-- Workflow compiler for DSPy program generation
-- Databricks deployment functionality
-
-📋 **Planned**:
-- Advanced type validation
-- Tool integration for ReAct modules
-- Workflow optimization features
-- Real-time collaboration
-- Workflow templates and marketplace
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License.
+**Built with ❤️ for the DSPy and Databricks communities**
