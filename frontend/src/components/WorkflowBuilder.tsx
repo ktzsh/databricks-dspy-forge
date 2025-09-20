@@ -407,6 +407,7 @@ const WorkflowBuilder: React.FC = () => {
           <div className="w-96 border-l border-gray-200 bg-gray-50 flex-shrink-0 overflow-y-auto">
             <PlaygroundSidebar
               workflowId={workflowId}
+              workflowIR={{ nodes, edges }}
               onClose={() => setIsPlaygroundOpen(false)}
               onExecute={(inputData) => {
                 console.log('Executing with input:', inputData);

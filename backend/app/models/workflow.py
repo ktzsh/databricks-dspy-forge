@@ -138,3 +138,28 @@ class WorkflowExecution(BaseModel):
     error: Optional[str] = None
     trace_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)
+
+
+class WorkflowCreateRequest(BaseModel):
+    name: str
+    description: str = ""
+    nodes: List[Dict[str, Any]] = []
+    edges: List[Dict[str, Any]] = []
+
+
+class WorkflowUpdateRequest(BaseModel):
+    name: str = None
+    description: str = None
+    nodes: List[Dict[str, Any]] = None
+    edges: List[Dict[str, Any]] = None
+
+
+class ExecutionRequest(BaseModel):
+    input_data: Dict[str, Any]
+
+
+class PlaygroundExecutionRequest(BaseModel):
+    workflow_id: Optional[str] = None  # Optional workflow ID for tracking
+    workflow_ir: Dict[str, Any]  # Workflow IR containing nodes and edges
+    question: str
+    conversation_history: list = []  # List of previous conversation exchanges

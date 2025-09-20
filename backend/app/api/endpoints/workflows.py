@@ -2,27 +2,13 @@ from fastapi import APIRouter, HTTPException, status
 from typing import List, Dict, Any
 from pydantic import BaseModel
 
-from app.models.workflow import Workflow
+from app.models.workflow import Workflow, WorkflowCreateRequest, WorkflowUpdateRequest
 from app.services.workflow_service import workflow_service
 from app.services.validation_service import WorkflowValidationError
 from app.core.logging import get_logger
 
 router = APIRouter()
 logger = get_logger(__name__)
-
-
-class WorkflowCreateRequest(BaseModel):
-    name: str
-    description: str = ""
-    nodes: List[Dict[str, Any]] = []
-    edges: List[Dict[str, Any]] = []
-
-
-class WorkflowUpdateRequest(BaseModel):
-    name: str = None
-    description: str = None
-    nodes: List[Dict[str, Any]] = None
-    edges: List[Dict[str, Any]] = None
 
 
 @router.post("/", response_model=Workflow, status_code=status.HTTP_201_CREATED)

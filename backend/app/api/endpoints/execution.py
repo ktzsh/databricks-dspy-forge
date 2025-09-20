@@ -1,185 +1,148 @@
 from fastapi import APIRouter, HTTPException, status, BackgroundTasks
-from typing import Dict, Any
+from datetime import datetime
+from typing import Dict, Any, Optional
 from pydantic import BaseModel
 
-from app.models.workflow import WorkflowExecution
+from app.models.workflow import WorkflowExecution, NodeType, PlaygroundExecutionRequest, ExecutionRequest
 from app.services.workflow_service import workflow_service
 from app.services.execution_service import execution_engine
 from app.core.logging import get_logger
 
+from app.services.validation_service import validation_service
+from app.models.workflow import Workflow
+        
 router = APIRouter()
 logger = get_logger(__name__)
 
 
-class ExecutionRequest(BaseModel):
-    input_data: Dict[str, Any]
-
-
-class PlaygroundExecutionRequest(BaseModel):
-    workflow_id: str
-    input_data: Dict[str, Any]
-
-
-@router.post("/run/{workflow_id}")
-async def run_workflow(workflow_id: str, execution_request: ExecutionRequest, background_tasks: BackgroundTasks):
-    """Execute a workflow with given input data"""
-    # Get workflow
-    workflow = await workflow_service.get_workflow(workflow_id)
-    if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found"
-        )
+def _process_playground_input(input_data: Dict[str, Any], conversation_history: list, workflow) -> Dict[str, Any]:
+    """
+    Process playground input to dynamically handle question and history.
     
-    try:
-        # Start execution in background
-        execution = await execution_engine.execute_workflow(workflow, execution_request.input_data)
+    Args:
+        input_data: Raw input data from frontend (contains current message)
+        conversation_history: List of previous conversation exchanges  
+        workflow: The workflow object to determine expected input fields
         
-        return {
-            "execution_id": execution.execution_id,
-            "status": execution.status,
-            "result": execution.result,
-            "error": execution.error
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to execute workflow: {str(e)}"
-        )
-
-
-@router.get("/status/{execution_id}")
-async def get_execution_status(execution_id: str):
-    """Get the status of a workflow execution"""
-    execution = execution_engine.get_execution_status(execution_id)
-    if not execution:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Execution not found"
-        )
+    Returns:
+        Processed input data with question and history fields
+    """
+    # Find start signature field nodes to determine expected input fields
+    start_nodes = [
+        node for node in workflow.nodes 
+        if node.type == NodeType.SIGNATURE_FIELD and 
+        (node.data.get('is_start', False) or node.data.get('isStart', False))
+    ]
     
-    return {
-        "execution_id": execution.execution_id,
-        "workflow_id": execution.workflow_id,
-        "status": execution.status,
-        "result": execution.result,
-        "error": execution.error,
-        "created_at": execution.created_at
-    }
-
-
-@router.get("/trace/{execution_id}")
-async def get_execution_trace(execution_id: str):
-    """Get execution trace for workflow execution"""
-    execution = execution_engine.get_execution_status(execution_id)
-    if not execution:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Execution not found"
-        )
+    expected_fields = set()
+    for start_node in start_nodes:
+        fields = start_node.data.get('fields', [])
+        for field_data in fields:
+            field_name = field_data.get('name')
+            if field_name:
+                expected_fields.add(field_name)
     
-    trace = execution_engine.get_execution_trace(execution_id)
+    logger.debug(f"Expected input fields from workflow: {expected_fields}")
     
-    return {
-        "execution_id": execution_id,
-        "trace": trace
-    }
-
-
-@router.get("/")
-async def list_executions():
-    """List all active executions"""
-    executions = []
-    for execution_id, execution in execution_engine.active_executions.items():
-        executions.append({
-            "execution_id": execution.execution_id,
-            "workflow_id": execution.workflow_id,
-            "status": execution.status,
-            "created_at": execution.created_at
-        })
+    # Extract current question from input_data
+    current_question = input_data['question']
     
-    return executions
-
-
-@router.delete("/{execution_id}")
-async def cancel_execution(execution_id: str):
-    """Cancel a running execution"""
-    execution = execution_engine.get_execution_status(execution_id)
-    if not execution:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Execution not found"
-        )
+    if not current_question:
+        # If no recognizable input field, use the first string value
+        for value in input_data.values():
+            if isinstance(value, str) and value.strip():
+                current_question = value
+                break
     
-    if execution.status == "running":
-        execution.status = "cancelled"
-        execution.error = "Execution cancelled by user"
+    # Build processed input data
+    processed_input = {}
     
-    return {"message": "Execution cancelled"}
-
-
-@router.post("/validate/{workflow_id}")
-async def validate_workflow_for_execution(workflow_id: str):
-    """Validate if a workflow can be executed"""
-    workflow = await workflow_service.get_workflow(workflow_id)
-    if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found"
-        )
+    # Handle question field
+    if 'question' in expected_fields:
+        processed_input['question'] = current_question or ""
     
-    try:
-        from app.services.validation_service import validation_service
-        errors = validation_service.validate_for_execution(workflow)
+    # Handle history field  
+    if 'history' in expected_fields:
+        # Convert conversation history to the expected format
+        history_list = []
+        for exchange in conversation_history:
+            if isinstance(exchange, dict):
+                # Extract all relevant fields from the exchange
+                history_entry = {}
+                if 'question' in exchange:
+                    history_entry['question'] = exchange['question']
+                if 'answer' in exchange:
+                    history_entry['answer'] = exchange['answer']
+                # Add any other output fields that might exist
+                for key, value in exchange.items():
+                    if key not in ['question'] and value is not None:
+                        history_entry[key] = value
+                
+                if history_entry:  # Only add non-empty entries
+                    history_list.append(history_entry)
         
-        # Additional execution-specific validation
-        execution_errors = []
-        
-        # Check for start nodes
-        start_nodes = [n for n in workflow.nodes if n.type.value == "signature_field" and n.data.get('is_start')]
-        if not start_nodes:
-            execution_errors.append("No start nodes defined")
-        
-        # Check for end nodes
-        end_nodes = [n for n in workflow.nodes if n.type.value == "signature_field" and n.data.get('is_end')]
-        if not end_nodes:
-            execution_errors.append("No end nodes defined")
-        
-        all_errors = errors + execution_errors
-        
-        return {
-            "executable": len(all_errors) == 0,
-            "errors": all_errors
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to validate workflow: {str(e)}"
-        )
+        processed_input['history'] = history_list
+    
+    # Add any other expected fields from input_data
+    for field in expected_fields:
+        if field not in processed_input and field in input_data:
+            processed_input[field] = input_data[field]
+    
+    # If no expected fields found, fall back to original behavior
+    if not expected_fields:
+        processed_input = input_data.copy()
+        if current_question:
+            processed_input['question'] = current_question
+    
+    return processed_input
 
 
 @router.post("/playground")
 async def execute_workflow_playground(request: PlaygroundExecutionRequest):
     """Execute a workflow from the playground interface"""
     try:
-        logger.info(f"Playground execution request for workflow: {request.workflow_id}")
-        logger.debug(f"Input data: {request.input_data}")
+        logger.info(f"Playground execution request with workflow IR")
+        logger.debug(f"Question: {request.question}")
+        logger.debug(f"Conversation history length: {len(request.conversation_history)}")
         
-        # Get workflow
-        workflow = await workflow_service.get_workflow(request.workflow_id)
-        if not workflow:
-            logger.error(f"Workflow not found: {request.workflow_id}")
+        # Use provided workflow ID
+        workflow_id = request.workflow_id
+        
+        workflow_data = {
+            "id": workflow_id,
+            "name": "Playground Workflow",
+            "description": "Temporary workflow for playground execution",
+            "nodes": request.workflow_ir.get("nodes", []),
+            "edges": request.workflow_ir.get("edges", []),
+            "created_at": datetime.now(),
+            "updated_at": datetime.now()
+        }
+        
+        workflow = Workflow(**workflow_data)
+        logger.debug(f"Created workflow with {len(workflow.nodes)} nodes and {len(workflow.edges)} edges")
+        
+        # Validate workflow
+        errors = validation_service.validate_for_execution(workflow)
+        
+        if errors:
+            logger.error(f"Workflow validation failed: {errors}")
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Workflow not found"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Workflow validation failed: {'; '.join(errors)}"
             )
         
-        logger.debug(f"Workflow nodes: {[n.id for n in workflow.nodes]}")
-        logger.debug(f"Workflow edges: {[(e.source, e.target) for e in workflow.edges]}")
+        # Prepare input data with question and history
+        input_data = {
+            "question": request.question,
+        }
+        
+        # Process input data to handle question and history dynamically
+        processed_input = _process_playground_input(input_data, request.conversation_history, workflow)
+        logger.debug(f"Processed input: {processed_input}")
         
         # Execute workflow directly
         logger.debug("Executing workflow")
-        execution = await execution_engine.execute_workflow(workflow, request.input_data)
+        execution = await execution_engine.execute_workflow(workflow, processed_input)
         
         logger.info(f"Execution completed with status: {execution.status}")
         if execution.error:
@@ -189,7 +152,7 @@ async def execute_workflow_playground(request: PlaygroundExecutionRequest):
         
         # Check if execution failed and return 500 error
         if execution.status == "failed":
-            logger.error(f"Workflow execution failed for {request.workflow_id}: {execution.error}")
+            logger.error(f"Workflow execution failed: {execution.error}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Workflow execution failed: {execution.error}"
@@ -204,7 +167,7 @@ async def execute_workflow_playground(request: PlaygroundExecutionRequest):
             "error": None
         }
         
-        logger.info(f"Playground execution completed successfully for workflow: {request.workflow_id}")
+        logger.info(f"Playground execution completed successfully")
         return response
         
     except HTTPException:

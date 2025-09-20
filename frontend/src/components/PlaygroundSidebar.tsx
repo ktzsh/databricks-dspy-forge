@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { X, Play, MessageSquare, Loader2, AlertCircle } from 'lucide-react';
+import { X, Play, MessageSquare, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 
 interface PlaygroundSidebarProps {
   workflowId: string | null;
+  workflowIR: { nodes: any[]; edges: any[] } | null;
   onClose: () => void;
   onExecute: (inputData: Record<string, any>) => void;
 }
 
-const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, onClose, onExecute }) => {
+const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workflowIR, onClose, onExecute }) => {
   const [inputText, setInputText] = useState('');
   const [chatHistory, setChatHistory] = useState<Array<{ 
     role: 'user' | 'assistant' | 'system'; 
@@ -16,18 +17,24 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, onClo
     execution_id?: string;
     error?: boolean;
   }>>([]);
+  const [conversationHistory, setConversationHistory] = useState<Array<Record<string, any>>>([]);
   const [isExecuting, setIsExecuting] = useState(false);
 
+  const clearPlayground = () => {
+    setChatHistory([]);
+    setConversationHistory([]);
+    setInputText('');
+  };
 
   const handleExecute = async () => {
     if (!inputText.trim() || isExecuting) return;
     
-    if (!workflowId) {
+    if (!workflowIR) {
       setChatHistory(prev => [
         ...prev,
         { 
           role: 'system', 
-          content: 'Please save the workflow first before executing it in the playground.',
+          content: 'No workflow defined. Please create a workflow first.',
           error: true,
           timestamp: new Date().toISOString()
         }
@@ -48,14 +55,7 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, onClo
     setInputText('');
 
     try {
-      // Prepare input data for workflow execution
-      const inputData = {
-        input: userInput,
-        query: userInput,
-        text: userInput
-      };
-
-      // Call the playground execution endpoint
+      // Call the playground execution endpoint with workflow IR, question, and history
       const response = await fetch('/api/v1/execution/playground', {
         method: 'POST',
         headers: {
@@ -63,39 +63,60 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, onClo
         },
         body: JSON.stringify({
           workflow_id: workflowId,
-          input_data: inputData
+          workflow_ir: workflowIR,
+          question: userInput,
+          conversation_history: conversationHistory
         }),
       });
 
       const result = await response.json();
 
       if (response.ok && result.success) {
-        // Format the successful response
+        // Extract all output fields from the result
+        const outputFields: Record<string, any> = {};
         let responseContent = '';
         
         if (result.result && typeof result.result === 'object') {
-          // Try to extract meaningful output from the result
+          // Process each end node result
           const resultEntries = Object.entries(result.result);
           if (resultEntries.length > 0) {
             responseContent = resultEntries.map(([key, value]) => {
               if (typeof value === 'object' && value !== null) {
-                // If the value is an object, try to extract meaningful content
+                // Extract fields from the end node result
+                Object.entries(value).forEach(([fieldName, fieldValue]) => {
+                  outputFields[fieldName] = fieldValue;
+                });
+                
+                // Format display content
                 if ('output' in value) {
                   return `**${key}**: ${value.output}`;
+                } else if ('answer' in value) {
+                  return `**${key}**: ${value.answer}`;
                 } else if ('context' in value) {
                   return `**${key}**: ${value.context}`;
                 } else {
                   return `**${key}**: ${JSON.stringify(value, null, 2)}`;
                 }
+              } else {
+                outputFields[key] = value;
+                return `**${key}**: ${value}`;
               }
-              return `**${key}**: ${value}`;
             }).join('\n\n');
           } else {
             responseContent = 'Workflow executed successfully, but no output was generated.';
           }
         } else {
+          outputFields['output'] = result.result;
           responseContent = result.result || 'Workflow executed successfully.';
         }
+
+        // Update conversation history with the complete exchange
+        const conversationExchange = {
+          question: userInput,
+          ...outputFields
+        };
+        
+        setConversationHistory(prev => [...prev, conversationExchange]);
 
         setChatHistory(prev => [
           ...prev,
@@ -143,12 +164,24 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, onClo
     <div className="h-full flex flex-col">
       <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
         <h2 className="text-lg font-semibold text-gray-900">Playground</h2>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-gray-100 rounded"
-        >
-          <X size={20} className="text-gray-500" />
-        </button>
+        <div className="flex items-center space-x-2">
+          {chatHistory.length > 0 && (
+            <button
+              onClick={clearPlayground}
+              className="p-1 hover:bg-gray-100 rounded flex items-center space-x-1 text-gray-500 hover:text-gray-700"
+              title="Clear conversation"
+            >
+              <Trash2 size={16} />
+              <span className="text-sm">Clear</span>
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 rounded"
+          >
+            <X size={20} className="text-gray-500" />
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col flex-1 min-h-0">
