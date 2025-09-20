@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -10,6 +10,8 @@ import ReactFlow, {
   MiniMap,
   Background,
   BackgroundVariant,
+  useReactFlow,
+  ReactFlowProvider,
 } from 'reactflow';
 import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash } from 'lucide-react';
 
@@ -50,7 +52,61 @@ const createDefaultStartNode = (): Node => ({
 const initialNodes: Node[] = [createDefaultStartNode()];
 const initialEdges: Edge[] = [];
 
-const WorkflowBuilder: React.FC = () => {
+// Helper function to find a good position for new nodes
+const findAvailablePosition = (existingNodes: Node[], preferredX: number = 100, preferredY: number = 100) => {
+  const nodeWidth = 200; // Approximate node width
+  const nodeHeight = 100; // Approximate node height
+  const padding = 50; // Padding between nodes
+  
+  // Check if position is occupied
+  const isPositionOccupied = (x: number, y: number) => {
+    return existingNodes.some(node => {
+      const nodeX = node.position.x;
+      const nodeY = node.position.y;
+      return (
+        x < nodeX + nodeWidth + padding &&
+        x + nodeWidth + padding > nodeX &&
+        y < nodeY + nodeHeight + padding &&
+        y + nodeHeight + padding > nodeY
+      );
+    });
+  };
+  
+  // Start with preferred position
+  let x = preferredX;
+  let y = preferredY;
+  
+  // If preferred position is occupied, find an alternative
+  if (isPositionOccupied(x, y)) {
+    // Try positions in a grid pattern
+    let found = false;
+    const maxAttempts = 50;
+    let attempt = 0;
+    
+    for (let row = 0; row < 10 && !found && attempt < maxAttempts; row++) {
+      for (let col = 0; col < 5 && !found && attempt < maxAttempts; col++) {
+        x = preferredX + (col * (nodeWidth + padding));
+        y = preferredY + (row * (nodeHeight + padding));
+        
+        if (!isPositionOccupied(x, y)) {
+          found = true;
+        }
+        attempt++;
+      }
+    }
+    
+    // If still not found, use a random offset
+    if (!found) {
+      x = preferredX + Math.random() * 300;
+      y = preferredY + Math.random() * 300;
+    }
+  }
+  
+  return { x, y };
+};
+
+const WorkflowBuilderContent: React.FC = () => {
+  const reactFlowInstance = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [workflowName, setWorkflowName] = useState('Untitled Workflow');
@@ -63,6 +119,7 @@ const WorkflowBuilder: React.FC = () => {
   const [showNodeExecutionModal, setShowNodeExecutionModal] = useState(false);
   const [selectedNodeExecution, setSelectedNodeExecution] = useState<any>(null);
   const { toasts, removeToast, showSuccess, showError } = useToast();
+  const fitViewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Function to ensure default start node exists and is the only start node
   const ensureDefaultStartNode = useCallback((nodes: Node[]) => {
@@ -157,6 +214,15 @@ const WorkflowBuilder: React.FC = () => {
     };
   }, [selectedNodes, selectedEdges, setNodes, setEdges]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (fitViewTimeoutRef.current) {
+        clearTimeout(fitViewTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleLoadWorkflow = useCallback((workflow: any) => {
     // Convert backend data to frontend format
     const loadedNodes = workflow.nodes.map((node: any) => ({
@@ -192,7 +258,20 @@ const WorkflowBuilder: React.FC = () => {
     // Clear selections
     setSelectedNodes([]);
     setSelectedEdges([]);
-  }, [setNodes, setEdges, ensureDefaultStartNode]);
+    
+    // Auto-fit view after loading with a slight delay to ensure nodes are rendered
+    if (fitViewTimeoutRef.current) {
+      clearTimeout(fitViewTimeoutRef.current);
+    }
+    fitViewTimeoutRef.current = setTimeout(() => {
+      reactFlowInstance.fitView({ 
+        padding: 0.1, 
+        duration: 800,
+        minZoom: 0.3,
+        maxZoom: 1.2
+      });
+    }, 100);
+  }, [setNodes, setEdges, ensureDefaultStartNode, reactFlowInstance]);
 
   const handleNewWorkflow = useCallback(() => {
     const defaultStart = createDefaultStartNode();
@@ -348,10 +427,14 @@ const WorkflowBuilder: React.FC = () => {
         <div className="w-80 border-r border-gray-200 bg-gray-50 flex-shrink-0 overflow-y-auto">
           <ComponentSidebar onAddNode={(nodeData) => {
           const newNodeId = `node-${Date.now()}`;
+          
+          // Find an available position for the new node
+          const availablePosition = findAvailablePosition(nodes, 100, 100);
+          
           const newNode: Node = {
             id: newNodeId,
             type: nodeData.type,
-            position: { x: 100, y: 100 },
+            position: availablePosition,
             data: nodeData.data,
           };
 
@@ -373,10 +456,13 @@ const WorkflowBuilder: React.FC = () => {
               signatureFields = [{ name: 'context', type: 'list[str]', required: true }];
             }
             
+            // Find position for signature node (to the right of the retriever)
+            const signaturePosition = findAvailablePosition([...nodes, newNode], availablePosition.x + 300, availablePosition.y);
+            
             const signatureNode: Node = {
               id: signatureNodeId,
               type: 'signature_field',
-              position: { x: 400, y: 100 },
+              position: signaturePosition,
               data: {
                 fields: signatureFields,
                 isStart: false,
@@ -413,11 +499,18 @@ const WorkflowBuilder: React.FC = () => {
             onSelectionChange={onSelectionChange}
             onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
-            fitView
+            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+            minZoom={0.1}
+            maxZoom={2}
             snapToGrid
             snapGrid={[20, 20]}
             deleteKeyCode={null}
             multiSelectionKeyCode={['Control', 'Meta']}
+            fitViewOptions={{
+              padding: 0.1,
+              minZoom: 0.3,
+              maxZoom: 1.2
+            }}
           >
             <Controls />
             <MiniMap />
@@ -537,6 +630,15 @@ const WorkflowBuilder: React.FC = () => {
         </div>
       )}
     </div>
+  );
+};
+
+// Wrapper component with ReactFlowProvider
+const WorkflowBuilder: React.FC = () => {
+  return (
+    <ReactFlowProvider>
+      <WorkflowBuilderContent />
+    </ReactFlowProvider>
   );
 };
 
