@@ -17,6 +17,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           description: 'Define input/output fields with types',
           type: 'signature_field',
           data: {
+            label: 'Signature Field',
             fields: [{ name: 'input', type: 'str', required: true }],
             isStart: false,
             isEnd: false
@@ -34,6 +35,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           description: 'Basic prediction module',
           type: 'module',
           data: {
+            label: 'Predict',
             moduleType: 'Predict',
             model: '',
             instruction: '',
@@ -47,6 +49,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           description: 'Chain of thought reasoning',
           type: 'module',
           data: {
+            label: 'Chain of Thought',
             moduleType: 'ChainOfThought',
             model: '',
             instruction: '',
@@ -60,6 +63,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           description: 'Reasoning and acting module',
           type: 'module',
           data: {
+            label: 'ReAct',
             moduleType: 'ReAct',
             model: '',
             instruction: '',
@@ -73,6 +77,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           description: 'Best of N selection module',
           type: 'module',
           data: {
+            label: 'Best of N',
             moduleType: 'BestOfN',
             model: '',
             instruction: '',
@@ -86,6 +91,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           description: 'Refinement module',
           type: 'module',
           data: {
+            label: 'Refine',
             moduleType: 'Refine',
             model: '',
             instruction: '',
@@ -104,6 +110,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           description: 'Conditional branching',
           type: 'logic',
           data: {
+            label: 'If-Else',
             logicType: 'IfElse',
             condition: '',
             parameters: {}
@@ -116,6 +123,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           description: 'Merge multiple paths',
           type: 'logic',
           data: {
+            label: 'Merge',
             logicType: 'Merge',
             parameters: {}
           }
@@ -127,6 +135,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           description: 'Select specific fields from input',
           type: 'logic',
           data: {
+            label: 'Field Selector',
             logicType: 'FieldSelector',
             selectedFields: [],
             fieldMappings: {},
@@ -145,10 +154,13 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           description: 'Databricks Vector Search',
           type: 'retriever',
           data: {
+            label: 'Unstructured Retrieve',
             retrieverType: 'UnstructuredRetrieve',
             catalogName: '',
             schemaName: '',
             indexName: '',
+            contentColumn: '',
+            idColumn: '',
             embeddingModel: '',
             queryType: 'HYBRID',
             numResults: 3,
@@ -163,6 +175,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           description: 'Databricks Genie Space',
           type: 'retriever',
           data: {
+            label: 'Structured Retrieve',
             retrieverType: 'StructuredRetrieve',
             genieSpaceId: '',
             parameters: {}

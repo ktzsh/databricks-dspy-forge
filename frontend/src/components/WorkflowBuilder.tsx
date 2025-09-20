@@ -225,17 +225,53 @@ const WorkflowBuilderContent: React.FC = () => {
 
   const handleLoadWorkflow = useCallback((workflow: any) => {
     // Convert backend data to frontend format
-    const loadedNodes = workflow.nodes.map((node: any) => ({
-      id: node.id,
-      type: node.type || 'signature_field',
-      position: node.position || { x: 100, y: 100 },
-      data: {
-        ...node.data,
-        // Convert snake_case back to camelCase for frontend
-        ...(node.data.module_type && { moduleType: node.data.module_type }),
-        ...(node.data.logic_type && { logicType: node.data.logic_type }),
+    const loadedNodes = workflow.nodes.map((node: any) => {
+      let nodeData = { ...node.data };
+      
+      // Convert snake_case back to camelCase for frontend
+      if (node.data.module_type) {
+        nodeData.moduleType = node.data.module_type;
+        delete nodeData.module_type;
       }
-    }));
+      
+      if (node.data.logic_type) {
+        nodeData.logicType = node.data.logic_type;
+        delete nodeData.logic_type;
+      }
+      
+      if (node.data.retriever_type) {
+        nodeData.retrieverType = node.data.retriever_type;
+        delete nodeData.retriever_type;
+      }
+      
+      // Convert other snake_case fields back to camelCase for retrievers
+      const snakeToCamelMappings = {
+        catalog_name: 'catalogName',
+        schema_name: 'schemaName',
+        index_name: 'indexName',
+        content_column: 'contentColumn',
+        id_column: 'idColumn',
+        embedding_model: 'embeddingModel',
+        query_type: 'queryType',
+        num_results: 'numResults',
+        score_threshold: 'scoreThreshold',
+        genie_space_id: 'genieSpaceId'
+      };
+      
+      for (const [snakeCase, camelCase] of Object.entries(snakeToCamelMappings)) {
+        if (nodeData[snakeCase] !== undefined) {
+          nodeData[camelCase] = nodeData[snakeCase];
+          delete nodeData[snakeCase];
+        }
+      }
+      
+      return {
+        id: node.id,
+        type: node.type || 'signature_field',
+        position: node.position || { x: 100, y: 100 },
+        data: nodeData
+      };
+    });
 
     const loadedEdges = workflow.edges.map((edge: any) => ({
       id: edge.id,
@@ -299,6 +335,35 @@ const WorkflowBuilderContent: React.FC = () => {
         if (node.type === 'logic' && nodeData.logicType) {
           nodeData.logic_type = nodeData.logicType;
           delete nodeData.logicType;
+        }
+        
+        if (node.type === 'retriever') {
+          // Convert retrieverType to retriever_type
+          if (nodeData.retrieverType) {
+            nodeData.retriever_type = nodeData.retrieverType;
+            delete nodeData.retrieverType;
+          }
+          
+          // Convert other camelCase fields for retrievers
+          const camelToSnakeMappings = {
+            catalogName: 'catalog_name',
+            schemaName: 'schema_name',
+            indexName: 'index_name',
+            contentColumn: 'content_column',
+            idColumn: 'id_column',
+            embeddingModel: 'embedding_model',
+            queryType: 'query_type',
+            numResults: 'num_results',
+            scoreThreshold: 'score_threshold',
+            genieSpaceId: 'genie_space_id'
+          };
+          
+          for (const [camelCase, snakeCase] of Object.entries(camelToSnakeMappings)) {
+            if (nodeData[camelCase] !== undefined) {
+              nodeData[snakeCase] = nodeData[camelCase];
+              delete nodeData[camelCase];
+            }
+          }
         }
         
         return {
@@ -464,6 +529,7 @@ const WorkflowBuilderContent: React.FC = () => {
               type: 'signature_field',
               position: signaturePosition,
               data: {
+                label: nodeData.data.retrieverType === 'StructuredRetrieve' ? 'SQL Results' : 'Retrieved Context',
                 fields: signatureFields,
                 isStart: false,
                 isEnd: false,

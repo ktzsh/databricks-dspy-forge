@@ -7,11 +7,14 @@ const retrieverTypes: RetrieverType[] = ['UnstructuredRetrieve', 'StructuredRetr
 
 const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected, id }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [nodeLabel, setNodeLabel] = useState(data.label || data.retrieverType || 'Retriever');
   const [retrieverType, setRetrieverType] = useState<RetrieverType>(data.retrieverType || 'UnstructuredRetrieve');
   // UnstructuredRetrieve fields
   const [catalogName, setCatalogName] = useState(data.catalogName || '');
   const [schemaName, setSchemaName] = useState(data.schemaName || '');
   const [indexName, setIndexName] = useState(data.indexName || '');
+  const [contentColumn, setContentColumn] = useState(data.contentColumn || '');
+  const [idColumn, setIdColumn] = useState(data.idColumn || '');
   const [embeddingModel, setEmbeddingModel] = useState(data.embeddingModel || '');
   const [queryType, setQueryType] = useState<'HYBRID' | 'ANN'>(data.queryType || 'HYBRID');
   const [numResults, setNumResults] = useState(data.numResults || 3);
@@ -23,11 +26,14 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
   const { deleteElements } = useReactFlow();
 
   const handleSave = () => {
+    data.label = nodeLabel;
     data.retrieverType = retrieverType;
     // Save UnstructuredRetrieve fields
     data.catalogName = catalogName;
     data.schemaName = schemaName;
     data.indexName = indexName;
+    data.contentColumn = contentColumn;
+    data.idColumn = idColumn;
     data.embeddingModel = embeddingModel;
     data.queryType = queryType;
     data.numResults = numResults;
@@ -76,9 +82,9 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
         <div className="flex flex-col">
           <div className="flex items-center space-x-2">
             <Database size={16} className="text-orange-600" />
-            <span className="font-medium text-orange-800">{retrieverType}</span>
+            <span className="font-medium text-orange-800">{nodeLabel}</span>
           </div>
-          <div className="text-xs text-orange-600 opacity-75 mt-1">ID: {id}</div>
+          <div className="text-xs text-orange-600 opacity-75 mt-1">{retrieverType}</div>
         </div>
         <div className="flex items-center space-x-1">
           <button
@@ -102,6 +108,18 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
       <div className="p-3">
         {isEditing ? (
           <div className="space-y-3">
+            {/* Node Name */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Node Name</label>
+              <input
+                type="text"
+                value={nodeLabel}
+                onChange={(e) => setNodeLabel(e.target.value)}
+                placeholder="Enter node name"
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              />
+            </div>
+            
             {/* Retriever Type Selection */}
             <div>
               <label className="block text-sm font-medium mb-1">Retriever Type</label>
@@ -156,6 +174,34 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
                     value={indexName}
                     onChange={(e) => setIndexName(e.target.value)}
                     placeholder="Enter index name"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Content Column <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={contentColumn}
+                    onChange={(e) => setContentColumn(e.target.value)}
+                    placeholder="Enter content column name"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    ID Column <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={idColumn}
+                    onChange={(e) => setIdColumn(e.target.value)}
+                    placeholder="Enter ID column name"
                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                     required
                   />

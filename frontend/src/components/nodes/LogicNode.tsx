@@ -13,6 +13,7 @@ const logicIcons: Record<LogicType, React.ReactNode> = {
 
 const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [nodeLabel, setNodeLabel] = useState(data.label || data.logicType || 'Logic');
   const [logicType, setLogicType] = useState<LogicType>(data.logicType || 'IfElse');
   const [condition, setCondition] = useState(data.condition || '');
   const [parameters, setParameters] = useState(data.parameters || {});
@@ -49,6 +50,7 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
   }, [logicType, nodes, edges, id]);
 
   const handleSave = () => {
+    data.label = nodeLabel;
     data.logicType = logicType;
     data.condition = condition;
     data.parameters = parameters;
@@ -138,9 +140,9 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
         <div className="flex flex-col">
           <div className="flex items-center space-x-2">
             {logicIcons[logicType] || <GitBranch size={16} className="text-purple-600" />}
-            <span className="font-medium text-purple-800">{logicType}</span>
+            <span className="font-medium text-purple-800">{nodeLabel}</span>
           </div>
-          <div className="text-xs text-purple-600 opacity-75 mt-1">ID: {id}</div>
+          <div className="text-xs text-purple-600 opacity-75 mt-1">{logicType}</div>
         </div>
         <div className="flex items-center space-x-1">
           <button
@@ -164,6 +166,18 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
       <div className="p-3">
         {isEditing ? (
           <div className="space-y-3">
+            {/* Node Name */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Node Name</label>
+              <input
+                type="text"
+                value={nodeLabel}
+                onChange={(e) => setNodeLabel(e.target.value)}
+                placeholder="Enter node name"
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              />
+            </div>
+            
             {/* Logic Type Selection */}
             <div>
               <label className="block text-sm font-medium mb-1">Logic Type</label>

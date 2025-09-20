@@ -59,6 +59,8 @@ def _normalize_workflow_data(workflow_ir: Dict[str, Any]) -> Dict[str, Any]:
                 "catalogName": "catalog_name",
                 "schemaName": "schema_name", 
                 "indexName": "index_name",
+                "contentColumn": "content_column",
+                "idColumn": "id_column",
                 "embeddingModel": "embedding_model",
                 "queryType": "query_type",
                 "numResults": "num_results",

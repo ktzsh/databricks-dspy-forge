@@ -21,6 +21,7 @@ const moduleIcons: Record<ModuleType, React.ReactNode> = {
 
 const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [nodeLabel, setNodeLabel] = useState(data.label || data.moduleType || 'Module');
   const [moduleType, setModuleType] = useState<ModuleType>(data.moduleType || 'Predict');
   const [model, setModel] = useState(data.model || '');
   const [instruction, setInstruction] = useState(data.instruction || '');
@@ -28,6 +29,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
   const { deleteElements } = useReactFlow();
 
   const handleSave = () => {
+    data.label = nodeLabel;
     data.moduleType = moduleType;
     data.model = model;
     data.instruction = instruction;
@@ -73,9 +75,9 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
         <div className="flex flex-col">
           <div className="flex items-center space-x-2">
             {moduleIcons[moduleType] || <Brain size={16} className="text-green-600" />}
-            <span className="font-medium text-green-800">{moduleType}</span>
+            <span className="font-medium text-green-800">{nodeLabel}</span>
           </div>
-          <div className="text-xs text-green-600 opacity-75 mt-1">ID: {id}</div>
+          <div className="text-xs text-green-600 opacity-75 mt-1">{moduleType}</div>
         </div>
         <div className="flex items-center space-x-1">
           <button
@@ -99,6 +101,18 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
       <div className="p-3">
         {isEditing ? (
           <div className="space-y-3">
+            {/* Node Name */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Node Name</label>
+              <input
+                type="text"
+                value={nodeLabel}
+                onChange={(e) => setNodeLabel(e.target.value)}
+                placeholder="Enter node name"
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              />
+            </div>
+            
             {/* Module Type Selection */}
             <div>
               <label className="block text-sm font-medium mb-1">Module Type</label>

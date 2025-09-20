@@ -7,6 +7,7 @@ const fieldTypes: FieldType[] = ['str', 'int', 'bool', 'float', 'list[str]', 'li
 
 const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data, selected, id }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [nodeLabel, setNodeLabel] = useState(data.label || 'Signature Field');
   const [fields, setFields] = useState<SignatureField[]>(data.fields || []);
   const [isStart, setIsStart] = useState(data.isStart || false);
   const [isEnd, setIsEnd] = useState(data.isEnd || false);
@@ -62,6 +63,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
 
   const handleSave = () => {
     // Update the node data
+    data.label = nodeLabel;
     data.fields = fields;
     
     // For default start node, don't allow changing start/end status
@@ -135,9 +137,9 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
         <div className="flex flex-col">
           <div className="flex items-center space-x-2">
             <Database size={16} className="text-blue-600" />
-            <span className="font-medium text-blue-800">Signature Field</span>
+            <span className="font-medium text-blue-800">{nodeLabel}</span>
           </div>
-          <div className="text-xs text-blue-600 opacity-75 mt-1">ID: {id}</div>
+          <div className="text-xs text-blue-600 opacity-75 mt-1">signature_field</div>
         </div>
         <div className="flex items-center space-x-1">
           <button
@@ -163,6 +165,19 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
       <div className="p-3">
         {isEditing ? (
           <div className="space-y-3">
+            {/* Node Name */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Node Name</label>
+              <input
+                type="text"
+                value={nodeLabel}
+                onChange={(e) => setNodeLabel(e.target.value)}
+                placeholder="Enter node name"
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                disabled={isDefaultStartNode}
+              />
+            </div>
+            
             {/* Node Type Settings */}
             {!isDefaultStartNode && (
               <div className="flex space-x-4">

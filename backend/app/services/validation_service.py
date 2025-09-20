@@ -289,7 +289,7 @@ class WorkflowValidationService:
         else:
             if retriever_type == 'UnstructuredRetrieve':
                 # Validate required fields for UnstructuredRetrieve
-                required_fields = ['catalog_name', 'schema_name', 'index_name']
+                required_fields = ['catalog_name', 'schema_name', 'index_name', 'content_column', 'id_column']
                 for field in required_fields:
                     if not node.data.get(field):
                         errors.append(f"UnstructuredRetrieve requires {field}")

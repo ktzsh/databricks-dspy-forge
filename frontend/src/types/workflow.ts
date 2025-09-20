@@ -68,6 +68,8 @@ export interface RetrieverNodeData extends BaseNodeData {
   catalogName?: string; // Mandatory for UnstructuredRetrieve
   schemaName?: string; // Mandatory for UnstructuredRetrieve
   indexName?: string; // Mandatory for UnstructuredRetrieve
+  contentColumn?: string; // Mandatory for UnstructuredRetrieve
+  idColumn?: string; // Mandatory for UnstructuredRetrieve
   embeddingModel?: string; // Optional for UnstructuredRetrieve
   queryType?: 'HYBRID' | 'ANN'; // Default HYBRID for UnstructuredRetrieve
   numResults?: number; // Default 3 for UnstructuredRetrieve
