@@ -70,9 +70,12 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
 
       {/* Header */}
       <div className="flex items-center justify-between p-3 bg-green-100 border-b border-green-200">
-        <div className="flex items-center space-x-2">
-          {moduleIcons[moduleType] || <Brain size={16} className="text-green-600" />}
-          <span className="font-medium text-green-800">{moduleType}</span>
+        <div className="flex flex-col">
+          <div className="flex items-center space-x-2">
+            {moduleIcons[moduleType] || <Brain size={16} className="text-green-600" />}
+            <span className="font-medium text-green-800">{moduleType}</span>
+          </div>
+          <div className="text-xs text-green-600 opacity-75 mt-1">ID: {id}</div>
         </div>
         <div className="flex items-center space-x-1">
           <button

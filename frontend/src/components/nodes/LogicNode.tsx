@@ -135,9 +135,12 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
 
       {/* Header */}
       <div className="flex items-center justify-between p-3 bg-purple-100 border-b border-purple-200">
-        <div className="flex items-center space-x-2">
-          {logicIcons[logicType] || <GitBranch size={16} className="text-purple-600" />}
-          <span className="font-medium text-purple-800">{logicType}</span>
+        <div className="flex flex-col">
+          <div className="flex items-center space-x-2">
+            {logicIcons[logicType] || <GitBranch size={16} className="text-purple-600" />}
+            <span className="font-medium text-purple-800">{logicType}</span>
+          </div>
+          <div className="text-xs text-purple-600 opacity-75 mt-1">ID: {id}</div>
         </div>
         <div className="flex items-center space-x-1">
           <button

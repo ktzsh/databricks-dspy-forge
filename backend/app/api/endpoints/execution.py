@@ -10,6 +10,74 @@ from app.core.logging import get_logger
 
 from app.services.validation_service import validation_service
 from app.models.workflow import Workflow
+
+
+def _normalize_workflow_data(workflow_ir: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize workflow IR data from frontend format to backend format.
+    Converts camelCase field names to snake_case where needed.
+    """
+    normalized_nodes = []
+    
+    for node in workflow_ir.get("nodes", []):
+        normalized_node = {
+            "id": node.get("id"),
+            "type": node.get("type"),
+            "position": node.get("position", {}),
+            "data": {}
+        }
+        
+        # Copy all data fields
+        node_data = node.get("data", {})
+        for key, value in node_data.items():
+            normalized_node["data"][key] = value
+        
+        # Convert frontend camelCase to backend snake_case for specific fields
+        if node.get("type") == "module":
+            # Convert moduleType to module_type
+            if "moduleType" in node_data:
+                normalized_node["data"]["module_type"] = node_data["moduleType"]
+                if "module_type" not in node_data:  # Don't duplicate if both exist
+                    del normalized_node["data"]["moduleType"]
+        
+        elif node.get("type") == "logic":
+            # Convert logicType to logic_type
+            if "logicType" in node_data:
+                normalized_node["data"]["logic_type"] = node_data["logicType"]
+                if "logic_type" not in node_data:  # Don't duplicate if both exist
+                    del normalized_node["data"]["logicType"]
+        
+        elif node.get("type") == "retriever":
+            # Convert retrieverType to retriever_type
+            if "retrieverType" in node_data:
+                normalized_node["data"]["retriever_type"] = node_data["retrieverType"]
+                if "retriever_type" not in node_data:  # Don't duplicate if both exist
+                    del normalized_node["data"]["retrieverType"]
+            
+            # Convert other camelCase fields
+            camel_to_snake_mappings = {
+                "catalogName": "catalog_name",
+                "schemaName": "schema_name", 
+                "indexName": "index_name",
+                "embeddingModel": "embedding_model",
+                "queryType": "query_type",
+                "numResults": "num_results",
+                "scoreThreshold": "score_threshold",
+                "genieSpaceId": "genie_space_id"
+            }
+            
+            for camel_case, snake_case in camel_to_snake_mappings.items():
+                if camel_case in node_data:
+                    normalized_node["data"][snake_case] = node_data[camel_case]
+                    if snake_case not in node_data:  # Don't duplicate if both exist
+                        del normalized_node["data"][camel_case]
+        
+        normalized_nodes.append(normalized_node)
+    
+    return {
+        "nodes": normalized_nodes,
+        "edges": workflow_ir.get("edges", [])
+    }
         
 router = APIRouter()
 logger = get_logger(__name__)
@@ -108,12 +176,16 @@ async def execute_workflow_playground(request: PlaygroundExecutionRequest):
         # Use provided workflow ID
         workflow_id = request.workflow_id
         
+        # Normalize workflow IR data from frontend format to backend format
+        normalized_workflow_ir = _normalize_workflow_data(request.workflow_ir)
+        logger.debug(f"Normalized workflow IR: {normalized_workflow_ir}")
+        
         workflow_data = {
             "id": workflow_id,
             "name": "Playground Workflow",
             "description": "Temporary workflow for playground execution",
-            "nodes": request.workflow_ir.get("nodes", []),
-            "edges": request.workflow_ir.get("edges", []),
+            "nodes": normalized_workflow_ir.get("nodes", []),
+            "edges": normalized_workflow_ir.get("edges", []),
             "created_at": datetime.now(),
             "updated_at": datetime.now()
         }
@@ -158,14 +230,32 @@ async def execute_workflow_playground(request: PlaygroundExecutionRequest):
                 detail=f"Workflow execution failed: {execution.error}"
             )
         
-        # Prepare successful response
-        response = {
-            "success": True,
-            "execution_id": execution.execution_id,
-            "status": execution.status,
-            "result": execution.result,
-            "error": None
-        }
+        # Prepare successful response with enhanced structure
+        result = execution.result
+        
+        # For backward compatibility, check if result has new structure
+        if isinstance(result, dict) and 'final_outputs' in result:
+            # New format with intermediate outputs
+            response = {
+                "success": True,
+                "execution_id": execution.execution_id,
+                "status": execution.status,
+                "result": result.get('final_outputs', {}),
+                "execution_trace": result.get('execution_trace', []),
+                "node_outputs": result.get('node_outputs', {}),
+                "error": None
+            }
+        else:
+            # Legacy format
+            response = {
+                "success": True,
+                "execution_id": execution.execution_id,
+                "status": execution.status,
+                "result": result,
+                "execution_trace": [],
+                "node_outputs": {},
+                "error": None
+            }
         
         logger.info(f"Playground execution completed successfully")
         return response

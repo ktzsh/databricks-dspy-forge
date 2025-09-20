@@ -114,7 +114,12 @@ class WorkflowExecutionEngine:
             for end_node_id in end_nodes:
                 final_outputs[end_node_id] = context.get_node_output(end_node_id)
             
-            execution.result = final_outputs
+            # Include execution trace and intermediate outputs in result
+            execution.result = {
+                'final_outputs': final_outputs,
+                'execution_trace': context.execution_trace,
+                'node_outputs': context.node_outputs
+            }
             execution.status = "completed"
             
             # Generate workflow code if debug_compiler is enabled

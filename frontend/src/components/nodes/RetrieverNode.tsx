@@ -73,9 +73,12 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
 
       {/* Header */}
       <div className="flex items-center justify-between p-3 bg-orange-100 border-b border-orange-200">
-        <div className="flex items-center space-x-2">
-          <Database size={16} className="text-orange-600" />
-          <span className="font-medium text-orange-800">{retrieverType}</span>
+        <div className="flex flex-col">
+          <div className="flex items-center space-x-2">
+            <Database size={16} className="text-orange-600" />
+            <span className="font-medium text-orange-800">{retrieverType}</span>
+          </div>
+          <div className="text-xs text-orange-600 opacity-75 mt-1">ID: {id}</div>
         </div>
         <div className="flex items-center space-x-1">
           <button
