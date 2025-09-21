@@ -18,8 +18,21 @@ from program import CompoundProgram
 mlflow.dspy.autolog()
 
 class DSPyResponseAgent(ResponsesAgent):
-    def __init__(self, agent):
+    def __init__(self):
         self.program = CompoundProgram()
+        # TODO add output field names to program and reference it here
+
+    def _convert_to_dspy_format(self, messages):
+        question = messages[-1]['content']
+
+        history = []
+        for i in range(0, len(messages) - 1, 2):
+            if i + 1 < len(messages):
+                history.append({
+                    'question': messages[i]['content'],
+                    'answer': messages[i + 1]['content']
+                })
+        return question, history
 
     def predict(self, request: ResponsesAgentRequest) -> ResponsesAgentResponse:
         outputs = [
@@ -34,22 +47,19 @@ class DSPyResponseAgent(ResponsesAgent):
         request: ResponsesAgentRequest,
     ) -> Generator[ResponsesAgentStreamEvent, None, None]:
         cc_msgs = self.prep_msgs_for_cc_llm([i.model_dump() for i in request.input])
+        dspy_msgs = self._convert_to_dspy_format(cc_msgs)
+        
+        output = self.program(*dspy_msgs)
 
-        for event in self.agent.stream({"messages": cc_msgs}, stream_mode=["updates", "messages"]):
-            if event[0] == "updates":
-                for node_data in event[1].values():
-                    for item in self._langchain_to_responses(node_data["messages"]):
-                        yield ResponsesAgentStreamEvent(type="response.output_item.done", item=item)
-            # filter the streamed messages to just the generated text messages
-            elif event[0] == "messages":
-                try:
-                    chunk = event[1][0]
-                    if isinstance(chunk, AIMessageChunk) and (content := chunk.content):
-                        yield ResponsesAgentStreamEvent(
-                            **self.create_text_delta(delta=content, item_id=chunk.id),
-                        )
-                except Exception as e:
-                    print(e)
+        # TODO Implement Streaming
+        for item in [output.answer]: # TODO use derived output field names
+            yield ResponsesAgentStreamEvent(
+                type="response.output_item.done",
+                item=self.create_text_output_item(
+                    text=item,
+                    id=str(uuid4())
+                )
+            )
 
 
 # Create the agent object, and specify it as the agent object to use when
