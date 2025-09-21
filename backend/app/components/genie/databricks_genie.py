@@ -1,4 +1,12 @@
-def DatabricksGenieRM(dspy.retrieve):
+import dspy
+
+from typing import Optional, Any, List, Dict
+
+from databricks_ai_bridge.genie import Genie
+from dspy.primitives.prediction import Prediction
+
+
+class DatabricksGenieRM(dspy.Retrieve):
     def __init__(
         self,
         databricks_genie_space_id: str,
@@ -6,6 +14,8 @@ def DatabricksGenieRM(dspy.retrieve):
         databricks_workspace_client: Optional[Any] = None,
         use_with_databricks_agent_framework: bool = False
     ):
+        super().__init__()
+        self.databricks_genie_space_id = databricks_genie_space_id
         self.use_with_databricks_agent_framework = use_with_databricks_agent_framework
         self.genie = Genie(databricks_genie_space_id, client=databricks_workspace_client)
     

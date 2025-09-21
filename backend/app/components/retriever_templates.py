@@ -3,6 +3,7 @@ Retriever component templates.
 
 Handles UnstructuredRetrieve and StructuredRetrieve node types.
 """
+import os, ast
 
 from typing import Dict, Any
 from app.core.templates import NodeTemplate, CodeGenerationContext
@@ -115,7 +116,6 @@ class UnstructuredRetrieveTemplate(BaseRetrieverTemplate):
         
         # Generate instance initialization
         instance_lines = [
-            f"",
             f"        # Initialize DatabricksRM retriever",
             f"        self.{instance_var} = DatabricksRM(",
             f"            databricks_index_name=\"{databricks_index_name}\",",
@@ -125,12 +125,14 @@ class UnstructuredRetrieveTemplate(BaseRetrieverTemplate):
             f"            use_with_databricks_agent_framework=True", 
             f"        )"
         ]
+        instance_lines[-1] += "\n"
         
         # Generate execution code
         forward_lines = [
             f"        # Execute UnstructuredRetrieve",
             f"        {output_fields[0]} = self.{instance_var}({input_fields[0]}, query_type='{query_type}')"
         ]
+        forward_lines[-1] += "\n"
         
         instance_code = '\n'.join(instance_lines)
         forward_code = '\n'.join(forward_lines)
@@ -157,61 +159,103 @@ class StructuredRetrieveTemplate(BaseRetrieverTemplate):
         if not genie_space_id:
             raise ValueError("StructuredRetrieve requires genie_space_id")
         
-        # TODO: Implement actual Genie integration for SQL generation and execution
-        # Mock SQL generation and execution results for now
-        mock_sql_query = f"SELECT * FROM sales_data WHERE description LIKE '%{query}%' ORDER BY date DESC LIMIT 10;"
-        mock_query_description = f"Searching for sales records related to '{query}', ordered by most recent first"
-        mock_sql_results = f"""
-| Date | Product | Sales | Region |
-|------|---------|-------|--------|
-| 2024-01-15 | Product A related to {query} | $1,500 | North |
-| 2024-01-14 | Product B matching {query} | $2,300 | South |
-| 2024-01-13 | Another item for {query} | $800 | East |
+        try:
+            # Import and initialize DatabricksGenieRM
+            from app.components.genie.databricks_genie import DatabricksGenieRM
+            
+            # Initialize the retriever
+            retriever = DatabricksGenieRM(
+                databricks_genie_space_id=genie_space_id,
+                use_with_databricks_agent_framework=False
+            )
+            
+            # Execute retrieval with Genie
+            result = retriever(query)
+            
+            # Extract fields from the Prediction object
+            context_list = result.result
+            sql_query = getattr(result, 'query_sql', '')
+            query_description = getattr(result, 'query_reasoning', '')
+            conversation_id = getattr(result, 'conversation_id', '')
 
-**Total Records Found:** 3
-**Query Execution Time:** 0.45s
-        """.strip()
-        
-        return {
-            'context': mock_sql_results,  # SQL results in markdown format
-            'sql_query': mock_sql_query,  # Generated SQL query
-            'query_description': mock_query_description,  # Description of the generated SQL query
-            'query': query,
-            'retriever_config': {
-                'genie_space_id': genie_space_id,
-                'retriever_type': 'StructuredRetrieve'
+            return {
+                'context': context_list,  # SQL results in markdown format
+                'sql_query': sql_query,  # Generated SQL query
+                'query_description': query_description,  # Description of the generated SQL query
+                'conversation_id': conversation_id,  # Genie conversation ID
+                'query': query,
+                'retriever_config': {
+                    'genie_space_id': genie_space_id,
+                    'retriever_type': 'StructuredRetrieve'
+                }
             }
-        }
+        except Exception as e:
+            # Handle any other errors gracefully
+            raise ValueError(f"StructuredRetrieve execution failed: {str(e)}")
+
     
     def generate_code(self, context: CodeGenerationContext) -> Dict[str, Any]:
         """Generate code for StructuredRetrieve node"""
         genie_space_id = self.node_data.get('genie_space_id', '')
         
-        instance_var = f"structured_retrieve_{context.get_node_count('structured_retrieve')}"
+        # Get input fields
+        input_fields = self._get_connected_fields(is_input=True)
         
-        # Generate configuration
-        config_lines = [
-            f"        # StructuredRetrieve configuration",
-            f"        {instance_var}_config = {{",
-            f"            'genie_space_id': '{genie_space_id}'",
-            f"        }}"
+        instance_var = f"genie_retriever_{context.get_node_count('structured_retrieve')}"
+        
+        # Generate instance initialization
+        instance_lines = [
+            f"        # Initialize DatabricksGenieRM retriever",
+            f"        self.{instance_var} = DatabricksGenieRM(",
+            f"            databricks_genie_space_id=\"{genie_space_id}\",",
+            f"            use_with_databricks_agent_framework=False",
+            f"        )"
         ]
+        instance_lines[-1] += "\n"
         
         # Generate execution code
         forward_lines = [
             f"        # Execute StructuredRetrieve",
-            f"        {instance_var}_result = await self._execute_structured_retrieve(query, {instance_var}_config)",
-            f"        context = {instance_var}_result['context']",
-            f"        sql_query = {instance_var}_result['sql_query']"
+            f"        genie_result = self.{instance_var}.forward({input_fields[0] if input_fields else 'query'})",
+            f"        context = genie_result.result[0] if genie_result.result else ''",
+            f"        sql_query = getattr(genie_result, 'query_sql', '')",
+            f"        query_reasoning = getattr(genie_result, 'query_reasoning', '')"
         ]
+        forward_lines[-1] += "\n"
         
-        instance_code = '\n'.join(config_lines)
+        instance_code = '\n'.join(instance_lines)
         forward_code = '\n'.join(forward_lines)
         
+        # Read DatabricksGenieRM class definition from the original file
+        def _read_genie_class_definition():
+            # Get the path to the databricks_genie.py file
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            genie_file_path = os.path.join(current_dir, 'genie', 'databricks_genie.py')
+            
+            # Read the file content
+            with open(genie_file_path, 'r') as f:
+                file_content = f.read()
+                
+                # Parse the AST to extract only the class definition
+                tree = ast.parse(file_content)
+                
+                # Find the DatabricksGenieRM class
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.ClassDef) and node.name == 'DatabricksGenieRM':
+                        # Get the source code for this class
+                        class_lines = file_content.split('\n')[node.lineno-1:node.end_lineno]
+                        class_definition = '\n'.join(class_lines)
+                        return class_definition
+                
+            raise ValueError("DatabricksGenieRM class not found in databricks_genie.py")
+        
+        genie_class_definition = _read_genie_class_definition()
+
         return {
             'signature': '',
             'instance': instance_code,
             'forward': forward_code,
             'dependencies': [],
+            'class_definition': genie_class_definition.strip(),
             'instance_var': instance_var
         }

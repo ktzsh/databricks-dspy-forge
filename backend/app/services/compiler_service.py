@@ -92,6 +92,7 @@ class WorkflowCompilerService:
             instances = []
             forward_code_blocks = []
             instance_vars = []
+            class_definitions = []
             
             for node_id in execution_order:
                 node = next((n for n in workflow.nodes if n.id == node_id), None)
@@ -105,6 +106,9 @@ class WorkflowCompilerService:
                 node_code = template.generate_code(context)
                 
                 # Collect code components
+                if node_code.get('class_definition'):
+                    class_definitions.append(node_code['class_definition'])
+
                 if node_code.get('signature'):
                     signatures.append(node_code['signature'])
                 
@@ -117,6 +121,12 @@ class WorkflowCompilerService:
                 if node_code.get('instance_var'):
                     instance_vars.append(node_code['instance_var'])
             
+            # Generate class definitions
+            for class_def in class_definitions:
+                if class_def.strip():
+                    code_lines.append(class_def)
+                    code_lines.append("")
+
             # Add signatures to code
             for signature in signatures:
                 if signature.strip():

@@ -131,6 +131,7 @@ class BaseModuleTemplate(NodeTemplate):
         # Extract output fields
         for field in output_fields:
             forward_lines.append(f"        {field} = {result_var}.{field}")
+        forward_lines[-1] += "\n"
         
         forward_code = '\n'.join(forward_lines)
         

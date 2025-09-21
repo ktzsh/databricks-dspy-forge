@@ -522,7 +522,7 @@ const WorkflowBuilderContent: React.FC = () => {
             if (nodeData.data.retrieverType === 'StructuredRetrieve') {
               // StructuredRetrieve outputs specialized fields
               signatureFields = [
-                { name: 'context', type: 'str', required: true, description: 'SQL results in markdown format' },
+                { name: 'context', type: 'list[str]', required: true, description: 'SQL results in markdown format' },
                 { name: 'sql_query', type: 'str', required: true, description: 'Generated SQL query' },
                 { name: 'query_description', type: 'str', required: true, description: 'Description of the generated SQL query' }
               ];
