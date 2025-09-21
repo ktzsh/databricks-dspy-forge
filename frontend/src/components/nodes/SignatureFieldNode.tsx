@@ -144,7 +144,10 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
         </div>
         <div className="flex items-center space-x-1">
           <button
-            onClick={() => setIsEditing(!isEditing)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsEditing(!isEditing);
+            }}
             className="p-1 hover:bg-blue-200 rounded"
             title="Edit node"
           >
@@ -152,7 +155,10 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
           </button>
           {!isDefaultStartNode && (
             <button
-              onClick={handleDelete}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete();
+              }}
               className="p-1 hover:bg-red-200 rounded"
               title="Delete node"
             >
@@ -297,7 +303,10 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
             </div>
 
             <button
-              onClick={handleSave}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSave();
+              }}
               className="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
               Save

@@ -82,14 +82,20 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
         </div>
         <div className="flex items-center space-x-1">
           <button
-            onClick={() => setIsEditing(!isEditing)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsEditing(!isEditing);
+            }}
             className="p-1 hover:bg-green-200 rounded"
             title="Edit node"
           >
             <Edit3 size={14} className="text-green-600" />
           </button>
           <button
-            onClick={handleDelete}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete();
+            }}
             className="p-1 hover:bg-red-200 rounded"
             title="Delete node"
           >
@@ -205,7 +211,10 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
             </div>
 
             <button
-              onClick={handleSave}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSave();
+              }}
               className="w-full px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700"
             >
               Save

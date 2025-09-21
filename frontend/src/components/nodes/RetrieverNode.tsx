@@ -89,14 +89,20 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
         </div>
         <div className="flex items-center space-x-1">
           <button
-            onClick={() => setIsEditing(!isEditing)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsEditing(!isEditing);
+            }}
             className="p-1 hover:bg-orange-200 rounded"
             title="Edit node"
           >
             <Edit3 size={14} className="text-orange-600" />
           </button>
           <button
-            onClick={handleDelete}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete();
+            }}
             className="p-1 hover:bg-red-200 rounded"
             title="Delete node"
           >
@@ -330,7 +336,10 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
             </div>
 
             <button
-              onClick={handleSave}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSave();
+              }}
               className="w-full px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
             >
               Save
