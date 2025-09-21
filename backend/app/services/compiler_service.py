@@ -54,6 +54,7 @@ class WorkflowCompilerService:
             
             code_lines = [
                 "import dspy",
+                "import mlflow",
                 "",
                 "from typing import Any, List, Dict, Optional"
             ]
@@ -63,7 +64,7 @@ class WorkflowCompilerService:
                 code_lines.extend([
                     "from dspy.retrievers.databricks_rm import DatabricksRM",
                 ])
-            elif has_structured_retrieve:
+            if has_structured_retrieve:
                 code_lines.extend([
                     "from databricks_ai_bridge.genie import Genie",
                     "from dspy.primitives.prediction import Prediction"
@@ -217,8 +218,7 @@ class WorkflowCompilerService:
                 if field_name:
                     fields.append(field_name)
         return fields
-    
-    
+
     def _generate_main_method(self, start_fields: List[str], code_lines: List[str]):
         """Generate the main execution method"""
         code_lines.append("")

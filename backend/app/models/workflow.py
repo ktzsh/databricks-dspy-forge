@@ -163,3 +163,9 @@ class PlaygroundExecutionRequest(BaseModel):
     workflow_ir: Dict[str, Any]  # Workflow IR containing nodes and edges
     question: str
     conversation_history: list = []  # List of previous conversation exchanges
+
+
+class DeploymentRequest(BaseModel):
+    model_name: str
+    catalog_name: str
+    schema_name: str

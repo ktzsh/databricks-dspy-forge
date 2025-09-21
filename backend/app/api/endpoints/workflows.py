@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, BackgroundTasks
 from typing import List, Dict, Any
 from pydantic import BaseModel
 
-from app.models.workflow import Workflow, WorkflowCreateRequest, WorkflowUpdateRequest
+from app.models.workflow import (
+    Workflow, WorkflowCreateRequest, WorkflowUpdateRequest, DeploymentRequest
+)
 from app.services.workflow_service import workflow_service
 from app.services.validation_service import WorkflowValidationError
 from app.core.logging import get_logger
@@ -151,6 +153,90 @@ async def validate_workflow_endpoint(workflow_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to validate workflow: {str(e)}"
         )
+
+
+@router.post("/deploy/{workflow_id}")
+async def deploy_workflow(workflow_id: str, deployment_request: DeploymentRequest, background_tasks: BackgroundTasks):
+    """Deploy compiled workflow to Databricks as agent endpoint"""
+    try:
+        logger.info(f"Starting deployment for workflow {workflow_id}")
+        
+        # Get workflow
+        workflow = await workflow_service.get_workflow(workflow_id)
+        if not workflow:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow not found"
+            )
+        
+        # Start background deployment task
+        from app.services.deployment_service import deployment_service
+        deployment_id = f"deploy_{workflow_id}_{deployment_request.model_name}"
+        
+        background_tasks.add_task(
+            deployment_service.deploy_workflow_async,
+            workflow,
+            deployment_request.model_name,
+            deployment_request.catalog_name,
+            deployment_request.schema_name,
+            deployment_id
+        )
+        
+        return {
+            "workflow_id": workflow_id,
+            "deployment_id": deployment_id,
+            "model_name": deployment_request.model_name,
+            "catalog_name": deployment_request.catalog_name,
+            "schema_name": deployment_request.schema_name,
+            "status": "deployment_started",
+            "message": "Deployment started in background. Check status using deployment_id."
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to start deployment for workflow {workflow_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start deployment: {str(e)}"
+        )
+
+
+@router.get("/deploy/status/{deployment_id}")
+async def get_deployment_status(deployment_id: str):
+    """Get deployment status"""
+    try:
+        logger.info(f"Getting deployment status for {deployment_id}")
+        from app.services.deployment_service import deployment_service
+        status_info = deployment_service.get_deployment_status(deployment_id)
+        
+        if not status_info:
+            logger.warning(f"Deployment status not found for {deployment_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Deployment not found"
+            )
+        
+        logger.info(f"Found deployment status for {deployment_id}: {status_info.get('status')}")
+        return status_info
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get deployment status for {deployment_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get deployment status: {str(e)}"
+        )
+
+
+@router.post("/optimize/{workflow_id}")
+async def optimize_workflow(workflow_id: str, optimization_config: Dict[str, Any]):
+    """Optimize workflow performance"""
+    # TODO: Implement workflow optimization logic
+    return {
+        "workflow_id": workflow_id,
+        "status": "optimized",
+        "message": "Optimization not implemented yet"
+    }
 
 
 @router.get("/_health")

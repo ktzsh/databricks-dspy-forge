@@ -128,6 +128,15 @@ const WorkflowBuilderContent: React.FC = () => {
   const [lastExecutionResults, setLastExecutionResults] = useState<any>(null);
   const [showNodeExecutionModal, setShowNodeExecutionModal] = useState(false);
   const [selectedNodeExecution, setSelectedNodeExecution] = useState<any>(null);
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [deploymentConfig, setDeploymentConfig] = useState({
+    model_name: '',
+    catalog_name: '',
+    schema_name: ''
+  });
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deploymentStatus, setDeploymentStatus] = useState<any>(null);
+  const [deploymentTimeoutId, setDeploymentTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const { toasts, removeToast, showSuccess, showError } = useToast();
   const fitViewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -224,14 +233,17 @@ const WorkflowBuilderContent: React.FC = () => {
     };
   }, [selectedNodes, selectedEdges, setNodes, setEdges]);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (fitViewTimeoutRef.current) {
         clearTimeout(fitViewTimeoutRef.current);
       }
+      if (deploymentTimeoutId) {
+        clearTimeout(deploymentTimeoutId);
+      }
     };
-  }, []);
+  }, [deploymentTimeoutId]);
 
   const handleLoadWorkflow = useCallback((workflow: any) => {
     // Convert backend data to frontend format
@@ -443,8 +455,126 @@ const WorkflowBuilderContent: React.FC = () => {
 
 
   const handleDeploy = async () => {
-    // TODO: Implement deployment
-    console.log('Deploying workflow...');
+    if (!workflowId) {
+      showError('Save Required', 'Please save your workflow before deploying.');
+      return;
+    }
+    setShowDeployModal(true);
+  };
+
+  const handleDeploySubmit = async () => {
+    if (!deploymentConfig.model_name || !deploymentConfig.catalog_name || !deploymentConfig.schema_name) {
+      showError('Missing Information', 'Please fill in all deployment fields.');
+      return;
+    }
+
+    setIsDeploying(true);
+    setDeploymentStatus(null);
+
+    try {
+      const response = await fetch(`/api/v1/workflows/deploy/${workflowId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(deploymentConfig),
+      });
+
+      if (response.ok) {
+        const deploymentResult = await response.json();
+        setDeploymentStatus(deploymentResult);
+        showSuccess('Deployment Started', 'Your workflow deployment has started. You can track the progress below.');
+        
+        // Poll for deployment status
+        pollDeploymentStatus(deploymentResult.deployment_id);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.detail || 'Failed to start deployment';
+        showError('Deployment Failed', errorMessage);
+        setIsDeploying(false);
+      }
+    } catch (error) {
+      showError('Network Error', 'Unable to start deployment. Please check your connection and try again.');
+      console.error('Error starting deployment:', error);
+      setIsDeploying(false);
+    }
+  };
+
+  const pollDeploymentStatus = async (deploymentId: string) => {
+    const maxAttempts = 60; // Poll for up to 10 minutes (10s intervals)
+    let attempts = 0;
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 3;
+
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        showError('Deployment Timeout', 'Deployment is taking longer than expected. Please check manually.');
+        setIsDeploying(false);
+        return;
+      }
+
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        showError('Deployment Error', 'Unable to check deployment status. Please check manually.');
+        setIsDeploying(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/v1/workflows/deploy/status/${deploymentId}`);
+        
+        if (response.ok) {
+          consecutiveErrors = 0; // Reset error counter on success
+          const status = await response.json();
+          setDeploymentStatus(status);
+
+          if (status.status === 'completed') {
+            showSuccess('Deployment Complete', 'Your workflow has been deployed successfully!');
+            setIsDeploying(false);
+            return;
+          } else if (status.status === 'failed') {
+            showError('Deployment Failed', status.message || 'Deployment failed');
+            setIsDeploying(false);
+            return;
+          } else {
+            // Continue polling for in-progress states
+            attempts++;
+            setTimeout(poll, 10000); // Poll every 10 seconds
+          }
+        } else if (response.status === 404) {
+          // Deployment not found - might be too early, try again
+          consecutiveErrors++;
+          attempts++;
+          setTimeout(poll, 5000); // Poll more frequently for 404s
+        } else {
+          // Other HTTP errors
+          consecutiveErrors++;
+          const errorData = await response.json().catch(() => ({}));
+          console.error('HTTP Error polling deployment status:', response.status, errorData);
+          attempts++;
+          setTimeout(poll, 10000);
+        }
+      } catch (error) {
+        consecutiveErrors++;
+        console.error('Network error polling deployment status:', error);
+        attempts++;
+        setTimeout(poll, 10000);
+      }
+    };
+
+    // Start polling after a short delay to ensure backend has time to create the deployment
+    const timeoutId = setTimeout(poll, 2000);
+    setDeploymentTimeoutId(timeoutId);
+  };
+
+  const cancelDeployment = () => {
+    if (deploymentTimeoutId) {
+      clearTimeout(deploymentTimeoutId);
+      setDeploymentTimeoutId(null);
+    }
+    setIsDeploying(false);
+    setDeploymentStatus(null);
+    setShowDeployModal(false);
+    showError('Deployment Cancelled', 'Deployment has been cancelled.');
   };
 
   return (
@@ -701,6 +831,130 @@ const WorkflowBuilderContent: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deployment Modal */}
+      {showDeployModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Deploy to Databricks</h3>
+              <button
+                onClick={() => setShowDeployModal(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+                disabled={isDeploying}
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Model Name
+                  </label>
+                  <input
+                    type="text"
+                    value={deploymentConfig.model_name}
+                    onChange={(e) => setDeploymentConfig(prev => ({ ...prev, model_name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="my-workflow-model"
+                    disabled={isDeploying}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Catalog Name
+                  </label>
+                  <input
+                    type="text"
+                    value={deploymentConfig.catalog_name}
+                    onChange={(e) => setDeploymentConfig(prev => ({ ...prev, catalog_name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="main"
+                    disabled={isDeploying}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Schema Name
+                  </label>
+                  <input
+                    type="text"
+                    value={deploymentConfig.schema_name}
+                    onChange={(e) => setDeploymentConfig(prev => ({ ...prev, schema_name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="agents"
+                    disabled={isDeploying}
+                  />
+                </div>
+
+                {/* Deployment Status */}
+                {deploymentStatus && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <div className={`w-3 h-3 rounded-full ${
+                        deploymentStatus.status === 'completed' ? 'bg-green-500' : 
+                        deploymentStatus.status === 'failed' ? 'bg-red-500' : 
+                        'bg-yellow-500 animate-pulse'
+                      }`}></div>
+                      <span className="font-medium text-sm">{deploymentStatus.status.replace('_', ' ').toUpperCase()}</span>
+                    </div>
+                    <p className="text-sm text-gray-600">{deploymentStatus.message}</p>
+                    {deploymentStatus.endpoint_url && (
+                      <div className="mt-2">
+                        <span className="text-sm font-medium text-gray-700">Endpoint URL:</span>
+                        <p className="text-sm text-blue-600 break-all">{deploymentStatus.endpoint_url}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end space-x-3 p-4 border-t border-gray-200">
+              {isDeploying ? (
+                <>
+                  <button
+                    onClick={cancelDeployment}
+                    className="px-4 py-2 text-red-700 bg-red-100 rounded-md hover:bg-red-200"
+                  >
+                    Cancel Deployment
+                  </button>
+                  <button
+                    disabled
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md opacity-50 cursor-not-allowed flex items-center space-x-2"
+                  >
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Deploying...</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setShowDeployModal(false)}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={handleDeploySubmit}
+                    disabled={!deploymentConfig.model_name || !deploymentConfig.catalog_name || !deploymentConfig.schema_name}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Deploy
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
