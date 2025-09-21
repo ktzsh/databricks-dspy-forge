@@ -139,7 +139,8 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
             <Database size={16} className="text-blue-600" />
             <span className="font-medium text-blue-800">{nodeLabel}</span>
           </div>
-          <div className="text-xs text-blue-600 opacity-75 mt-1">signature_field</div>
+          <div className="text-xs text-blue-600 opacity-75 mt-1">SignatureField</div>
+          <div className="text-xs text-blue-600 opacity-75">{id}</div>
         </div>
         <div className="flex items-center space-x-1">
           <button

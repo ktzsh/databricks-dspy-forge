@@ -52,6 +52,16 @@ const createDefaultStartNode = (): Node => ({
 const initialNodes: Node[] = [createDefaultStartNode()];
 const initialEdges: Edge[] = [];
 
+// Helper function to generate consistent node IDs
+const generateNodeId = (): string => {
+  return `node-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+};
+
+// Helper function to generate consistent edge IDs
+const generateEdgeId = (): string => {
+  return `edge-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+};
+
 // Helper function to find a good position for new nodes
 const findAvailablePosition = (existingNodes: Node[], preferredX: number = 100, preferredY: number = 100) => {
   const nodeWidth = 200; // Approximate node width
@@ -491,7 +501,7 @@ const WorkflowBuilderContent: React.FC = () => {
         {/* Left Sidebar - Components */}
         <div className="w-80 border-r border-gray-200 bg-gray-50 flex-shrink-0 overflow-y-auto">
           <ComponentSidebar onAddNode={(nodeData) => {
-          const newNodeId = `node-${Date.now()}`;
+          const newNodeId = generateNodeId();
           
           // Find an available position for the new node
           const availablePosition = findAvailablePosition(nodes, 100, 100);
@@ -506,7 +516,7 @@ const WorkflowBuilderContent: React.FC = () => {
           // Auto-connect retriever nodes to signature field with appropriate output
           if (nodeData.type === 'retriever') {
             // Create different signature fields based on retriever type
-            const signatureNodeId = `node-${Date.now() + 1}`;
+            const signatureNodeId = generateNodeId();
             let signatureFields;
             
             if (nodeData.data.retrieverType === 'StructuredRetrieve') {
@@ -538,7 +548,7 @@ const WorkflowBuilderContent: React.FC = () => {
             };
 
             // Create edge connecting retriever to signature field
-            const edgeId = `edge-${Date.now()}`;
+            const edgeId = generateEdgeId();
             const newEdge: Edge = {
               id: edgeId,
               source: newNodeId,

@@ -7,6 +7,7 @@ Handles UnstructuredRetrieve and StructuredRetrieve node types.
 from typing import Dict, Any
 from app.core.templates import NodeTemplate, CodeGenerationContext
 
+from dspy.retrievers.databricks_rm import DatabricksRM
 
 class BaseRetrieverTemplate(NodeTemplate):
     """Base template for retriever nodes"""
@@ -34,90 +35,111 @@ class UnstructuredRetrieveTemplate(BaseRetrieverTemplate):
         """Execute UnstructuredRetrieve node"""
         query = self._extract_query(inputs)
         
+        query_type = self.node_data.get('query_type', '')
         catalog_name = self.node_data.get('catalog_name', '')
         schema_name = self.node_data.get('schema_name', '')
         index_name = self.node_data.get('index_name', '')
-        embedding_model = self.node_data.get('embedding_model')
-        query_type = self.node_data.get('query_type', 'HYBRID')
+        content_column = self.node_data.get('content_column', '')
+        id_column = self.node_data.get('id_column', '')
         num_results = self.node_data.get('num_results', 3)
         score_threshold = self.node_data.get('score_threshold', 0.0)
         
         # Validate mandatory fields
-        if not all([catalog_name, schema_name, index_name]):
-            raise ValueError("UnstructuredRetrieve requires catalog_name, schema_name, and index_name")
+        if not all([catalog_name, schema_name, index_name, content_column, id_column]):
+            raise ValueError("UnstructuredRetrieve requires catalog_name, schema_name, index_name, content_column, and id_column")
         
-        # TODO: Implement actual Databricks vector search integration
-        # Mock retrieval results for now
-        mock_passages = [
-            f"Mock retrieved passage 1 for query: {query}",
-            f"Mock retrieved passage 2 for query: {query}",
-            f"Mock retrieved passage 3 for query: {query}"
-        ][:num_results]
-        
-        mock_scores = [0.95, 0.89, 0.82][:num_results]
-        if score_threshold > 0:
-            filtered_results = [(passage, score) for passage, score in zip(mock_passages, mock_scores) if score >= score_threshold]
-            mock_passages = [p for p, s in filtered_results]
-            mock_scores = [s for p, s in filtered_results]
-        
-        return {
-            'context': mock_passages,  # Return as list[str] as expected by signature field
-            'passages': mock_passages,  # Keep for backwards compatibility
-            'scores': mock_scores,
-            'query': query,
-            'retriever_config': {
-                'catalog': catalog_name,
-                'schema': schema_name,
-                'index': index_name,
-                'embedding_model': embedding_model,
-                'query_type': query_type,
-                'num_results': len(mock_passages),
-                'score_threshold': score_threshold
+        try:            
+            # Construct full index name
+            databricks_index_name = f"{catalog_name}.{schema_name}.{index_name}"
+            
+            # Initialize the retriever
+            retriever = DatabricksRM(
+                databricks_index_name=databricks_index_name,
+                text_column_name=content_column,
+                docs_id_column_name=id_column,
+                k=num_results,
+                use_with_databricks_agent_framework=False
+            )
+            
+            # Execute retrieval
+            passages = retriever(query, query_type=query_type).docs
+            
+            # Extract content from passages
+            if hasattr(passages, 'passages'):
+                # If passages is a dspy.Prediction object
+                context_list = [passage for passage in passages.passages]
+            elif isinstance(passages, list):
+                # If passages is already a list
+                context_list = passages
+            else:
+                # Fallback
+                context_list = [str(passages)]
+            
+            # Apply score threshold if needed (Note: DatabricksRM may not return scores)
+            # For now, we'll include all results as DatabricksRM handles relevance internally
+            
+            return {
+                'context': context_list,  # Return as list[str] as expected by signature field
+                'passages': context_list,  # Keep for backwards compatibility
+                'query': query,
+                'retriever_config': {
+                    'databricks_index_name': databricks_index_name,
+                    'text_column_name': content_column,
+                    'docs_id_column_name': id_column,
+                    'k': num_results,
+                    'score_threshold': score_threshold
+                }
             }
-        }
+        except Exception as e:
+            # Handle any other errors gracefully
+            raise ValueError(f"UnstructuredRetrieve execution failed: {str(e)}")
     
     def generate_code(self, context: CodeGenerationContext) -> Dict[str, Any]:
         """Generate code for UnstructuredRetrieve node"""
+        query_type = self.node_data.get('query_type', '')
         catalog_name = self.node_data.get('catalog_name', '')
         schema_name = self.node_data.get('schema_name', '')
         index_name = self.node_data.get('index_name', '')
-        embedding_model = self.node_data.get('embedding_model', '')
-        query_type = self.node_data.get('query_type', 'HYBRID')
+        content_column = self.node_data.get('content_column', '')
+        id_column = self.node_data.get('id_column', '')
         num_results = self.node_data.get('num_results', 3)
-        score_threshold = self.node_data.get('score_threshold', 0.0)
+
+        # Get input and output fields
+        input_fields = self._get_connected_fields(is_input=True)
+        output_fields = self._get_connected_fields(is_input=False)
         
-        instance_var = f"unstructured_retrieve_{context.get_node_count('unstructured_retrieve')}"
+        instance_var = f"retriever_{context.get_node_count('unstructured_retrieve')}"
         
-        # Generate configuration
-        config_lines = [
-            f"        # UnstructuredRetrieve configuration",
-            f"        {instance_var}_config = {{",
-            f"            'catalog_name': '{catalog_name}',",
-            f"            'schema_name': '{schema_name}',",
-            f"            'index_name': '{index_name}',",
-            f"            'embedding_model': '{embedding_model}',",
-            f"            'query_type': '{query_type}',",
-            f"            'num_results': {num_results},",
-            f"            'score_threshold': {score_threshold}",
-            f"        }}"
+        # Construct full index name
+        databricks_index_name = f"{catalog_name}.{schema_name}.{index_name}"
+        
+        # Generate instance initialization
+        instance_lines = [
+            f"",
+            f"        # Initialize DatabricksRM retriever",
+            f"        self.{instance_var} = DatabricksRM(",
+            f"            databricks_index_name=\"{databricks_index_name}\",",
+            f"            text_column_name=\"{content_column}\",",
+            f"            docs_id_column_name=\"{id_column}\",",
+            f"            k={num_results},",
+            f"            use_with_databricks_agent_framework=True", 
+            f"        )"
         ]
         
         # Generate execution code
         forward_lines = [
             f"        # Execute UnstructuredRetrieve",
-            f"        {instance_var}_result = await self._execute_unstructured_retrieve(query, {instance_var}_config)",
-            f"        context = {instance_var}_result['context']",
-            f"        passages = {instance_var}_result['passages']"
+            f"        {output_fields[0]} = self.{instance_var}({input_fields[0]}, query_type='{query_type}')"
         ]
         
-        instance_code = '\n'.join(config_lines)
+        instance_code = '\n'.join(instance_lines)
         forward_code = '\n'.join(forward_lines)
         
         return {
             'signature': '',
             'instance': instance_code,
             'forward': forward_code,
-            'dependencies': [],
+            'dependencies': ['from dspy.retrieve.databricks_rm import DatabricksRM'],
             'instance_var': instance_var
         }
 

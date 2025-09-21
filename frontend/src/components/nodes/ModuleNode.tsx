@@ -78,6 +78,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
             <span className="font-medium text-green-800">{nodeLabel}</span>
           </div>
           <div className="text-xs text-green-600 opacity-75 mt-1">{moduleType}</div>
+          <div className="text-xs text-green-600 opacity-75">{id}</div>
         </div>
         <div className="flex items-center space-x-1">
           <button

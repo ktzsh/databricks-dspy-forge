@@ -1,4 +1,7 @@
 import uuid
+import time
+import random
+import string
 from typing import List, Optional
 from datetime import datetime
 
@@ -6,6 +9,20 @@ from app.models.workflow import Workflow
 from app.storage.factory import get_storage_backend
 from app.services.validation_service import validation_service, WorkflowValidationError
 from app.core.logging import get_logger
+
+
+def generate_node_id() -> str:
+    """Generate consistent node ID matching frontend format: node-{timestamp}-{random}"""
+    timestamp = int(time.time() * 1000)  # milliseconds like Date.now()
+    random_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
+    return f"node-{timestamp}-{random_suffix}"
+
+
+def generate_edge_id() -> str:
+    """Generate consistent edge ID matching frontend format: edge-{timestamp}-{random}"""
+    timestamp = int(time.time() * 1000)  # milliseconds like Date.now()
+    random_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
+    return f"edge-{timestamp}-{random_suffix}"
 
 
 class WorkflowService:
@@ -132,13 +149,17 @@ class WorkflowService:
             node_id_mapping = {}
             for node in new_workflow_data['nodes']:
                 old_id = node['id']
-                new_id = f"node-{uuid.uuid4()}"
+                # Preserve default-start-node ID or generate new consistent ID
+                if old_id == 'default-start-node':
+                    new_id = 'default-start-node'
+                else:
+                    new_id = generate_node_id()
                 node['id'] = new_id
                 node_id_mapping[old_id] = new_id
             
-            # Update edge references
+            # Update edge references with consistent IDs
             for edge in new_workflow_data['edges']:
-                edge['id'] = f"edge-{uuid.uuid4()}"
+                edge['id'] = generate_edge_id()
                 edge['source'] = node_id_mapping.get(edge['source'], edge['source'])
                 edge['target'] = node_id_mapping.get(edge['target'], edge['target'])
             

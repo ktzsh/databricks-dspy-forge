@@ -143,6 +143,7 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
             <span className="font-medium text-purple-800">{nodeLabel}</span>
           </div>
           <div className="text-xs text-purple-600 opacity-75 mt-1">{logicType}</div>
+          <div className="text-xs text-purple-600 opacity-75">{id}</div>
         </div>
         <div className="flex items-center space-x-1">
           <button

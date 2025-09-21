@@ -103,11 +103,7 @@ class BaseModuleTemplate(NodeTemplate):
         
         # Get input and output fields
         input_fields = self._get_connected_fields(is_input=True)
-        if not input_fields:
-            input_fields = ['input']
         output_fields = self._get_connected_fields(is_input=False)
-        if not output_fields:
-            output_fields = ['output']
         
         # Generate unique signature name
         signature_key = (module_type_str, tuple(input_fields), tuple(output_fields), instruction)
@@ -163,9 +159,6 @@ class PredictTemplate(BaseModuleTemplate):
         
         # Create dynamic signature
         signature_class = self._create_dynamic_signature(instruction)
-
-        logger.debug(f"Signature: {signature_class}")
-        logger.debug(f"Signature dir: {[attr for attr in dir(signature_class) if not attr.startswith('_')]}")
         
         # Create and execute predictor
         predictor = dspy.Predict(signature_class)
@@ -184,60 +177,12 @@ class PredictTemplate(BaseModuleTemplate):
         # Extract actual output fields from DSPy result
         output_fields = {}
         
-        # Debug: log the result structure
-        
-        logger.debug(f"DSPy result type: {type(result)}")
-        logger.debug(f"DSPy result dir: {[attr for attr in dir(result) if not attr.startswith('_')]}")
-        logger.debug(f"DSPy result dict: {result.__dict__}")
-        
-        # Try multiple approaches to extract the output
-        
         # Approach 1: Direct attribute access - get field names from workflow IR
         output_field_names = self._get_connected_fields(is_input=False)
         logger.debug(f"Output fields from workflow IR: {output_field_names}")
 
-        logger.debug(f"Expected output fields: {output_field_names}")
-        logger.debug(f"Result has attributes: {[attr for attr in dir(result) if hasattr(result, attr) and not attr.startswith('_')]}")
-        
-        # Test direct access to understand the issue
-        try:
-            test_answer = result.answer
-            logger.debug(f"Direct access result.answer works: {test_answer}")
-        except Exception as e:
-            logger.debug(f"Direct access result.answer failed: {e}")
-            
-        # Test dictionary access
-        try:
-            test_answer_dict = result['answer']
-            logger.debug(f"Dict access result['answer'] works: {test_answer_dict}")
-        except Exception as e:
-            logger.debug(f"Dict access result['answer'] failed: {e}")
-            
         # Check what's in completions
         logger.debug(f"Completions object: {result._completions}")
-        if hasattr(result._completions, 'choices') and result._completions.choices:
-            logger.debug(f"Number of choices: {len(result._completions.choices)}")
-            for i, choice in enumerate(result._completions.choices):
-                logger.debug(f"Choice {i}: {choice}")
-                if hasattr(choice, 'message'):
-                    logger.debug(f"Choice {i} message: {choice.message}")
-                    if hasattr(choice.message, 'content'):
-                        logger.debug(f"Choice {i} content: {choice.message.content}")
-        else:
-            logger.debug("No choices found in completions")
-            
-        # Try to access the prediction's internal store
-        if hasattr(result, '_store'):
-            logger.debug(f"Prediction _store: {result._store}")
-            
-        # Check all prediction methods
-        for attr in ['toDict', 'items', 'keys', 'values']:
-            if hasattr(result, attr):
-                try:
-                    method_result = getattr(result, attr)()
-                    logger.debug(f"Prediction.{attr}(): {method_result}")
-                except Exception as e:
-                    logger.debug(f"Prediction.{attr}() failed: {e}")
         
         for field_name in output_field_names:
             if hasattr(result, field_name):
@@ -247,64 +192,6 @@ class PredictTemplate(BaseModuleTemplate):
                     output_fields[field_name] = field_value
             else:
                 logger.debug(f"Field {field_name} NOT found in result object")
-        
-        # Approach 2: Try dictionary-style access for DSPy Prediction objects
-        try:
-            for field_name in output_field_names:
-                if field_name not in output_fields:
-                    try:
-                        field_value = result[field_name] if hasattr(result, '__getitem__') else None
-                        if field_value is not None and field_value != "":
-                            logger.debug(f"Found field via dict access {field_name}: {field_value}")
-                            output_fields[field_name] = field_value
-                    except (KeyError, TypeError):
-                        logger.debug(f"Dict access failed for field {field_name}")
-        except Exception as e:
-            logger.debug(f"Dictionary access approach failed: {e}")
-        
-        # Approach 3: Try common DSPy output field names
-        common_fields = ['answer', 'output', 'response', 'text', 'completion']
-        for field_name in common_fields:
-            if field_name not in output_fields:
-                # Try attribute access
-                if hasattr(result, field_name):
-                    field_value = getattr(result, field_name)
-                    logger.debug(f"Found common field {field_name}: {field_value}")
-                    if field_value is not None and field_value != "":
-                        output_fields[field_name] = field_value
-                # Try dictionary access
-                elif hasattr(result, '__getitem__'):
-                    try:
-                        field_value = result[field_name]
-                        if field_value is not None and field_value != "":
-                            logger.debug(f"Found common field via dict {field_name}: {field_value}")
-                            output_fields[field_name] = field_value
-                    except (KeyError, TypeError):
-                        pass
-        
-        # Approach 4: Try to access completions directly
-        if not output_fields and hasattr(result, '_completions') and result._completions:
-            try:
-                # Get the first completion
-                completions = result._completions
-                if hasattr(completions, 'choices') and completions.choices:
-                    first_completion = completions.choices[0]
-                    if hasattr(first_completion, 'message') and hasattr(first_completion.message, 'content'):
-                        content = first_completion.message.content
-                        # Use the first expected output field name or 'answer' as fallback
-                        field_name = output_field_names[0] if output_field_names else 'answer'
-                        output_fields[field_name] = content
-                        logger.debug(f"Extracted from completions: {field_name} = {content}")
-            except Exception as e:
-                logger.debug(f"Completions extraction failed: {e}")
-        
-        # Approach 5: Extract from result's __dict__ if it contains useful data
-        if not output_fields:
-            result_dict = result.__dict__
-            for key, value in result_dict.items():
-                if not key.startswith('_') and value is not None and isinstance(value, str) and value.strip():
-                    output_fields[key] = value
-                    logger.debug(f"Found from dict {key}: {value}")
         
         logger.debug(f"Final output_fields: {output_fields}")
         return output_fields
@@ -342,23 +229,10 @@ class ChainOfThoughtTemplate(BaseModuleTemplate):
         # Extract actual output fields from DSPy result
         output_fields = {}
         
-        # Debug: log the result structure
-        from app.core.logging import get_logger
-        logger = get_logger(__name__)
-        logger.debug(f"ChainOfThought result type: {type(result)}")
-        logger.debug(f"ChainOfThought result dir: {[attr for attr in dir(result) if not attr.startswith('_')]}")
-        logger.debug(f"ChainOfThought result dict: {result.__dict__}")
-        
-        # Try multiple approaches to extract the output
-        
         # Approach 1: Direct attribute access - get field names from workflow IR
         output_field_names = self._get_connected_fields(is_input=False)
         logger.debug(f"CoT output fields from workflow IR: {output_field_names}")
-        
-        if not output_field_names:
-            output_field_names = ['output', 'answer']  # Common defaults
-            logger.debug(f"Using default CoT output fields: {output_field_names}")
-        
+
         # Add rationale for chain of thought
         all_field_names = ['rationale'] + output_field_names
         
@@ -373,64 +247,6 @@ class ChainOfThoughtTemplate(BaseModuleTemplate):
                     output_fields[field_name] = field_value
             else:
                 logger.debug(f"CoT field {field_name} NOT found in result object")
-        
-        # Approach 2: Try dictionary-style access for DSPy Prediction objects
-        try:
-            for field_name in all_field_names:
-                if field_name not in output_fields:
-                    try:
-                        field_value = result[field_name] if hasattr(result, '__getitem__') else None
-                        if field_value is not None and field_value != "":
-                            logger.debug(f"Found CoT field via dict access {field_name}: {field_value}")
-                            output_fields[field_name] = field_value
-                    except (KeyError, TypeError):
-                        logger.debug(f"Dict access failed for CoT field {field_name}")
-        except Exception as e:
-            logger.debug(f"Dictionary access approach failed for CoT: {e}")
-        
-        # Approach 3: Try common DSPy output field names
-        common_fields = ['answer', 'output', 'response', 'text', 'completion', 'rationale']
-        for field_name in common_fields:
-            if field_name not in output_fields:
-                # Try attribute access
-                if hasattr(result, field_name):
-                    field_value = getattr(result, field_name)
-                    logger.debug(f"Found CoT common field {field_name}: {field_value}")
-                    if field_value is not None and field_value != "":
-                        output_fields[field_name] = field_value
-                # Try dictionary access
-                elif hasattr(result, '__getitem__'):
-                    try:
-                        field_value = result[field_name]
-                        if field_value is not None and field_value != "":
-                            logger.debug(f"Found CoT common field via dict {field_name}: {field_value}")
-                            output_fields[field_name] = field_value
-                    except (KeyError, TypeError):
-                        pass
-        
-        # Approach 4: Try to access completions directly
-        if not output_fields and hasattr(result, '_completions') and result._completions:
-            try:
-                # Get the first completion
-                completions = result._completions
-                if hasattr(completions, 'choices') and completions.choices:
-                    first_completion = completions.choices[0]
-                    if hasattr(first_completion, 'message') and hasattr(first_completion.message, 'content'):
-                        content = first_completion.message.content
-                        # Use the first expected output field name or 'answer' as fallback
-                        field_name = output_field_names[0] if output_field_names else 'answer'
-                        output_fields[field_name] = content
-                        logger.debug(f"Extracted from CoT completions: {field_name} = {content}")
-            except Exception as e:
-                logger.debug(f"CoT completions extraction failed: {e}")
-        
-        # Approach 5: Extract from result's __dict__ if it contains useful data
-        if not output_fields:
-            result_dict = result.__dict__
-            for key, value in result_dict.items():
-                if not key.startswith('_') and value is not None and isinstance(value, str) and value.strip():
-                    output_fields[key] = value
-                    logger.debug(f"Found CoT from dict {key}: {value}")
         
         logger.debug(f"Final CoT output_fields: {output_fields}")
         return output_fields

@@ -38,11 +38,37 @@ class WorkflowCompilerService:
             # Initialize code generation context
             context = CodeGenerationContext()
             
+            # Check if workflow contains UnstructuredRetrieve nodes
+            has_unstructured_retrieve = any(
+                node.type == NodeType.RETRIEVER and 
+                node.data.get('retriever_type') == 'UnstructuredRetrieve'
+                for node in workflow.nodes
+            )
+
+            # Check if workflow contains UnstructuredRetrieve nodes
+            has_structured_retrieve = any(
+                node.type == NodeType.RETRIEVER and 
+                node.data.get('retriever_type') == 'StructuredRetrieve'
+                for node in workflow.nodes
+            )
+            
             code_lines = [
                 "import dspy",
-                "from typing import Any, List, Dict",
-                ""
+                "",
+                "from typing import Any, List, Dict, Optional"
             ]
+            
+            # Add DatabricksRM import only if needed
+            if has_unstructured_retrieve:
+                code_lines.extend([
+                    "from dspy.retrievers.databricks_rm import DatabricksRM",
+                ])
+            elif has_structured_retrieve:
+                code_lines.extend([
+                    "from databricks_ai_bridge.genie import Genie",
+                    "from dspy.primitives.prediction import Prediction"
+                ])
+            code_lines.append("")
             
             # Find start and end nodes
             signature_field_nodes = [node for node in workflow.nodes if node.type == NodeType.SIGNATURE_FIELD]

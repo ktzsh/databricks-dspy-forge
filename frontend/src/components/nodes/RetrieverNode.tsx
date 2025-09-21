@@ -85,6 +85,7 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
             <span className="font-medium text-orange-800">{nodeLabel}</span>
           </div>
           <div className="text-xs text-orange-600 opacity-75 mt-1">{retrieverType}</div>
+          <div className="text-xs text-orange-600 opacity-75">{id}</div>
         </div>
         <div className="flex items-center space-x-1">
           <button
