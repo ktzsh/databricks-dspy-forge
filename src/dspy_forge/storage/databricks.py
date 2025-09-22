@@ -7,9 +7,9 @@ from pathlib import Path
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.files import FileInfo
 
-from app.storage.base import WorkflowStorageBackend
-from app.models.workflow import Workflow
-from app.core.logging import get_logger
+from dspy_forge.storage.base import WorkflowStorageBackend
+from dspy_forge.models.workflow import Workflow
+from dspy_forge.core.logging import get_logger
 
 
 class DatabricksVolumeStorage(WorkflowStorageBackend):

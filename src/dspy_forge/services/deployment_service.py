@@ -14,12 +14,12 @@ from mlflow.models.resources import (
     DatabricksVectorSearchIndex,
 )
 
-from app.models.workflow import Workflow, NodeType
-from app.services.validation_service import validation_service
-from app.services.compiler_service import compiler_service
-from app.core.config import settings
-from app.core.logging import get_logger
-from app.deployment.runner import deploy_agent
+from dspy_forge.models.workflow import Workflow, NodeType
+from dspy_forge.services.validation_service import validation_service
+from dspy_forge.services.compiler_service import compiler_service
+from dspy_forge.core.config import settings
+from dspy_forge.core.logging import get_logger
+from dspy_forge.deployment.runner import deploy_agent
 
 logger = get_logger(__name__)
 

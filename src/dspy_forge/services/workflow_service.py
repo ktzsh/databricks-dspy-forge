@@ -5,10 +5,10 @@ import string
 from typing import List, Optional
 from datetime import datetime
 
-from app.models.workflow import Workflow
-from app.storage.factory import get_storage_backend
-from app.services.validation_service import validation_service, WorkflowValidationError
-from app.core.logging import get_logger
+from dspy_forge.models.workflow import Workflow
+from dspy_forge.storage.factory import get_storage_backend
+from dspy_forge.services.validation_service import validation_service, WorkflowValidationError
+from dspy_forge.core.logging import get_logger
 
 
 def generate_node_id() -> str:

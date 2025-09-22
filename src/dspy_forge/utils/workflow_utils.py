@@ -1,8 +1,8 @@
 from typing import Dict, List
 import networkx as nx
 
-from app.models.workflow import Workflow, NodeType
-from app.core.dspy_types import (
+from dspy_forge.models.workflow import Workflow, NodeType
+from dspy_forge.core.dspy_types import (
     SignatureFieldDefinition, 
     ModuleDefinition, 
     LogicDefinition,
@@ -10,7 +10,7 @@ from app.core.dspy_types import (
     DSPyModuleType,
     DSPyLogicType
 )
-from app.services.validation_service import validation_service, WorkflowValidationError
+from dspy_forge.services.validation_service import validation_service, WorkflowValidationError
 
 
 def validate_workflow(workflow: Workflow) -> List[str]:

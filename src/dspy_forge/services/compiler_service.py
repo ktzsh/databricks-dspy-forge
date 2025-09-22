@@ -2,17 +2,17 @@ import os
 from typing import Dict, Any, List, Set, Tuple
 from datetime import datetime
 
-from app.models.workflow import Workflow, NodeType
-from app.core.config import settings
-from app.core.logging import get_logger
-from app.core.dspy_types import DSPyModuleType
-from app.utils.workflow_utils import (
+from dspy_forge.models.workflow import Workflow, NodeType
+from dspy_forge.core.config import settings
+from dspy_forge.core.logging import get_logger
+from dspy_forge.core.dspy_types import DSPyModuleType
+from dspy_forge.utils.workflow_utils import (
     get_execution_order, 
     find_start_nodes,
     find_end_nodes
 )
-from app.core.templates import TemplateFactory, CodeGenerationContext
-from app.components import registry  # This will auto-register all templates
+from dspy_forge.core.templates import TemplateFactory, CodeGenerationContext
+from dspy_forge.components import registry  # This will auto-register all templates
 
 logger = get_logger(__name__)
 

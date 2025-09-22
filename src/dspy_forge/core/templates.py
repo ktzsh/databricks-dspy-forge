@@ -7,7 +7,7 @@ must implement to support both execution and code generation.
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional, Tuple
-from app.models.workflow import NodeType
+from dspy_forge.models.workflow import NodeType
 
 
 class CodeGenerationContext:

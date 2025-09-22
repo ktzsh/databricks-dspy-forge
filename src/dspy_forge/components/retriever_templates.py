@@ -6,7 +6,7 @@ Handles UnstructuredRetrieve and StructuredRetrieve node types.
 import os, ast
 
 from typing import Dict, Any
-from app.core.templates import NodeTemplate, CodeGenerationContext
+from dspy_forge.core.templates import NodeTemplate, CodeGenerationContext
 
 from dspy.retrievers.databricks_rm import DatabricksRM
 
@@ -161,7 +161,7 @@ class StructuredRetrieveTemplate(BaseRetrieverTemplate):
         
         try:
             # Import and initialize DatabricksGenieRM
-            from app.components.genie.databricks_genie import DatabricksGenieRM
+            from dspy_forge.components.genie.databricks_genie import DatabricksGenieRM
             
             # Initialize the retriever
             retriever = DatabricksGenieRM(

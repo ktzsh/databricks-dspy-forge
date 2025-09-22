@@ -1,6 +1,9 @@
 # Custom
-backend/artifacts/
-backend/mlruns/
+src/artifacts/
+src/mlruns/
+ui/static/
+ui/build/
+uv.lock
 
 # Dependencies
 node_modules/

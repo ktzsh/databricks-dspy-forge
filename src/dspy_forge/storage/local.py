@@ -5,9 +5,9 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pathlib import Path
 
-from app.storage.base import WorkflowStorageBackend
-from app.models.workflow import Workflow
-from app.core.logging import get_logger
+from dspy_forge.storage.base import WorkflowStorageBackend
+from dspy_forge.models.workflow import Workflow
+from dspy_forge.core.logging import get_logger
 
 
 class LocalDirectoryStorage(WorkflowStorageBackend):

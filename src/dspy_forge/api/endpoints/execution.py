@@ -3,13 +3,13 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
 
-from app.models.workflow import WorkflowExecution, NodeType, PlaygroundExecutionRequest, ExecutionRequest
-from app.services.workflow_service import workflow_service
-from app.services.execution_service import execution_engine
-from app.core.logging import get_logger
+from dspy_forge.models.workflow import WorkflowExecution, NodeType, PlaygroundExecutionRequest, ExecutionRequest
+from dspy_forge.services.workflow_service import workflow_service
+from dspy_forge.services.execution_service import execution_engine
+from dspy_forge.core.logging import get_logger
 
-from app.services.validation_service import validation_service
-from app.models.workflow import Workflow
+from dspy_forge.services.validation_service import validation_service
+from dspy_forge.models.workflow import Workflow
 
 
 def _normalize_workflow_data(workflow_ir: Dict[str, Any]) -> Dict[str, Any]:

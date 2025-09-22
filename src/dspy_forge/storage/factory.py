@@ -1,10 +1,10 @@
 from typing import Optional
 
-from app.storage.base import WorkflowStorageBackend
-from app.storage.local import LocalDirectoryStorage
-from app.storage.databricks import DatabricksVolumeStorage
-from app.core.config import settings
-from app.core.logging import get_logger
+from dspy_forge.storage.base import WorkflowStorageBackend
+from dspy_forge.storage.local import LocalDirectoryStorage
+from dspy_forge.storage.databricks import DatabricksVolumeStorage
+from dspy_forge.core.config import settings
+from dspy_forge.core.logging import get_logger
 
 
 logger = get_logger(__name__)

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import workflows, execution
+from dspy_forge.api.endpoints import workflows, execution
 
 router = APIRouter()
 

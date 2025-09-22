@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from app.models.workflow import Workflow
+from dspy_forge.models.workflow import Workflow
 
 
 class WorkflowStorageBackend(ABC):

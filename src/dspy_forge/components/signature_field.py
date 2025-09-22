@@ -5,7 +5,7 @@ Handles pass-through validation for input/output signature fields.
 """
 
 from typing import Dict, Any
-from app.core.templates import NodeTemplate, CodeGenerationContext
+from dspy_forge.core.templates import NodeTemplate, CodeGenerationContext
 
 
 class SignatureFieldTemplate(NodeTemplate):

@@ -1,9 +1,9 @@
 from typing import Dict, List, Any, Tuple, Optional
 import networkx as nx
 
-from app.models.workflow import Workflow, NodeType
-from app.core.dspy_types import DSPyModuleType, DSPyLogicType
-from app.core.logging import get_logger
+from dspy_forge.models.workflow import Workflow, NodeType
+from dspy_forge.core.dspy_types import DSPyModuleType, DSPyLogicType
+from dspy_forge.core.logging import get_logger
 
 logger = get_logger(__name__)
 

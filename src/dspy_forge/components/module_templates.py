@@ -6,9 +6,9 @@ Handles Predict, ChainOfThought, and other DSPy module types.
 import dspy
 
 from typing import Dict, Any, List
-from app.core.templates import NodeTemplate, CodeGenerationContext
-from app.core.dspy_types import DSPyModuleType
-from app.core.logging import get_logger
+from dspy_forge.core.templates import NodeTemplate, CodeGenerationContext
+from dspy_forge.core.dspy_types import DSPyModuleType
+from dspy_forge.core.logging import get_logger
 
 logger = get_logger(__name__)
 

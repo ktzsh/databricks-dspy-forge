@@ -1,0 +1,8 @@
+command: ["uv", "run", "dspy-forge"]
+# databricks apps listen by default on port 8000
+
+env:
+  - name: STORAGE_BACKEND
+    value: "databricks"
+  - name: LOCAL_STORAGE_PATH
+    value: "./artifacts/workflows"

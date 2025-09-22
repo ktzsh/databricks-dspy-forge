@@ -4,8 +4,8 @@ Component template registry.
 Automatically registers all component templates with the TemplateFactory.
 """
 
-from app.core.templates import TemplateFactory
-from app.models.workflow import NodeType, ModuleType, RetrieverType, LogicType
+from dspy_forge.core.templates import TemplateFactory
+from dspy_forge.models.workflow import NodeType, ModuleType, RetrieverType, LogicType
 
 # Import all component templates
 from .signature_field import SignatureFieldTemplate

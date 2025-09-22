@@ -5,8 +5,8 @@ Handles IfElse, Merge, FieldSelector, and other logic node types.
 """
 
 from typing import Dict, Any
-from app.core.templates import NodeTemplate, CodeGenerationContext
-from app.core.dspy_types import DSPyLogicType
+from dspy_forge.core.templates import NodeTemplate, CodeGenerationContext
+from dspy_forge.core.dspy_types import DSPyLogicType
 
 
 class BaseLogicTemplate(NodeTemplate):

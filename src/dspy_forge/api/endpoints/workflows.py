@@ -2,12 +2,12 @@ from fastapi import APIRouter, HTTPException, status, BackgroundTasks
 from typing import List, Dict, Any
 from pydantic import BaseModel
 
-from app.models.workflow import (
+from dspy_forge.models.workflow import (
     Workflow, WorkflowCreateRequest, WorkflowUpdateRequest, DeploymentRequest
 )
-from app.services.workflow_service import workflow_service
-from app.services.validation_service import WorkflowValidationError
-from app.core.logging import get_logger
+from dspy_forge.services.workflow_service import workflow_service
+from dspy_forge.services.validation_service import WorkflowValidationError
+from dspy_forge.core.logging import get_logger
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -142,7 +142,7 @@ async def validate_workflow_endpoint(workflow_id: str):
         )
     
     try:
-        from app.services.validation_service import validation_service
+        from dspy_forge.services.validation_service import validation_service
         errors = validation_service.validate_workflow(workflow)
         return {
             "valid": len(errors) == 0,
@@ -170,7 +170,7 @@ async def deploy_workflow(workflow_id: str, deployment_request: DeploymentReques
             )
         
         # Start background deployment task
-        from app.services.deployment_service import deployment_service
+        from dspy_forge.services.deployment_service import deployment_service
         deployment_id = f"deploy_{workflow_id}_{deployment_request.model_name}"
         
         background_tasks.add_task(
@@ -205,7 +205,7 @@ async def get_deployment_status(deployment_id: str):
     """Get deployment status"""
     try:
         logger.info(f"Getting deployment status for {deployment_id}")
-        from app.services.deployment_service import deployment_service
+        from dspy_forge.services.deployment_service import deployment_service
         status_info = deployment_service.get_deployment_status(deployment_id)
         
         if not status_info:

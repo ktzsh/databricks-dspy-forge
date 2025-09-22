@@ -6,10 +6,10 @@ import dspy
 import os
 import inspect
 
-from app.models.workflow import Workflow, WorkflowExecution, NodeType
-from app.core.config import settings
-from app.core.logging import get_logger
-from app.core.dspy_types import (
+from dspy_forge.models.workflow import Workflow, WorkflowExecution, NodeType
+from dspy_forge.core.config import settings
+from dspy_forge.core.logging import get_logger
+from dspy_forge.core.dspy_types import (
     create_dspy_signature, 
     get_module_class, 
     DSPyModuleType, 
@@ -17,7 +17,7 @@ from app.core.dspy_types import (
     SignatureFieldDefinition,
     python_type_to_dspy_type
 )
-from app.utils.workflow_utils import (
+from dspy_forge.utils.workflow_utils import (
     get_execution_order, 
     extract_signature_fields, 
     extract_modules, 
@@ -27,9 +27,9 @@ from app.utils.workflow_utils import (
     get_node_dependencies,
     get_node_dependents
 )
-from app.services.compiler_service import compiler_service
-from app.core.templates import TemplateFactory
-from app.components import registry  # This will auto-register all templates
+from dspy_forge.services.compiler_service import compiler_service
+from dspy_forge.core.templates import TemplateFactory
+from dspy_forge.components import registry  # This will auto-register all templates
 
 logger = get_logger(__name__)
 
