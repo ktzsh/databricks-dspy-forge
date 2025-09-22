@@ -1,13 +1,18 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-import os
-import dspy
 
 from app.core.config import settings
 from app.core.logging import setup_logging, get_logger
 from app.api.routes import router as api_router
+
+# Set Databricks SDK environment variables from settings
+if settings.databricks_host and settings.databricks_token:
+    os.environ["DATABRICKS_HOST"] = settings.databricks_host
+    os.environ["DATABRICKS_TOKEN"] = settings.databricks_token
 
 # Initialize logging
 setup_logging(
