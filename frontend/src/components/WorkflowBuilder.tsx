@@ -142,13 +142,19 @@ const WorkflowBuilderContent: React.FC = () => {
 
   // Function to ensure default start node exists and is the only start node
   const ensureDefaultStartNode = useCallback((nodes: Node[]) => {
-    // Remove any existing start nodes
+    // Find the existing default-start-node to preserve its position
+    const existingDefaultStart = nodes.find((node: Node) => node.id === 'default-start-node');
+    
+    // Remove all start nodes (including existing default-start-node)
     const nonStartNodes = nodes.filter((node: Node) => 
       !(node.data as any).isStart && !(node.data as any).is_start
     );
     
-    // Add the default start node
-    const defaultStart = createDefaultStartNode();
+    // Create default start node, preserving position if it existed
+    const defaultStart = existingDefaultStart 
+      ? { ...createDefaultStartNode(), position: existingDefaultStart.position }
+      : createDefaultStartNode();
+      
     return [defaultStart, ...nonStartNodes];
   }, []);
 
