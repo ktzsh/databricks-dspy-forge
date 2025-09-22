@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional, Literal
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -28,16 +29,11 @@ class Settings(BaseSettings):
     databricks_host: Optional[str] = None
     databricks_token: Optional[str] = None
     
-    # DSPy LLM settings
-    dspy_model: str = "openai/gpt-3.5-turbo"
-    dspy_api_key: Optional[str] = None
-    dspy_api_base: Optional[str] = None
-    
     # CORS settings
     allowed_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     
     class Config:
-        env_file = ".env"
+        env_file = Path(__file__).parent.parent.parent / ".env"
 
 
 settings = Settings()
