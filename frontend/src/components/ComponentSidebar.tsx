@@ -16,6 +16,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           icon: Database,
           description: 'Define input/output fields with types',
           type: 'signature_field',
+          enabled: true,
           data: {
             label: 'Signature Field',
             fields: [{ name: 'input', type: 'str', required: true }],
@@ -34,6 +35,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           icon: Brain,
           description: 'Basic prediction module',
           type: 'module',
+          enabled: true,
           data: {
             label: 'Predict',
             moduleType: 'Predict',
@@ -48,6 +50,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           icon: Brain,
           description: 'Chain of thought reasoning',
           type: 'module',
+          enabled: false,
           data: {
             label: 'Chain of Thought',
             moduleType: 'ChainOfThought',
@@ -62,6 +65,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           icon: Brain,
           description: 'Reasoning and acting module',
           type: 'module',
+          enabled: false,
           data: {
             label: 'ReAct',
             moduleType: 'ReAct',
@@ -76,6 +80,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           icon: Brain,
           description: 'Best of N selection module',
           type: 'module',
+          enabled: false,
           data: {
             label: 'Best of N',
             moduleType: 'BestOfN',
@@ -84,64 +89,21 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
             parameters: {}
           }
         },
-        {
-          id: 'refine',
-          name: 'Refine',
-          icon: Brain,
-          description: 'Refinement module',
-          type: 'module',
-          data: {
-            label: 'Refine',
-            moduleType: 'Refine',
-            model: '',
-            instruction: '',
-            parameters: {}
-          }
-        }
-      ]
-    },
-    {
-      category: 'Logic Components',
-      items: [
-        {
-          id: 'if-else',
-          name: 'If-Else',
-          icon: GitBranch,
-          description: 'Conditional branching',
-          type: 'logic',
-          data: {
-            label: 'If-Else',
-            logicType: 'IfElse',
-            condition: '',
-            parameters: {}
-          }
-        },
-        {
-          id: 'merge',
-          name: 'Merge',
-          icon: GitBranch,
-          description: 'Merge multiple paths',
-          type: 'logic',
-          data: {
-            label: 'Merge',
-            logicType: 'Merge',
-            parameters: {}
-          }
-        },
-        {
-          id: 'field-selector',
-          name: 'Field Selector',
-          icon: Filter,
-          description: 'Select specific fields from input',
-          type: 'logic',
-          data: {
-            label: 'Field Selector',
-            logicType: 'FieldSelector',
-            selectedFields: [],
-            fieldMappings: {},
-            parameters: {}
-          }
-        }
+        // {
+        //   id: 'refine',
+        //   name: 'Refine',
+        //   icon: Brain,
+        //   description: 'Refinement module',
+        //   type: 'module',
+        //   enabled: false,
+        //   data: {
+        //     label: 'Refine',
+        //     moduleType: 'Refine',
+        //     model: '',
+        //     instruction: '',
+        //     parameters: {}
+        //   }
+        // }
       ]
     },
     {
@@ -153,6 +115,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           icon: Search,
           description: 'Databricks Vector Search',
           type: 'retriever',
+          enabled: true,
           data: {
             label: 'Unstructured Retrieve',
             retrieverType: 'UnstructuredRetrieve',
@@ -174,10 +137,58 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           icon: Database,
           description: 'Databricks Genie Space',
           type: 'retriever',
+          enabled: true,
           data: {
             label: 'Structured Retrieve',
             retrieverType: 'StructuredRetrieve',
             genieSpaceId: '',
+            parameters: {}
+          }
+        }
+      ]
+    },
+    {
+      category: 'Logic Components',
+      items: [
+        {
+          id: 'if-else',
+          name: 'If-Else',
+          icon: GitBranch,
+          description: 'Conditional branching',
+          type: 'logic',
+          enabled: true,
+          data: {
+            label: 'If-Else',
+            logicType: 'IfElse',
+            condition: '',
+            parameters: {}
+          }
+        },
+        {
+          id: 'merge',
+          name: 'Merge',
+          icon: GitBranch,
+          description: 'Merge multiple paths',
+          type: 'logic',
+          enabled: false,
+          data: {
+            label: 'Merge',
+            logicType: 'Merge',
+            parameters: {}
+          }
+        },
+        {
+          id: 'field-selector',
+          name: 'Field Selector',
+          icon: Filter,
+          description: 'Select specific fields from input',
+          type: 'logic',
+          enabled: true,
+          data: {
+            label: 'Field Selector',
+            logicType: 'FieldSelector',
+            selectedFields: [],
+            fieldMappings: {},
             parameters: {}
           }
         }
@@ -199,22 +210,38 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
             <div className="space-y-2">
               {category.items.map((component) => {
                 const IconComponent = component.icon;
+                const isEnabled = component.enabled !== false;
                 return (
                   <div
                     key={component.id}
-                    className="p-3 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-300 transition-colors"
-                    onClick={() => onAddNode({
-                      type: component.type,
-                      data: component.data
-                    })}
+                    className={`p-3 bg-white border border-gray-200 rounded-lg transition-colors ${
+                      isEnabled 
+                        ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-300' 
+                        : 'cursor-not-allowed opacity-50 grayscale'
+                    }`}
+                    onClick={() => {
+                      if (isEnabled) {
+                        onAddNode({
+                          type: component.type,
+                          data: component.data
+                        });
+                      }
+                    }}
                   >
                     <div className="flex items-center space-x-3">
-                      <IconComponent size={20} className="text-gray-600" />
+                      <IconComponent 
+                        size={20} 
+                        className={isEnabled ? "text-gray-600" : "text-gray-400"} 
+                      />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className={`text-sm font-medium ${
+                          isEnabled ? "text-gray-900" : "text-gray-500"
+                        }`}>
                           {component.name}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className={`text-xs ${
+                          isEnabled ? "text-gray-500" : "text-gray-400"
+                        }`}>
                           {component.description}
                         </div>
                       </div>
