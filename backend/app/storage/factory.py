@@ -39,7 +39,7 @@ class StorageBackendFactory:
     @staticmethod
     def _create_local_storage() -> LocalDirectoryStorage:
         """Create local directory storage backend"""
-        storage_path = settings.local_storage_path
+        storage_path = settings.artifacts_path + "/workflows"
         logger.debug(f"Creating local storage with path: {storage_path}")
         return LocalDirectoryStorage(storage_path)
     

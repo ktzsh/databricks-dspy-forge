@@ -123,7 +123,7 @@ class WorkflowExecutionEngine:
             execution.status = "completed"
             
             # Generate workflow code if debug_compiler is enabled
-            self._compile_and_save_workflow(workflow, context)
+            # self._compile_and_save_workflow(workflow, context)
             
         except Exception as e:
             execution.error = str(e)
