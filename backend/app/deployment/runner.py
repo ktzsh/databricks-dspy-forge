@@ -8,7 +8,9 @@ from mlflow.pyfunc import ResponsesAgent
 mlflow.set_registry_uri("databricks-uc")
 
 
-def main(
+def deploy_agent(
+        agent_file_path: str,
+        program_file_path: str,
         model_name: str,
         schema_name: str,
         catalog_name:str ,
@@ -16,8 +18,8 @@ def main(
     ):
     with mlflow.start_run():
         logged_agent_info = mlflow.pyfunc.log_model(
-            name="agent",
-            python_model="agent.py",
+            name="model",
+            python_model=agent_file_path,
             extra_pip_requirements=[
                 f"databricks-ai-bridge=={get_distribution('databricks-ai-bridge').version}",
                 f"databricks-sdk=={get_distribution('databricks-sdk').version}",
@@ -25,6 +27,9 @@ def main(
                 f"databricks-agents=={get_distribution('databricks-agents').version}",
                 f"mlflow=={get_distribution('mlflow').version}"
             ],
+            registered_model_name=f"{catalog_name}.{schema_name}.{model_name}",
+            code_paths=[program_file_path],
+            input_example={"input": [{"role": "user", "content": "Hi, this is a test message."}]},
             resources=resources,
         )
     

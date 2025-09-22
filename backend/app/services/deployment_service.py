@@ -1,15 +1,25 @@
 import os
 import shutil
 import json
-from typing import Dict, Any, List, Optional
+
 from datetime import datetime
+from typing import Dict, Any, List, Optional
+
+from mlflow.models.resources import (
+    DatabricksFunction,
+    DatabricksGenieSpace,
+    DatabricksSQLWarehouse,
+    DatabricksTable,
+    DatabricksServingEndpoint,
+    DatabricksVectorSearchIndex,
+)
 
 from app.models.workflow import Workflow, NodeType
 from app.services.validation_service import validation_service
 from app.services.compiler_service import compiler_service
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.deployment.runner import main
+from app.deployment.runner import deploy_agent
 
 logger = get_logger(__name__)
 
@@ -123,12 +133,14 @@ class DeploymentService:
             logger.info(f"Starting Databricks deployment for {model_name}")            
             
             # Call the deployment
-            # main(
-            #     model_name=model_name,
-            #     catalog_name=catalog_name,
-            #     schema_name=schema_name,
-            #     resources=resources
-            # )
+            deploy_agent(
+                agent_file_path=agent_dest,
+                program_file_path=program_path,
+                model_name=model_name,
+                catalog_name=catalog_name,
+                schema_name=schema_name,
+                resources=resources
+            )
             
             # Success - update status
             endpoint_url = f"https://databricks.com/serving-endpoints/{catalog_name}.{schema_name}.{model_name}"
@@ -191,7 +203,7 @@ class DeploymentService:
                     if catalog and schema and index_name:
                         unstructured_indices.add((catalog, schema, index_name))
                     if embedding_model:
-                        embedding_models_used.add(embedding_model)
+                        models_used.add(embedding_model)
                 
                 elif retriever_type == 'StructuredRetrieve':
                     # Extract structured space info  
@@ -199,38 +211,21 @@ class DeploymentService:
                     if space_id:
                         structured_spaces.add(space_id)
         
-        # Create resource entries (stub implementation)
-        # TODO: Implement actual resource generation based on discovered components
-        
+        # Create resource entries
         for model in models_used:
-            resources.append({
-                "type": "model",
-                "name": model,
-                "resource_type": "llm_model"
-            })
-        
-        for embedding_model in embedding_models_used:
-            resources.append({
-                "type": "embedding_model", 
-                "name": embedding_model,
-                "resource_type": "embedding_model"
-            })
+            resources.append(
+                DatabricksServingEndpoint(endpoint_name=model)
+            )
         
         for catalog, schema, index_name in unstructured_indices:
-            resources.append({
-                "type": "unstructured_index",
-                "catalog": catalog,
-                "schema": schema, 
-                "index_name": index_name,
-                "resource_type": "vector_search_index"
-            })
+            resources.append(
+                DatabricksVectorSearchIndex(index_name=f"{catalog}.{schema}.{index_name}")
+            )
         
         for space_id in structured_spaces:
-            resources.append({
-                "type": "structured_space",
-                "space_id": space_id,
-                "resource_type": "genie_space"
-            })
+            resources.append(
+                DatabricksGenieSpace(space_id=space_id)
+            )
         
         logger.info(f"Generated {len(resources)} resources for deployment")
         logger.debug(f"Resources: {resources}")

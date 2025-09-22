@@ -181,9 +181,6 @@ class PredictTemplate(BaseModuleTemplate):
         # Approach 1: Direct attribute access - get field names from workflow IR
         output_field_names = self._get_connected_fields(is_input=False)
         logger.debug(f"Output fields from workflow IR: {output_field_names}")
-
-        # Check what's in completions
-        logger.debug(f"Completions object: {result._completions}")
         
         for field_name in output_field_names:
             if hasattr(result, field_name):
