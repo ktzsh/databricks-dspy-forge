@@ -234,9 +234,7 @@ class ChainOfThoughtTemplate(BaseModuleTemplate):
         # Add rationale for chain of thought
         all_field_names = ['rationale'] + output_field_names
         
-        logger.debug(f"Expected CoT output fields: {all_field_names}")
-        logger.debug(f"CoT result has attributes: {[attr for attr in dir(result) if hasattr(result, attr) and not attr.startswith('_')]}")
-        
+        logger.debug(f"Expected CoT output fields: {all_field_names}")        
         for field_name in all_field_names:
             if hasattr(result, field_name):
                 field_value = getattr(result, field_name)

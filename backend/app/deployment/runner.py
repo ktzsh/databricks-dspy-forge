@@ -1,14 +1,21 @@
 import mlflow
 
 from typing import Any
-from databricks import agents
 from pkg_resources import get_distribution
-from mlflow.pyfunc import ResponsesAgent
 
+from databricks import agents
+from databricks.sdk import WorkspaceClient
+
+w = WorkspaceClient()
+        
+# Get current user information
+current_user = w.current_user.me().user_name
+
+mlflow.set_tracking_uri("databricks")
 mlflow.set_registry_uri("databricks-uc")
 
-
 def deploy_agent(
+        workflow_id: str,
         agent_file_path: str,
         program_file_path: str,
         model_name: str,
@@ -16,6 +23,7 @@ def deploy_agent(
         catalog_name:str ,
         resources: list[Any]
     ):
+    mlflow.set_experiment(f"/Users/{current_user}/DSPy-Forge-Experiment-{workflow_id}")
     with mlflow.start_run():
         logged_agent_info = mlflow.pyfunc.log_model(
             name="model",
@@ -38,7 +46,10 @@ def deploy_agent(
         name=f"{catalog_name}.{schema_name}.{model_name}",
     )
 
-    agents.deploy(
-        f"{catalog_name}.{schema_name}.{model_name}",
-        uc_registered_model_info.version,
+    deployment_info = agents.deploy(
+        model_name=f"{catalog_name}.{schema_name}.{model_name}",
+        model_version=uc_registered_model_info.version,
+        scale_to_zero=True,
+        endpoint_name=f"agents_{model_name}"
     )
+    return deployment_info

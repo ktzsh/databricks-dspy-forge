@@ -27,15 +27,7 @@ def setup_logging(
             "%(asctime)s - %(name)s - %(levelname)s - "
             "%(filename)s:%(lineno)d - %(message)s"
         )
-    
-    # Configure logging
-    logging.basicConfig(
-        level=getattr(logging, level.upper()),
-        format=format_string,
-        datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[]
-    )
-    
+
     # Get root logger
     logger = logging.getLogger()
     

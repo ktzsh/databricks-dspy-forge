@@ -133,7 +133,8 @@ class DeploymentService:
             logger.info(f"Starting Databricks deployment for {model_name}")            
             
             # Call the deployment
-            deploy_agent(
+            deployment_info = deploy_agent(
+                workflow_id=workflow.id,
                 agent_file_path=agent_dest,
                 program_file_path=program_path,
                 model_name=model_name,
@@ -141,15 +142,15 @@ class DeploymentService:
                 schema_name=schema_name,
                 resources=resources
             )
+            logger.debug(f"Deployment info: {deployment_info}")
             
             # Success - update status
-            endpoint_url = f"https://databricks.com/serving-endpoints/{catalog_name}.{schema_name}.{model_name}"
             status.update({
                 "status": "completed",
                 "message": "Deployment completed successfully",
                 "completed_at": datetime.now().isoformat(),
-                "endpoint_url": endpoint_url,
-                "resources": resources
+                "endpoint_url": deployment_info.endpoint_url,
+                "review_app_url": deployment_info.review_app_url
             })
             self._save_deployment_status(deployment_id, status)
             

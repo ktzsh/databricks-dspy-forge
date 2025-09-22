@@ -13,7 +13,16 @@ from mlflow.types.responses import (
     ResponsesAgentStreamEvent,
 )
 
-from program import CompoundProgram
+try:
+    from program import CompoundProgram
+except ImportError:
+    import sys
+    import os
+    # Add the directory containing this file to Python path
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    if current_dir not in sys.path:
+        sys.path.insert(0, current_dir)
+    from program import CompoundProgram
 
 mlflow.dspy.autolog()
 

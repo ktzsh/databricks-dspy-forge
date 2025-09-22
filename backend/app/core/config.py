@@ -8,11 +8,11 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     
     # Logging settings
-    log_level: str = "DEBUG"
-    log_file: Optional[str] = None #"./logs/app.log"
+    log_level: str = "INFO"
+    log_file: Optional[str] = None # "./logs/app.log"
     
     # Debug settings
-    debug_compiler: bool = True
+    debug_compiler: bool = False
     artifacts_path: str = "./artifacts"
     
     # Workflow storage configuration
