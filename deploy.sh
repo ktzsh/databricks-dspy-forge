@@ -4,7 +4,7 @@ set -e  # Exit immediately if a command exits with a non-zero status
 set -x  # Print each command before executing it
 
 # Parse command line arguments
-APP_NAME="DSPy-Forge"  # Default app name
+APP_NAME="dspy-forge"  # Default app name
 DATABRICKS_CONFIG_PROFILE=""  # Will be set if --profile is specified
 
 while [[ $# -gt 0 ]]; do

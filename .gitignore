@@ -1,8 +1,6 @@
 # Custom
 artifacts/
 mlruns/
-ui/static/
-ui/build/
 uv.lock
 
 # Dependencies
@@ -19,7 +17,6 @@ venv/
 
 # Build outputs
 dist/
-build/
 *.egg-info/
 
 # IDEs
@@ -51,3 +48,4 @@ coverage/
 .cache/
 .npm/
 .yarn/
+.databricks
