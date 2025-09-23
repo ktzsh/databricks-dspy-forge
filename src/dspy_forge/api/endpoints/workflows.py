@@ -206,7 +206,7 @@ async def get_deployment_status(deployment_id: str):
     try:
         logger.info(f"Getting deployment status for {deployment_id}")
         from dspy_forge.services.deployment_service import deployment_service
-        status_info = deployment_service.get_deployment_status(deployment_id)
+        status_info = await deployment_service.get_deployment_status(deployment_id)
         
         if not status_info:
             logger.warning(f"Deployment status not found for {deployment_id}")

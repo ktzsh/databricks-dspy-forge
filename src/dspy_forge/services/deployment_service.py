@@ -26,6 +26,9 @@ logger = get_logger(__name__)
 class DeploymentService:
     """Service for deploying workflows to Databricks as agent endpoints"""
 
+    def __init__(self):
+        self._temp_dir = None
+
     async def _save_deployment_status(self, deployment_id: str, status: Dict[str, Any]):
         """Save deployment status using storage backend"""
         try:
@@ -61,19 +64,28 @@ class DeploymentService:
             full_path = storage.storage_path / path
             return str(full_path)
         else:
-            # For remote storage, create temp file
+            # For remote storage, create temp file in shared temp directory
             content = await storage.get_file(path)
             if content is None:
                 raise RuntimeError(f"File not found in storage: {path}")
 
-            # Create temp file with proper suffix
-            suffix = Path(path).suffix
-            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False)
-            temp_file.write(content)
-            temp_file.close()
+            # Create shared temp directory if it doesn't exist
+            if self._temp_dir is None:
+                self._temp_dir = tempfile.mkdtemp()
+                logger.debug(f"Created shared temporary directory {self._temp_dir}")
 
-            logger.debug(f"Created temporary file {temp_file.name} for {path}")
-            return temp_file.name
+            original_filename = Path(path).name
+            temp_file_path = os.path.join(self._temp_dir, original_filename)
+
+            if isinstance(content, bytes):
+                with open(temp_file_path, 'wb') as f:
+                    f.write(content)
+            else:
+                with open(temp_file_path, 'w') as f:
+                    f.write(content)
+
+            logger.debug(f"Created temporary file {temp_file_path} for {path}")
+            return temp_file_path
     
     async def deploy_workflow_async(
         self, 

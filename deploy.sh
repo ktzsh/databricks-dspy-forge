@@ -41,9 +41,10 @@ APP_FOLDER_IN_WORKSPACE="/Workspace/Users/${DATABRICKS_USERNAME}/${APP_NAME}"
   cd ".."
 )
 
-# Backend packaging. Swap in your /backend folder name if it's different here.
+# Sync source code but ui/build is not git tracked so import it manually
 (
   databricks sync . "$APP_FOLDER_IN_WORKSPACE"
+  databricks workspace import-dir ui/build "$APP_FOLDER_IN_WORKSPACE/ui/build" --overwrite
 ) &
 
 # Wait for both background processes to finish
