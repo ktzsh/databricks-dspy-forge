@@ -1,6 +1,6 @@
 # Custom
-src/artifacts/
-src/mlruns/
+artifacts/
+mlruns/
 ui/static/
 ui/build/
 uv.lock

@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     storage_backend: Literal["local", "databricks"] = "local"
     
     # Local storage settings
-    local_storage_path: str = "./artifacts/workflows"
+    artifacts_path: str = "./artifacts/workflows"
     
     # Databricks storage settings
     databricks_volume_path: Optional[str] = None
