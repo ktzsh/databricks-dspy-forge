@@ -23,7 +23,7 @@ const LogicNode: React.FC<NodeProps<LogicNodeData & { traceData?: any; onTraceCl
   const [fieldMappings, setFieldMappings] = useState<Record<string, string>>(nodeData.fieldMappings || {});
   const [availableFields, setAvailableFields] = useState<SignatureField[]>([]);
   
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, setNodes } = useReactFlow();
   const nodes = useNodes();
   const edges = useEdges();
 
@@ -52,17 +52,27 @@ const LogicNode: React.FC<NodeProps<LogicNodeData & { traceData?: any; onTraceCl
   }, [logicType, nodes, edges, id]);
 
   const handleSave = () => {
-    Object.assign(data, {
-      ...nodeData,
-      label: nodeLabel,
-      logicType: logicType,
-      condition: condition,
-      parameters: parameters,
-      selectedFields: selectedFields,
-      fieldMappings: fieldMappings,
-      traceData,
-      onTraceClick
-    });
+    // Update the node data immutably using setNodes to ensure React Flow detects the change
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: {
+                ...nodeData,
+                label: nodeLabel,
+                logicType: logicType,
+                condition: condition,
+                parameters: parameters,
+                selectedFields: selectedFields,
+                fieldMappings: fieldMappings,
+                traceData,
+                onTraceClick
+              }
+            }
+          : node
+      )
+    );
     setIsEditing(false);
   };
 

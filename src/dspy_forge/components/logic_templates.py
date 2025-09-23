@@ -7,7 +7,9 @@ Handles IfElse, Merge, FieldSelector, and other logic node types.
 from typing import Dict, Any
 from dspy_forge.core.templates import NodeTemplate, CodeGenerationContext
 from dspy_forge.core.dspy_types import DSPyLogicType
+from dspy_forge.core.logging import get_logger
 
+logger = get_logger(__name__)
 
 class BaseLogicTemplate(NodeTemplate):
     """Base template for logic nodes"""
@@ -101,9 +103,9 @@ class FieldSelectorTemplate(BaseLogicTemplate):
     
     async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
         """Execute FieldSelector logic node"""
-        selected_fields = self.node_data.get('selectedFields', [])
-        field_mappings = self.node_data.get('fieldMappings', {})
-        
+        selected_fields = self.node_data.get('selected_fields', [])
+        field_mappings = self.node_data.get('field_mappings', {})
+        logger.info(f"FieldSelector selected fields: {selected_fields}, mappings: {field_mappings}")
         if not selected_fields:
             # If no fields are explicitly selected, pass through all inputs
             return inputs
@@ -120,8 +122,8 @@ class FieldSelectorTemplate(BaseLogicTemplate):
     
     def generate_code(self, context: CodeGenerationContext) -> Dict[str, Any]:
         """Generate code for FieldSelector logic node"""
-        selected_fields = self.node_data.get('selectedFields', [])
-        field_mappings = self.node_data.get('fieldMappings', {})
+        selected_fields = self.node_data.get('selected_fields', [])
+        field_mappings = self.node_data.get('field_mappings', {})
         instance_var = f"field_selector_{context.get_node_count('field_selector')}"
         
         # Generate field selection code

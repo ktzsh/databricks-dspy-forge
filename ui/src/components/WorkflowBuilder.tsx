@@ -310,6 +310,17 @@ const WorkflowBuilderContent: React.FC = () => {
         nodeData.logicType = node.data.logic_type;
         delete nodeData.logic_type;
       }
+
+      // Convert logic node specific fields
+      if (node.data.selected_fields) {
+        nodeData.selectedFields = node.data.selected_fields;
+        delete nodeData.selected_fields;
+      }
+
+      if (node.data.field_mappings) {
+        nodeData.fieldMappings = node.data.field_mappings;
+        delete nodeData.field_mappings;
+      }
       
       if (node.data.retriever_type) {
         nodeData.retrieverType = node.data.retriever_type;
@@ -404,9 +415,24 @@ const WorkflowBuilderContent: React.FC = () => {
           delete nodeData.moduleType;
         }
         
-        if (node.type === 'logic' && nodeData.logicType) {
-          nodeData.logic_type = nodeData.logicType;
-          delete nodeData.logicType;
+        if (node.type === 'logic') {
+          // Convert logicType to logic_type
+          if (nodeData.logicType) {
+            nodeData.logic_type = nodeData.logicType;
+            delete nodeData.logicType;
+          }
+
+          // Convert selectedFields to selected_fields
+          if (nodeData.selectedFields) {
+            nodeData.selected_fields = nodeData.selectedFields;
+            delete nodeData.selectedFields;
+          }
+
+          // Convert fieldMappings to field_mappings
+          if (nodeData.fieldMappings) {
+            nodeData.field_mappings = nodeData.fieldMappings;
+            delete nodeData.fieldMappings;
+          }
         }
         
         if (node.type === 'retriever') {
