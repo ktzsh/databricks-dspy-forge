@@ -46,6 +46,18 @@ def _normalize_workflow_data(workflow_ir: Dict[str, Any]) -> Dict[str, Any]:
                 normalized_node["data"]["logic_type"] = node_data["logicType"]
                 if "logic_type" not in node_data:  # Don't duplicate if both exist
                     del normalized_node["data"]["logicType"]
+            
+            # Convert other camelCase fields
+            camel_to_snake_mappings = {
+                "selectedFields": "selected_fields",
+                "fieldMappings": "field_mappings", 
+            }
+            
+            for camel_case, snake_case in camel_to_snake_mappings.items():
+                if camel_case in node_data:
+                    normalized_node["data"][snake_case] = node_data[camel_case]
+                    if snake_case not in node_data:  # Don't duplicate if both exist
+                        del normalized_node["data"][camel_case]
         
         elif node.get("type") == "retriever":
             # Convert retrieverType to retriever_type

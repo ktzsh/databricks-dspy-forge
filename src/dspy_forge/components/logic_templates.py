@@ -103,6 +103,7 @@ class FieldSelectorTemplate(BaseLogicTemplate):
     
     async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
         """Execute FieldSelector logic node"""
+        logger.info(f"FieldSelector data: {self.node_data}")
         selected_fields = self.node_data.get('selected_fields', [])
         field_mappings = self.node_data.get('field_mappings', {})
         logger.info(f"FieldSelector selected fields: {selected_fields}, mappings: {field_mappings}")
@@ -151,7 +152,7 @@ class FieldSelectorTemplate(BaseLogicTemplate):
         return {
             'signature': '',
             'instance': f"        # FieldSelector logic configured: {selected_fields}",
-            'forward': '\n'.join(forward_lines),
+            'forward': '\n'.join(forward_lines) + "\n",
             'dependencies': [],
             'instance_var': instance_var
         }

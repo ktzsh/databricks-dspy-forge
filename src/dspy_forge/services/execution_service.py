@@ -27,7 +27,6 @@ from dspy_forge.utils.workflow_utils import (
     get_node_dependencies,
     get_node_dependents
 )
-from dspy_forge.services.compiler_service import compiler_service
 from dspy_forge.core.templates import TemplateFactory
 from dspy_forge.components import registry  # This will auto-register all templates
 
@@ -70,17 +69,6 @@ class WorkflowExecutionEngine:
     def __init__(self):
         self.active_executions: Dict[str, WorkflowExecution] = {}
     
-    
-    def _compile_and_save_workflow(self, workflow: Workflow, context: ExecutionContext = None):
-        """Compile workflow to code and save if debug_compiler is enabled"""
-        if settings.debug_compiler:
-            try:
-                workflow_code = compiler_service.compile_workflow_to_code(workflow, context)
-                compiler_service.save_compiled_workflow(workflow.id, workflow_code)
-            except Exception as e:
-                logger.error(f"Failed to compile and save workflow {workflow.id}: {e}")
-    
-    
     async def execute_workflow(self, workflow: Workflow, input_data: Dict[str, Any]) -> WorkflowExecution:
         """Execute a workflow with given input data"""
         execution_id = str(uuid.uuid4())
@@ -121,9 +109,6 @@ class WorkflowExecutionEngine:
                 'node_outputs': context.node_outputs
             }
             execution.status = "completed"
-            
-            # Generate workflow code if debug_compiler is enabled
-            # self._compile_and_save_workflow(workflow, context)
             
         except Exception as e:
             execution.error = str(e)

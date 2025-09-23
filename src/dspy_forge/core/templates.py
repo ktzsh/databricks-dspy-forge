@@ -82,38 +82,51 @@ class NodeTemplate(ABC):
         pass
     
     def _get_connected_fields(self, is_input: bool = True) -> List[str]:
-        """Get field names from connected signature field nodes"""
+        """Get field names from connected signature field nodes and field selector logic nodes"""
         fields = []
-        
+
         if is_input:
             edges = [edge for edge in self.workflow.edges if edge.target == self.node_id]
         else:
             edges = [edge for edge in self.workflow.edges if edge.source == self.node_id]
-        
+
         for edge in edges:
             node_id = edge.source if is_input else edge.target
             node = next((n for n in self.workflow.nodes if n.id == node_id), None)
-            
+
             if node and node.type == NodeType.SIGNATURE_FIELD:
                 node_fields = node.data.get('fields', [])
                 for field_data in node_fields:
                     field_name = field_data.get('name')
                     if field_name and field_name not in fields:
                         fields.append(field_name)
-        
+            elif node and node.type == NodeType.LOGIC:
+                # Handle field selector logic nodes
+                logic_type = node.data.get('logic_type')
+                if logic_type == 'FieldSelector':
+                    # Get selected fields from field selector
+                    selected_fields = node.data.get('selected_fields', [])
+                    field_mappings = node.data.get('field_mappings', {})
+
+                    for field_name in selected_fields:
+                        # Use mapped name if provided, otherwise use original name
+                        output_name = field_mappings.get(field_name, field_name)
+                        if output_name and output_name not in fields:
+                            fields.append(output_name)
+
         return fields
     
     def _get_field_info(self, field_name: str, is_input: bool = True) -> Tuple[str, str]:
-        """Get field type and description from connected signature field nodes"""
+        """Get field type and description from connected signature field nodes and field selector logic nodes"""
         if is_input:
             edges = [edge for edge in self.workflow.edges if edge.target == self.node_id]
         else:
             edges = [edge for edge in self.workflow.edges if edge.source == self.node_id]
-        
+
         for edge in edges:
             node_id = edge.source if is_input else edge.target
             node = next((n for n in self.workflow.nodes if n.id == node_id), None)
-            
+
             if node and node.type == NodeType.SIGNATURE_FIELD:
                 fields = node.data.get('fields', [])
                 for field_data in fields:
@@ -121,8 +134,56 @@ class NodeTemplate(ABC):
                         field_type = field_data.get('type', 'str')
                         field_desc = field_data.get('description', '')
                         return field_type, field_desc
-        
-        return 'str', ''
+            elif node and node.type == NodeType.LOGIC:
+                # Handle field selector logic nodes
+                logic_type = node.data.get('logic_type')
+                if logic_type == 'FieldSelector':
+                    selected_fields = node.data.get('selected_fields', [])
+                    field_mappings = node.data.get('field_mappings', {})
+
+                    # Check if this field comes from the field selector
+                    for selected_field in selected_fields:
+                        output_name = field_mappings.get(selected_field, selected_field)
+                        if output_name == field_name:
+                            # Trace back to find the original field type from upstream nodes
+                            return self._trace_field_info_upstream(node.id, selected_field)
+
+        raise ValueError(
+            f"Field '{field_name}' not found in connected SignatureField or FieldSelector nodes for node '{self.node_id}'"
+        )
+
+    def _trace_field_info_upstream(self, field_selector_node_id: str, original_field_name: str) -> Tuple[str, str]:
+        """Trace upstream from field selector to find original field type and description"""
+        # Find edges coming into the field selector node
+        upstream_edges = [edge for edge in self.workflow.edges if edge.target == field_selector_node_id]
+
+        for edge in upstream_edges:
+            upstream_node = next((n for n in self.workflow.nodes if n.id == edge.source), None)
+
+            if upstream_node and upstream_node.type == NodeType.SIGNATURE_FIELD:
+                fields = upstream_node.data.get('fields', [])
+                for field_data in fields:
+                    if field_data.get('name') == original_field_name:
+                        field_type = field_data.get('type', 'str')
+                        field_desc = field_data.get('description', '')
+                        return field_type, field_desc
+            elif upstream_node and upstream_node.type == NodeType.LOGIC:
+                # If upstream is another logic node, trace further
+                upstream_logic_type = upstream_node.data.get('logic_type')
+                if upstream_logic_type == 'FieldSelector':
+                    # Recursively trace through nested field selectors
+                    upstream_selected_fields = upstream_node.data.get('selected_fields', [])
+                    upstream_field_mappings = upstream_node.data.get('field_mappings', {})
+
+                    # Find the original field name in the upstream field selector
+                    for upstream_field in upstream_selected_fields:
+                        upstream_output = upstream_field_mappings.get(upstream_field, upstream_field)
+                        if upstream_output == original_field_name:
+                            return self._trace_field_info_upstream(upstream_node.id, upstream_field)
+
+        raise ValueError(
+            f"Field '{original_field_name}' not found upstream of FieldSelector node '{field_selector_node_id}'"
+        )
     
     def _convert_ui_type_to_python(self, ui_type: str) -> str:
         """Convert UI field type to Python type annotation"""
