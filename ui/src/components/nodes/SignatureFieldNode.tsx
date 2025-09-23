@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { Plus, X, Edit3, Database, Trash2 } from 'lucide-react';
 import { SignatureFieldNodeData, SignatureField, FieldType } from '../../types/workflow';
+import TraceIndicator from './TraceIndicator';
 
 const fieldTypes: FieldType[] = ['str', 'int', 'bool', 'float', 'list[str]', 'list[int]', 'dict', 'list[dict[str, Any]]', 'Any'];
 
-const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data, selected, id }) => {
+const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceData?: any; onTraceClick?: (nodeId: string, traceData: any) => void }>> = ({ data, selected, id }) => {
+  const { traceData, onTraceClick, ...nodeData } = data;
   const [isEditing, setIsEditing] = useState(false);
-  const [nodeLabel, setNodeLabel] = useState(data.label || 'Signature Field');
-  const [fields, setFields] = useState<SignatureField[]>(data.fields || []);
-  const [isStart, setIsStart] = useState(data.isStart || false);
-  const [isEnd, setIsEnd] = useState(data.isEnd || false);
-  const [connectionMode, setConnectionMode] = useState<'whole' | 'field-level'>(data.connectionMode || 'whole');
+  const [nodeLabel, setNodeLabel] = useState(nodeData.label || 'Signature Field');
+  const [fields, setFields] = useState<SignatureField[]>(nodeData.fields || []);
+  const [isStart, setIsStart] = useState(nodeData.isStart || false);
+  const [isEnd, setIsEnd] = useState(nodeData.isEnd || false);
+  const [connectionMode, setConnectionMode] = useState<'whole' | 'field-level'>(nodeData.connectionMode || 'whole');
   const { deleteElements } = useReactFlow();
 
   // Check if this is the default start node
@@ -63,16 +65,21 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
 
   const handleSave = () => {
     // Update the node data
-    data.label = nodeLabel;
-    data.fields = fields;
-    
+    Object.assign(data, {
+      ...nodeData,
+      label: nodeLabel,
+      fields: fields,
+      connectionMode: connectionMode,
+      traceData,
+      onTraceClick
+    });
+
     // For default start node, don't allow changing start/end status
     if (!isDefaultStartNode) {
       data.isStart = isStart;
       data.isEnd = isEnd;
     }
-    
-    data.connectionMode = connectionMode;
+
     setIsEditing(false);
   };
 
@@ -84,7 +91,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
   };
 
   return (
-    <div className={`signature-field-node min-w-[250px] ${selected ? 'node-selected' : ''}`}>
+    <div className={`signature-field-node min-w-[250px] relative ${selected ? 'node-selected' : ''}`}>
       {/* Handles */}
       {connectionMode === 'whole' ? (
         // Whole-node connection mode
@@ -350,6 +357,18 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData>> = ({ data,
           </div>
         )}
       </div>
+
+      {/* Trace Indicator */}
+      {traceData && (
+        <TraceIndicator
+          hasTrace={true}
+          executionTime={traceData.execution_time}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTraceClick?.(id, traceData);
+          }}
+        />
+      )}
     </div>
   );
 };

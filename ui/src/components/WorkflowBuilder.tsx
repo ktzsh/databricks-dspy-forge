@@ -119,6 +119,12 @@ const WorkflowBuilderContent: React.FC = () => {
   const reactFlowInstance = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Custom handler to update base nodes when enhanced nodes change
+  const handleNodesChange = useCallback((changes: any[]) => {
+    // Extract the base changes (removing trace data) and apply to base nodes
+    onNodesChange(changes);
+  }, [onNodesChange]);
   const [workflowName, setWorkflowName] = useState('Untitled Workflow');
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [isPlaygroundOpen, setIsPlaygroundOpen] = useState(true);
@@ -129,6 +135,7 @@ const WorkflowBuilderContent: React.FC = () => {
   const [showNodeExecutionModal, setShowNodeExecutionModal] = useState(false);
   const [selectedNodeExecution, setSelectedNodeExecution] = useState<any>(null);
   const [showDeployModal, setShowDeployModal] = useState(false);
+  const [nodesWithTraceData, setNodesWithTraceData] = useState<Node[]>([]);
   const [deploymentConfig, setDeploymentConfig] = useState({
     model_name: '',
     catalog_name: '',
@@ -172,24 +179,61 @@ const WorkflowBuilderContent: React.FC = () => {
     []
   );
 
-  // Handle node click to show execution details
-  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    // Only show execution details if we have results and the node was executed
-    if (lastExecutionResults && lastExecutionResults.execution_trace) {
-      const nodeExecution = lastExecutionResults.execution_trace.find(
-        (trace: any) => trace.node_id === node.id
-      );
-      
-      if (nodeExecution) {
+  // Handle trace indicator click to show execution details
+  const handleTraceClick = useCallback((nodeId: string, traceData: any) => {
+    if (lastExecutionResults) {
+      const node = nodes.find(n => n.id === nodeId);
+      if (node) {
         setSelectedNodeExecution({
           node,
-          execution: nodeExecution,
-          nodeOutput: lastExecutionResults.node_outputs[node.id]
+          execution: traceData,
+          nodeOutput: lastExecutionResults.node_outputs[nodeId]
         });
         setShowNodeExecutionModal(true);
       }
     }
-  }, [lastExecutionResults]);
+  }, [lastExecutionResults, nodes]);
+
+  // Update nodes with trace data when execution results change
+  useEffect(() => {
+    if (lastExecutionResults && lastExecutionResults.execution_trace) {
+      const enhancedNodes = nodes.map(node => {
+        const traceData = lastExecutionResults.execution_trace.find(
+          (trace: any) => trace.node_id === node.id
+        );
+
+        if (traceData) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              traceData,
+              onTraceClick: handleTraceClick
+            }
+          };
+        }
+
+        // Remove trace data if no longer available
+        const { traceData: _, onTraceClick: __, ...cleanData } = node.data || {};
+        return {
+          ...node,
+          data: cleanData
+        };
+      });
+
+      setNodesWithTraceData(enhancedNodes);
+    } else {
+      // Remove trace data from all nodes
+      const cleanNodes = nodes.map(node => {
+        const { traceData: _, onTraceClick: __, ...cleanData } = node.data || {};
+        return {
+          ...node,
+          data: cleanData
+        };
+      });
+      setNodesWithTraceData(cleanNodes);
+    }
+  }, [nodes, lastExecutionResults, handleTraceClick]);
 
   // Handle keyboard events for deletion (Delete key only, not Backspace)
   useEffect(() => {
@@ -703,13 +747,12 @@ const WorkflowBuilderContent: React.FC = () => {
         {/* Main Canvas */}
         <div className="flex-1 relative overflow-hidden">
           <ReactFlow
-            nodes={nodes}
+            nodes={nodesWithTraceData}
             edges={edges}
-            onNodesChange={onNodesChange}
+            onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onSelectionChange={onSelectionChange}
-            onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
             defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
             minZoom={0.1}

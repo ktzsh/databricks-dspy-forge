@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Handle, Position, NodeProps, useReactFlow, useNodes, useEdges } from 'reactflow';
 import { Edit3, GitBranch, GitMerge, Trash2, Filter } from 'lucide-react';
 import { LogicNodeData, LogicType, SignatureField, SignatureFieldNodeData } from '../../types/workflow';
+import TraceIndicator from './TraceIndicator';
 
 const logicTypes: LogicType[] = ['IfElse', 'Merge', 'FieldSelector'];
 
@@ -11,14 +12,15 @@ const logicIcons: Record<LogicType, React.ReactNode> = {
   'FieldSelector': <Filter size={16} className="text-purple-600" />
 };
 
-const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) => {
+const LogicNode: React.FC<NodeProps<LogicNodeData & { traceData?: any; onTraceClick?: (nodeId: string, traceData: any) => void }>> = ({ data, selected, id }) => {
+  const { traceData, onTraceClick, ...nodeData } = data;
   const [isEditing, setIsEditing] = useState(false);
-  const [nodeLabel, setNodeLabel] = useState(data.label || data.logicType || 'Logic');
-  const [logicType, setLogicType] = useState<LogicType>(data.logicType || 'IfElse');
-  const [condition, setCondition] = useState(data.condition || '');
-  const [parameters, setParameters] = useState(data.parameters || {});
-  const [selectedFields, setSelectedFields] = useState<string[]>(data.selectedFields || []);
-  const [fieldMappings, setFieldMappings] = useState<Record<string, string>>(data.fieldMappings || {});
+  const [nodeLabel, setNodeLabel] = useState(nodeData.label || nodeData.logicType || 'Logic');
+  const [logicType, setLogicType] = useState<LogicType>(nodeData.logicType || 'IfElse');
+  const [condition, setCondition] = useState(nodeData.condition || '');
+  const [parameters, setParameters] = useState(nodeData.parameters || {});
+  const [selectedFields, setSelectedFields] = useState<string[]>(nodeData.selectedFields || []);
+  const [fieldMappings, setFieldMappings] = useState<Record<string, string>>(nodeData.fieldMappings || {});
   const [availableFields, setAvailableFields] = useState<SignatureField[]>([]);
   
   const { deleteElements } = useReactFlow();
@@ -50,12 +52,17 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
   }, [logicType, nodes, edges, id]);
 
   const handleSave = () => {
-    data.label = nodeLabel;
-    data.logicType = logicType;
-    data.condition = condition;
-    data.parameters = parameters;
-    data.selectedFields = selectedFields;
-    data.fieldMappings = fieldMappings;
+    Object.assign(data, {
+      ...nodeData,
+      label: nodeLabel,
+      logicType: logicType,
+      condition: condition,
+      parameters: parameters,
+      selectedFields: selectedFields,
+      fieldMappings: fieldMappings,
+      traceData,
+      onTraceClick
+    });
     setIsEditing(false);
   };
 
@@ -101,7 +108,7 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
   };
 
   return (
-    <div className={`logic-node min-w-[250px] ${selected ? 'node-selected' : ''}`}>
+    <div className={`logic-node min-w-[250px] relative ${selected ? 'node-selected' : ''}`}>
       {/* Handles */}
       <Handle
         type="target"
@@ -400,6 +407,18 @@ const LogicNode: React.FC<NodeProps<LogicNodeData>> = ({ data, selected, id }) =
           </div>
         )}
       </div>
+
+      {/* Trace Indicator */}
+      {traceData && (
+        <TraceIndicator
+          hasTrace={true}
+          executionTime={traceData.execution_time}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTraceClick?.(id, traceData);
+          }}
+        />
+      )}
     </div>
   );
 };

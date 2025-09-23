@@ -2,45 +2,52 @@ import React, { useState } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { Edit3, Database, Trash2, Settings } from 'lucide-react';
 import { RetrieverNodeData, RetrieverType } from '../../types/workflow';
+import TraceIndicator from './TraceIndicator';
 
 const retrieverTypes: RetrieverType[] = ['UnstructuredRetrieve', 'StructuredRetrieve'];
 
-const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected, id }) => {
+const RetrieverNode: React.FC<NodeProps<RetrieverNodeData & { traceData?: any; onTraceClick?: (nodeId: string, traceData: any) => void }>> = ({ data, selected, id }) => {
+  const { traceData, onTraceClick, ...nodeData } = data;
   const [isEditing, setIsEditing] = useState(false);
-  const [nodeLabel, setNodeLabel] = useState(data.label || data.retrieverType || 'Retriever');
-  const [retrieverType, setRetrieverType] = useState<RetrieverType>(data.retrieverType || 'UnstructuredRetrieve');
+  const [nodeLabel, setNodeLabel] = useState(nodeData.label || nodeData.retrieverType || 'Retriever');
+  const [retrieverType, setRetrieverType] = useState<RetrieverType>(nodeData.retrieverType || 'UnstructuredRetrieve');
   // UnstructuredRetrieve fields
-  const [catalogName, setCatalogName] = useState(data.catalogName || '');
-  const [schemaName, setSchemaName] = useState(data.schemaName || '');
-  const [indexName, setIndexName] = useState(data.indexName || '');
-  const [contentColumn, setContentColumn] = useState(data.contentColumn || '');
-  const [idColumn, setIdColumn] = useState(data.idColumn || '');
-  const [embeddingModel, setEmbeddingModel] = useState(data.embeddingModel || '');
-  const [queryType, setQueryType] = useState<'HYBRID' | 'ANN'>(data.queryType || 'HYBRID');
-  const [numResults, setNumResults] = useState(data.numResults || 3);
-  const [scoreThreshold, setScoreThreshold] = useState(data.scoreThreshold || 0.0);
+  const [catalogName, setCatalogName] = useState(nodeData.catalogName || '');
+  const [schemaName, setSchemaName] = useState(nodeData.schemaName || '');
+  const [indexName, setIndexName] = useState(nodeData.indexName || '');
+  const [contentColumn, setContentColumn] = useState(nodeData.contentColumn || '');
+  const [idColumn, setIdColumn] = useState(nodeData.idColumn || '');
+  const [embeddingModel, setEmbeddingModel] = useState(nodeData.embeddingModel || '');
+  const [queryType, setQueryType] = useState<'HYBRID' | 'ANN'>(nodeData.queryType || 'HYBRID');
+  const [numResults, setNumResults] = useState(nodeData.numResults || 3);
+  const [scoreThreshold, setScoreThreshold] = useState(nodeData.scoreThreshold || 0.0);
   // StructuredRetrieve fields
-  const [genieSpaceId, setGenieSpaceId] = useState(data.genieSpaceId || '');
-  const [parameters, setParameters] = useState(data.parameters || {});
+  const [genieSpaceId, setGenieSpaceId] = useState(nodeData.genieSpaceId || '');
+  const [parameters, setParameters] = useState(nodeData.parameters || {});
   
   const { deleteElements } = useReactFlow();
 
   const handleSave = () => {
-    data.label = nodeLabel;
-    data.retrieverType = retrieverType;
-    // Save UnstructuredRetrieve fields
-    data.catalogName = catalogName;
-    data.schemaName = schemaName;
-    data.indexName = indexName;
-    data.contentColumn = contentColumn;
-    data.idColumn = idColumn;
-    data.embeddingModel = embeddingModel;
-    data.queryType = queryType;
-    data.numResults = numResults;
-    data.scoreThreshold = scoreThreshold;
-    // Save StructuredRetrieve fields
-    data.genieSpaceId = genieSpaceId;
-    data.parameters = parameters;
+    Object.assign(data, {
+      ...nodeData,
+      label: nodeLabel,
+      retrieverType: retrieverType,
+      // Save UnstructuredRetrieve fields
+      catalogName: catalogName,
+      schemaName: schemaName,
+      indexName: indexName,
+      contentColumn: contentColumn,
+      idColumn: idColumn,
+      embeddingModel: embeddingModel,
+      queryType: queryType,
+      numResults: numResults,
+      scoreThreshold: scoreThreshold,
+      // Save StructuredRetrieve fields
+      genieSpaceId: genieSpaceId,
+      parameters: parameters,
+      traceData,
+      onTraceClick
+    });
     setIsEditing(false);
   };
 
@@ -64,7 +71,7 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
   };
 
   return (
-    <div className={`bg-orange-50 border-2 border-orange-200 rounded-lg shadow-sm min-w-[280px] ${selected ? 'ring-2 ring-blue-500 ring-opacity-50' : ''}`}>
+    <div className={`bg-orange-50 border-2 border-orange-200 rounded-lg shadow-sm min-w-[280px] relative ${selected ? 'ring-2 ring-blue-500 ring-opacity-50' : ''}`}>
       {/* Handles */}
       <Handle
         type="target"
@@ -426,6 +433,18 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData>> = ({ data, selected,
           </div>
         )}
       </div>
+
+      {/* Trace Indicator */}
+      {traceData && (
+        <TraceIndicator
+          hasTrace={true}
+          executionTime={traceData.execution_time}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTraceClick?.(id, traceData);
+          }}
+        />
+      )}
     </div>
   );
 };

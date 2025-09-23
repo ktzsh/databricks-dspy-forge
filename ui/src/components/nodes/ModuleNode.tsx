@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { Edit3, Brain, Settings, Trash2 } from 'lucide-react';
 import { ModuleNodeData, ModuleType } from '../../types/workflow';
+import TraceIndicator from './TraceIndicator';
 
 const moduleTypes: ModuleType[] = [
   'Predict',
@@ -19,21 +20,28 @@ const moduleIcons: Record<ModuleType, React.ReactNode> = {
   'Refine': <Brain size={16} className="text-indigo-600" />
 };
 
-const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id }) => {
+const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTraceClick?: (nodeId: string, traceData: any) => void }>> = ({ data, selected, id }) => {
+  const { traceData, onTraceClick, ...nodeData } = data;
   const [isEditing, setIsEditing] = useState(false);
-  const [nodeLabel, setNodeLabel] = useState(data.label || data.moduleType || 'Module');
-  const [moduleType, setModuleType] = useState<ModuleType>(data.moduleType || 'Predict');
-  const [model, setModel] = useState(data.model || '');
-  const [instruction, setInstruction] = useState(data.instruction || '');
-  const [parameters, setParameters] = useState(data.parameters || {});
+  const [nodeLabel, setNodeLabel] = useState(nodeData.label || nodeData.moduleType || 'Module');
+  const [moduleType, setModuleType] = useState<ModuleType>(nodeData.moduleType || 'Predict');
+  const [model, setModel] = useState(nodeData.model || '');
+  const [instruction, setInstruction] = useState(nodeData.instruction || '');
+  const [parameters, setParameters] = useState(nodeData.parameters || {});
   const { deleteElements } = useReactFlow();
 
   const handleSave = () => {
-    data.label = nodeLabel;
-    data.moduleType = moduleType;
-    data.model = model;
-    data.instruction = instruction;
-    data.parameters = parameters;
+    // Update the original data object (which includes trace data)
+    Object.assign(data, {
+      ...nodeData,
+      label: nodeLabel,
+      moduleType: moduleType,
+      model: model,
+      instruction: instruction,
+      parameters: parameters,
+      traceData,
+      onTraceClick
+    });
     setIsEditing(false);
   };
 
@@ -57,7 +65,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
   };
 
   return (
-    <div className={`module-node min-w-[250px] ${selected ? 'node-selected' : ''}`}>
+    <div className={`module-node min-w-[250px] relative ${selected ? 'node-selected' : ''}`}>
       {/* Handles */}
       <Handle
         type="target"
@@ -266,6 +274,18 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData>> = ({ data, selected, id })
           </div>
         )}
       </div>
+
+      {/* Trace Indicator */}
+      {traceData && (
+        <TraceIndicator
+          hasTrace={true}
+          executionTime={traceData.execution_time}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTraceClick?.(id, traceData);
+          }}
+        />
+      )}
     </div>
   );
 };

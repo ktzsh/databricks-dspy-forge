@@ -28,7 +28,8 @@ class DatabricksGenieRM(dspy.Retrieve):
         if history:
             query_with_history = f"I will provide you a chat history. Please help with the provided query based on information described in the chat history.\n\n"
             for i, message in enumerate(history):
-                query_with_history += f"Turn {i+1}\n {'\n'.join(f"{key}:{value}" for key, value in message.items())}"
+                turn_message = '\n'.join(f"{key}:{value}" for key, value in message.items())
+                query_with_history += f"Turn {i+1}\n {turn_message}"
             query_with_history += f"\n\nNow, please help with the following query:\n{query}"
             query = query_with_history
                 
