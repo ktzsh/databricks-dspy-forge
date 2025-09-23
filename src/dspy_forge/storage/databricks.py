@@ -1,21 +1,19 @@
 import json
 import asyncio
+import os
 from typing import List, Optional, Dict, Any
-from datetime import datetime
-from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.files import FileInfo
 
-from dspy_forge.storage.base import WorkflowStorageBackend
+from dspy_forge.storage.base import StorageBackend
 from dspy_forge.models.workflow import Workflow
 from dspy_forge.core.logging import get_logger
 
 
-class DatabricksVolumeStorage(WorkflowStorageBackend):
+class DatabricksVolumeStorage(StorageBackend):
     """Databricks Unity Catalog Volume storage backend for workflows"""
     
-    def __init__(self, volume_path: str, host: Optional[str] = None, token: Optional[str] = None):
+    def __init__(self, volume_path: str):
         """
         Initialize Databricks volume storage
         
@@ -26,16 +24,9 @@ class DatabricksVolumeStorage(WorkflowStorageBackend):
         """
         self.volume_path = volume_path.rstrip('/')
         self.logger = get_logger(__name__)
-        
-        # Initialize Databricks workspace client
-        client_kwargs = {}
-        if host:
-            client_kwargs['host'] = host
-        if token:
-            client_kwargs['token'] = token
             
         try:
-            self.client = WorkspaceClient(**client_kwargs)
+            self.client = WorkspaceClient()
         except Exception as e:
             self.logger.error(f"Failed to initialize Databricks client: {e}")
             raise
@@ -71,7 +62,7 @@ class DatabricksVolumeStorage(WorkflowStorageBackend):
     
     def _get_workflow_file_path(self, workflow_id: str) -> str:
         """Get the file path for a workflow in the volume"""
-        return f"{self.volume_path}/{workflow_id}.json"
+        return f"{self.volume_path}/workflows/{workflow_id}.json"
     
     async def save_workflow(self, workflow: Workflow) -> bool:
         """Save a workflow to Databricks volume"""
@@ -114,7 +105,7 @@ class DatabricksVolumeStorage(WorkflowStorageBackend):
                 try:
                     # Download file content from volume
                     response = self.client.files.download(file_path)
-                    return response.contents.decode('utf-8')
+                    return response.contents.read()
                 except Exception:
                     # File doesn't exist
                     return None
@@ -141,20 +132,24 @@ class DatabricksVolumeStorage(WorkflowStorageBackend):
             
             def _list_files():
                 try:
-                    # List all files in the volume directory
-                    file_infos = list(self.client.files.list_directory_contents(self.volume_path))
+                    # List all files in the workflows directory
+                    workflows_path = f"{self.volume_path}/workflows"
+                    file_infos = list(self.client.files.list_directory_contents(workflows_path, page_size=1000))
                     return [f for f in file_infos if f.name.endswith('.json')]
                 except Exception as e:
-                    self.logger.error(f"Failed to list volume directory: {e}")
+                    self.logger.error(f"Failed to list volume workflows directory: {e}")
                     return []
             
+            self.logger.info(f"Looking for workflows in volume path: {self.volume_path}/workflows")
             json_files = await loop.run_in_executor(None, _list_files)
             
             # Load each workflow file
             for file_info in json_files:
                 try:
                     workflow_id = file_info.name[:-5]  # Remove .json extension
+                    self.logger.info(f"Workflow id: {workflow_id}")
                     workflow = await self.get_workflow(workflow_id)
+
                     if workflow:
                         workflows.append(workflow)
                 except Exception as e:
@@ -249,3 +244,183 @@ class DatabricksVolumeStorage(WorkflowStorageBackend):
                 "message": f"Health check failed: {str(e)}",
                 "volume_path": self.volume_path
             }
+
+    # Deployment artifact management
+    async def save_deployment_status(self, deployment_id: str, status: Dict[str, Any]) -> bool:
+        """Save deployment status to deployments directory in volume"""
+        try:
+            file_path = f"{self.volume_path}/deployments/{deployment_id}.json"
+            status_json = json.dumps(status, indent=2, default=str)
+
+            # Run in thread pool since databricks SDK is synchronous
+            loop = asyncio.get_event_loop()
+
+            def _save_file():
+                self.client.files.upload(
+                    file_path=file_path,
+                    contents=status_json.encode('utf-8'),
+                    overwrite=True
+                )
+                return True
+
+            await loop.run_in_executor(None, _save_file)
+
+            self.logger.debug(f"Saved deployment status for {deployment_id} to volume")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to save deployment status for {deployment_id} to volume: {e}")
+            return False
+
+    async def get_deployment_status(self, deployment_id: str) -> Optional[Dict[str, Any]]:
+        """Get deployment status from deployments directory in volume"""
+        try:
+            file_path = f"{self.volume_path}/deployments/{deployment_id}.json"
+
+            # Run in thread pool since databricks SDK is synchronous
+            loop = asyncio.get_event_loop()
+
+            def _get_file():
+                try:
+                    response = self.client.files.download(file_path)
+                    return response.contents.read()
+                except Exception:
+                    return None
+
+            content = await loop.run_in_executor(None, _get_file)
+
+            if content is None:
+                return None
+
+            return json.loads(content)
+        except Exception as e:
+            self.logger.error(f"Failed to get deployment status for {deployment_id} from volume: {e}")
+            return None
+
+    async def save_compiled_workflow(self, workflow_id: str, code: str, filename: str = "program.py") -> bool:
+        """Save compiled workflow code to workflows directory in volume"""
+        try:
+            file_path = f"{self.volume_path}/workflows/{workflow_id}/{filename}"
+
+            # Run in thread pool since databricks SDK is synchronous
+            loop = asyncio.get_event_loop()
+
+            def _save_file():
+                self.client.files.upload(
+                    file_path=file_path,
+                    contents=code.encode('utf-8'),
+                    overwrite=True
+                )
+                return True
+
+            await loop.run_in_executor(None, _save_file)
+
+            self.logger.debug(f"Saved compiled workflow {workflow_id} to volume: {file_path}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to save compiled workflow {workflow_id} to volume: {e}")
+            return False
+
+    async def get_compiled_workflow(self, workflow_id: str, filename: str = "program.py") -> Optional[str]:
+        """Get compiled workflow code from workflows directory in volume"""
+        try:
+            file_path = f"{self.volume_path}/workflows/{workflow_id}/{filename}"
+
+            # Run in thread pool since databricks SDK is synchronous
+            loop = asyncio.get_event_loop()
+
+            def _get_file():
+                try:
+                    response = self.client.files.download(file_path)
+                    return response.contents.read()
+                except Exception:
+                    return None
+
+            content = await loop.run_in_executor(None, _get_file)
+            return content
+        except Exception as e:
+            self.logger.error(f"Failed to get compiled workflow {workflow_id} from volume: {e}")
+            return None
+
+    async def save_file(self, path: str, content: str) -> bool:
+        """Save arbitrary file content to volume"""
+        try:
+            file_path = f"{self.volume_path}/{path}"
+
+            # Run in thread pool since databricks SDK is synchronous
+            loop = asyncio.get_event_loop()
+
+            def _save_file():
+                self.client.files.upload(
+                    file_path=file_path,
+                    contents=content.encode('utf-8'),
+                    overwrite=True
+                )
+                return True
+
+            await loop.run_in_executor(None, _save_file)
+
+            self.logger.debug(f"Saved file to volume: {file_path}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to save file {path} to volume: {e}")
+            return False
+
+    async def get_file(self, path: str) -> Optional[str]:
+        """Get arbitrary file content from volume"""
+        try:
+            file_path = f"{self.volume_path}/{path}"
+
+            # Run in thread pool since databricks SDK is synchronous
+            loop = asyncio.get_event_loop()
+
+            def _get_file():
+                try:
+                    response = self.client.files.download(file_path)
+                    return response.contents.read()
+                except Exception:
+                    return None
+
+            return await loop.run_in_executor(None, _get_file)
+        except Exception as e:
+            self.logger.error(f"Failed to get file {path} from volume: {e}")
+            return None
+
+    async def copy_file(self, src_path: str, dest_path: str) -> bool:
+        """Copy file to volume (from external source or within volume)"""
+        try:
+            # Read source file content
+            if os.path.isabs(src_path) and os.path.exists(src_path):
+                # External file
+                with open(src_path, 'r') as f:
+                    content = f.read()
+            else:
+                # File within volume
+                content = await self.get_file(src_path)
+                if content is None:
+                    self.logger.error(f"Source file {src_path} not found in volume")
+                    return False
+
+            # Save to destination
+            return await self.save_file(dest_path, content)
+        except Exception as e:
+            self.logger.error(f"Failed to copy file from {src_path} to {dest_path}: {e}")
+            return False
+
+    async def file_exists(self, path: str) -> bool:
+        """Check if file exists in volume"""
+        try:
+            file_path = f"{self.volume_path}/{path}"
+
+            # Run in thread pool since databricks SDK is synchronous
+            loop = asyncio.get_event_loop()
+
+            def _check_file():
+                try:
+                    self.client.files.get_metadata(file_path)
+                    return True
+                except Exception:
+                    return False
+
+            return await loop.run_in_executor(None, _check_file)
+        except Exception:
+            return False

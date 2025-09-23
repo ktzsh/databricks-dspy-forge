@@ -10,17 +10,14 @@ class Settings(BaseSettings):
     # Logging settings
     log_level: str = "INFO"
     log_file: Optional[str] = None # "./logs/app.log"
-    
-    # Workflow storage configuration
+        
+    # Storage settings
     storage_backend: Literal["local", "databricks"] = "local"
-    
-    # Local storage settings
-    artifacts_path: str = "./artifacts/workflows"
-    
-    # Databricks storage settings
-    databricks_volume_path: Optional[str] = None
+    artifacts_path: str = "./artifacts/"
+    # artifacts_path: str = "/Volumes/users/kshitiz_sharma/dspy_forge_artifacts"
     
     # Databricks settings
+    databricks_config_profile: Optional[str] = None
     databricks_host: Optional[str] = None
     databricks_token: Optional[str] = None
     

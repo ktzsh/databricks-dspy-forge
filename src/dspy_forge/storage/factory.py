@@ -1,6 +1,6 @@
 from typing import Optional
 
-from dspy_forge.storage.base import WorkflowStorageBackend
+from dspy_forge.storage.base import StorageBackend
 from dspy_forge.storage.local import LocalDirectoryStorage
 from dspy_forge.storage.databricks import DatabricksVolumeStorage
 from dspy_forge.core.config import settings
@@ -14,7 +14,7 @@ class StorageBackendFactory:
     """Factory class for creating workflow storage backends"""
     
     @staticmethod
-    def create_storage_backend() -> WorkflowStorageBackend:
+    def create_storage_backend() -> StorageBackend:
         """
         Create a storage backend based on configuration
         
@@ -39,38 +39,32 @@ class StorageBackendFactory:
     @staticmethod
     def _create_local_storage() -> LocalDirectoryStorage:
         """Create local directory storage backend"""
-        storage_path = settings.artifacts_path + "/workflows"
+        storage_path = settings.artifacts_path
         logger.debug(f"Creating local storage with path: {storage_path}")
         return LocalDirectoryStorage(storage_path)
     
     @staticmethod
     def _create_databricks_storage() -> DatabricksVolumeStorage:
         """Create Databricks volume storage backend"""
-        volume_path = settings.databricks_volume_path
+        volume_path = settings.artifacts_path
         
         if not volume_path:
             raise ValueError(
-                "databricks_volume_path must be configured when using Databricks storage backend"
+                "artifacts_path must be configured when using Databricks storage backend"
             )
         
         logger.debug(f"Creating Databricks storage with volume path: {volume_path}")
         
-        # Use Databricks settings from config if available
-        host = settings.databricks_host
-        token = settings.databricks_token
-        
         return DatabricksVolumeStorage(
-            volume_path=volume_path,
-            host=host,
-            token=token
+            volume_path=volume_path
         )
 
 
 # Global storage backend instance
-_storage_backend: Optional[WorkflowStorageBackend] = None
+_storage_backend: Optional[StorageBackend] = None
 
 
-async def get_storage_backend() -> WorkflowStorageBackend:
+async def get_storage_backend() -> StorageBackend:
     """
     Get the configured storage backend instance (singleton pattern)
     

@@ -2,6 +2,8 @@
 artifacts/
 mlruns/
 uv.lock
+*.js.map
+*.css.map
 
 # Dependencies
 node_modules/

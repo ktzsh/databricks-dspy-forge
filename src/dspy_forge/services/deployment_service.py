@@ -1,9 +1,8 @@
 import os
-import shutil
-import json
-
+import tempfile
 from datetime import datetime
 from typing import Dict, Any, List, Optional
+from pathlib import Path
 
 from mlflow.models.resources import (
     DatabricksFunction,
@@ -17,7 +16,7 @@ from mlflow.models.resources import (
 from dspy_forge.models.workflow import Workflow, NodeType
 from dspy_forge.services.validation_service import validation_service
 from dspy_forge.services.compiler_service import compiler_service
-from dspy_forge.core.config import settings
+from dspy_forge.storage.factory import get_storage_backend
 from dspy_forge.core.logging import get_logger
 from dspy_forge.deployment.runner import deploy_agent
 
@@ -26,36 +25,55 @@ logger = get_logger(__name__)
 
 class DeploymentService:
     """Service for deploying workflows to Databricks as agent endpoints"""
-    
-    def __init__(self):
-        self.status_dir = os.path.join(settings.artifacts_path, "deployments")
-        os.makedirs(self.status_dir, exist_ok=True)
-    
-    def _save_deployment_status(self, deployment_id: str, status: Dict[str, Any]):
-        """Save deployment status to file"""
+
+    async def _save_deployment_status(self, deployment_id: str, status: Dict[str, Any]):
+        """Save deployment status using storage backend"""
         try:
-            status_file = os.path.join(self.status_dir, f"{deployment_id}.json")
-            with open(status_file, 'w') as f:
-                json.dump(status, f, indent=2)
-            logger.debug(f"Saved deployment status for {deployment_id}")
+            storage = await get_storage_backend()
+            success = await storage.save_deployment_status(deployment_id, status)
+            if success:
+                logger.debug(f"Saved deployment status for {deployment_id}")
+            else:
+                logger.error(f"Failed to save deployment status for {deployment_id}")
         except Exception as e:
             logger.error(f"Failed to save deployment status for {deployment_id}: {e}")
-    
-    def _load_deployment_status(self, deployment_id: str) -> Optional[Dict[str, Any]]:
-        """Load deployment status from file"""
+
+    async def _load_deployment_status(self, deployment_id: str) -> Optional[Dict[str, Any]]:
+        """Load deployment status using storage backend"""
         try:
-            status_file = os.path.join(self.status_dir, f"{deployment_id}.json")
-            if os.path.exists(status_file):
-                with open(status_file, 'r') as f:
-                    status = json.load(f)
+            storage = await get_storage_backend()
+            status = await storage.get_deployment_status(deployment_id)
+            if status:
                 logger.debug(f"Loaded deployment status for {deployment_id}")
-                return status
             else:
                 logger.debug(f"No status file found for deployment {deployment_id}")
-                return None
+            return status
         except Exception as e:
             logger.error(f"Failed to load deployment status for {deployment_id}: {e}")
             return None
+
+    async def _get_local_file_path(self, storage, path: str) -> str:
+        """Get local file path for deployment, creating temp file if using remote storage"""
+        from dspy_forge.storage.local import LocalDirectoryStorage
+
+        if isinstance(storage, LocalDirectoryStorage):
+            # For local storage, return direct path
+            full_path = storage.storage_path / path
+            return str(full_path)
+        else:
+            # For remote storage, create temp file
+            content = await storage.get_file(path)
+            if content is None:
+                raise RuntimeError(f"File not found in storage: {path}")
+
+            # Create temp file with proper suffix
+            suffix = Path(path).suffix
+            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False)
+            temp_file.write(content)
+            temp_file.close()
+
+            logger.debug(f"Created temporary file {temp_file.name} for {path}")
+            return temp_file.name
     
     async def deploy_workflow_async(
         self, 
@@ -76,7 +94,7 @@ class DeploymentService:
                 "catalog_name": catalog_name,
                 "schema_name": schema_name
             }
-            self._save_deployment_status(deployment_id, status)
+            await self._save_deployment_status(deployment_id, status)
             
             # Step 1: Validate workflow
             logger.info(f"Validating workflow {workflow.id}")
@@ -87,7 +105,7 @@ class DeploymentService:
                     "message": f"Validation failed: {'; '.join(errors)}",
                     "completed_at": datetime.now().isoformat()
                 })
-                self._save_deployment_status(deployment_id, status)
+                await self._save_deployment_status(deployment_id, status)
                 return
             
             # Step 2: Compile workflow
@@ -95,30 +113,38 @@ class DeploymentService:
                 "status": "compiling",
                 "message": "Compiling workflow to DSPy code"
             })
-            self._save_deployment_status(deployment_id, status)
+            await self._save_deployment_status(deployment_id, status)
             
             logger.info(f"Compiling workflow {workflow.id}")
             workflow_code = compiler_service.compile_workflow_to_code(workflow)
             
-            # Step 3: Create deployment directory and save code
-            artifacts_dir = os.path.join(settings.artifacts_path, "workflows", workflow.id)
-            os.makedirs(artifacts_dir, exist_ok=True)
-            
-            # Write program.py
-            program_path = os.path.join(artifacts_dir, "program.py")
-            with open(program_path, 'w') as f:
-                f.write(f"# DSPy Workflow: {workflow.id}\n")
-                f.write(f"# Generated at: {datetime.now().isoformat()}\n\n")
-                f.write(workflow_code)
-            
-            logger.info(f"Saved workflow code to {program_path}")
-            
+            # Step 3: Save compiled workflow code using storage backend
+            storage = await get_storage_backend()
+
+            # Add header to workflow code
+            workflow_code_with_header = f"# DSPy Workflow: {workflow.id}\n"
+            workflow_code_with_header += f"# Generated at: {datetime.now().isoformat()}\n\n"
+            workflow_code_with_header += workflow_code
+
+            # Save program.py
+            success = await storage.save_compiled_workflow(workflow.id, workflow_code_with_header, "program.py")
+            if not success:
+                raise RuntimeError("Failed to save compiled workflow code")
+
+            logger.info(f"Saved compiled workflow code for {workflow.id}")
+
             # Step 4: Copy agent.py
             agent_source = os.path.join(os.path.dirname(__file__), "..", "deployment", "agent.py")
-            agent_dest = os.path.join(artifacts_dir, "agent.py")
-            shutil.copy2(agent_source, agent_dest)
-            
-            logger.info(f"Copied agent.py to {agent_dest}")
+
+            # Read agent.py and save to storage
+            with open(agent_source, 'r') as f:
+                agent_content = f.read()
+
+            success = await storage.save_file(f"workflows/{workflow.id}/agent.py", agent_content)
+            if not success:
+                raise RuntimeError("Failed to save agent.py")
+
+            logger.info(f"Copied agent.py for workflow {workflow.id}")
             
             # Step 5: Generate resource list
             resources = self._generate_resource_list(workflow)
@@ -128,15 +154,19 @@ class DeploymentService:
                 "status": "deploying",
                 "message": "Deploying to Databricks"
             })
-            self._save_deployment_status(deployment_id, status)
+            await self._save_deployment_status(deployment_id, status)
             
             logger.info(f"Starting Databricks deployment for {model_name}")            
             
+            # Get file paths for deployment - check if storage is local or create temp files
+            agent_file_path = await self._get_local_file_path(storage, f"workflows/{workflow.id}/agent.py")
+            program_file_path = await self._get_local_file_path(storage, f"workflows/{workflow.id}/program.py")
+
             # Call the deployment
             deployment_info = deploy_agent(
                 workflow_id=workflow.id,
-                agent_file_path=agent_dest,
-                program_file_path=program_path,
+                agent_file_path=agent_file_path,
+                program_file_path=program_file_path,
                 model_name=model_name,
                 catalog_name=catalog_name,
                 schema_name=schema_name,
@@ -152,7 +182,7 @@ class DeploymentService:
                 "endpoint_url": deployment_info.endpoint_url,
                 "review_app_url": deployment_info.review_app_url
             })
-            self._save_deployment_status(deployment_id, status)
+            await self._save_deployment_status(deployment_id, status)
             
             logger.info(f"Successfully deployed workflow {workflow.id} as {catalog_name}.{schema_name}.{model_name}")
             
@@ -165,11 +195,11 @@ class DeploymentService:
                 "message": error_msg,
                 "completed_at": datetime.now().isoformat()
             })
-            self._save_deployment_status(deployment_id, status)
+            await self._save_deployment_status(deployment_id, status)
     
-    def get_deployment_status(self, deployment_id: str) -> Optional[Dict[str, Any]]:
+    async def get_deployment_status(self, deployment_id: str) -> Optional[Dict[str, Any]]:
         """Get deployment status by ID"""
-        return self._load_deployment_status(deployment_id)
+        return await self._load_deployment_status(deployment_id)
     
     def _generate_resource_list(self, workflow: Workflow) -> List[Dict[str, Any]]:
         """Generate list of resources based on workflow components"""

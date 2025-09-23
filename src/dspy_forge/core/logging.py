@@ -30,27 +30,38 @@ def setup_logging(
 
     # Get root logger
     logger = logging.getLogger()
-    
-    # Clear any existing handlers
-    logger.handlers.clear()
-    
-    # Create console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(getattr(logging, level.upper()))
-    console_formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
-    console_handler.setFormatter(console_formatter)
-    logger.addHandler(console_handler)
-    
-    # Create file handler if specified
+
+    # Set the logger level
+    logger.setLevel(getattr(logging, level.upper()))
+
     if log_file:
+        # If log file is specified, clear existing handlers and create new ones
+        logger.handlers.clear()
+
+        # Create console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(getattr(logging, level.upper()))
+        console_formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
+        console_handler.setFormatter(console_formatter)
+        logger.addHandler(console_handler)
+
+        # Create file handler
         log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(getattr(logging, level.upper()))
         file_formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
+    else:
+        # If no log file, just update existing handlers with new formatting
+        formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
+
+        # Update all existing handlers with new formatter and level
+        for handler in logger.handlers:
+            handler.setFormatter(formatter)
+            handler.setLevel(getattr(logging, level.upper()))
     
     return logger
 

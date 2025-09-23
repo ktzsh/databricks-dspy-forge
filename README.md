@@ -95,12 +95,11 @@ pip install -r requirements.txt
 ```env
 # Storage backend
 STORAGE_BACKEND=local  # or "databricks"
-LOCAL_STORAGE_PATH=./artifacts/workflows
+ARTIFACTS_PATH=./artifacts/workflows
 
 # Databricks
 DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
 DATABRICKS_TOKEN=your-access-token
-DATABRICKS_VOLUME_PATH=/Volumes/catalog/schema/volume/workflows
 ```
 
 5. **Start the backend**:

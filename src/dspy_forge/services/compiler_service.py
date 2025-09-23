@@ -1,16 +1,10 @@
-import os
-from typing import Dict, Any, List, Set, Tuple
+from typing import Dict, Any, List
 from datetime import datetime
 
 from dspy_forge.models.workflow import Workflow, NodeType
-from dspy_forge.core.config import settings
+from dspy_forge.storage.factory import get_storage_backend
 from dspy_forge.core.logging import get_logger
-from dspy_forge.core.dspy_types import DSPyModuleType
-from dspy_forge.utils.workflow_utils import (
-    get_execution_order, 
-    find_start_nodes,
-    find_end_nodes
-)
+from dspy_forge.utils.workflow_utils import get_execution_order
 from dspy_forge.core.templates import TemplateFactory, CodeGenerationContext
 from dspy_forge.components import registry  # This will auto-register all templates
 
@@ -23,13 +17,12 @@ class WorkflowCompilerService:
     def __init__(self):
         self.compiled_workflows: Dict[str, str] = {}  # Cache compiled code
     
-    def compile_workflow_to_code(self, workflow: Workflow, execution_context=None) -> str:
+    def compile_workflow_to_code(self, workflow: Workflow) -> str:
         """
         Compile a workflow to optimized DSPy code using template system
         
         Args:
             workflow: The workflow to compile
-            execution_context: Optional execution context for runtime data
             
         Returns:
             Generated DSPy code as string
@@ -172,41 +165,52 @@ class WorkflowCompilerService:
             logger.error(f"Failed to compile workflow {workflow.id}: {e}")
             raise
     
-    def save_compiled_workflow(self, workflow_id: str, workflow_code: str) -> str:
+    async def save_compiled_workflow(self, workflow_id: str, workflow_code: str) -> bool:
         """
-        Save compiled workflow code to artifacts directory
-        
+        Save compiled workflow code using storage backend
+
         Args:
             workflow_id: ID of the workflow
             workflow_code: Generated code to save
-            
+
         Returns:
-            Path to saved file
+            True if successful, False otherwise
         """
         try:
-            # Create artifacts directory if it doesn't exist
-            artifacts_dir = os.path.join(settings.artifacts_path, "workflows", workflow_id)
-            os.makedirs(artifacts_dir, exist_ok=True)
-            
-            # Save the workflow code
-            filename = "program.py"
-            filepath = os.path.join(artifacts_dir, filename)
-            
-            with open(filepath, 'w') as f:
-                f.write(f"# DSPy Workflow: {workflow_id}\n")
-                f.write(f"# Generated at: {datetime.now().isoformat()}\n\n")
-                f.write(workflow_code)
-            
-            logger.info(f"Workflow code saved to: {filepath}")
-            return filepath
-            
+            storage = await get_storage_backend()
+
+            # Add header to workflow code
+            workflow_code_with_header = f"# DSPy Workflow: {workflow_id}\n"
+            workflow_code_with_header += f"# Generated at: {datetime.now().isoformat()}\n\n"
+            workflow_code_with_header += workflow_code
+
+            # Save using storage backend
+            success = await storage.save_compiled_workflow(workflow_id, workflow_code_with_header, "program.py")
+
+            if success:
+                logger.info(f"Workflow code saved for workflow: {workflow_id}")
+            else:
+                logger.error(f"Failed to save workflow code for: {workflow_id}")
+
+            return success
+
         except Exception as e:
             logger.error(f"Failed to save workflow code: {str(e)}")
-            raise
+            return False
     
     def get_compiled_code(self, workflow_id: str) -> str:
         """Get cached compiled code for a workflow"""
         return self.compiled_workflows.get(workflow_id, "")
+
+    async def get_compiled_workflow_from_storage(self, workflow_id: str, filename: str = "program.py") -> str:
+        """Get compiled workflow code from storage backend"""
+        try:
+            storage = await get_storage_backend()
+            content = await storage.get_compiled_workflow(workflow_id, filename)
+            return content or ""
+        except Exception as e:
+            logger.error(f"Failed to get compiled workflow {workflow_id} from storage: {e}")
+            return ""
     
     def _extract_field_names(self, nodes: List[Any]) -> List[str]:
         """Extract field names from signature field nodes"""

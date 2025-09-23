@@ -4,5 +4,5 @@ command: ["uv", "run", "dspy-forge"]
 env:
   - name: STORAGE_BACKEND
     value: "databricks"
-  - name: LOCAL_STORAGE_PATH
-    value: "./artifacts/workflows"
+  - name: ARTIFACTS_PATH
+    valueFrom: "artifacts_path"
