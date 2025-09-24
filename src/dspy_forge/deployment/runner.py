@@ -3,8 +3,15 @@ import mlflow
 from typing import Any
 from pkg_resources import get_distribution
 
+from mlflow.models.auth_policy import AuthPolicy, SystemAuthPolicy, UserAuthPolicy
+from mlflow.models.resources import DatabricksServingEndpoint
+
 from databricks import agents
 from databricks.sdk import WorkspaceClient
+
+from dspy_forge.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 w = WorkspaceClient()
         
@@ -21,9 +28,32 @@ def deploy_agent(
         model_name: str,
         schema_name: str,
         catalog_name:str ,
-        resources: list[Any]
+        auth_policy: tuple[list[Any], list[Any]]
     ):
     mlflow.set_experiment(f"/Users/{current_user}/DSPy-Forge-Experiment-{workflow_id}")
+
+    authentication_kwargs = {}
+    if auth_policy[1]:
+        # System policy: resources accessed with system credentials
+        system_policy = SystemAuthPolicy(
+            resources=auth_policy[0]
+        )
+
+        # User policy: API scopes for OBO access
+        user_policy = UserAuthPolicy(
+            api_scopes=auth_policy[1]
+        )
+
+        authentication_kwargs["auth_policy"] = AuthPolicy(
+            system_auth_policy=system_policy,
+            user_auth_policy=user_policy
+        )
+    else:
+        # System Policy: resources accessed with system credentials
+        authentication_kwargs["resources"] = auth_policy[0]
+
+    logger.info(f"Using authentication kwargs: {authentication_kwargs}")
+
     with mlflow.start_run():
         logged_agent_info = mlflow.pyfunc.log_model(
             name="model",
@@ -40,7 +70,7 @@ def deploy_agent(
             registered_model_name=f"{catalog_name}.{schema_name}.{model_name}",
             code_paths=[program_file_path],
             input_example={"input": [{"role": "user", "content": "Hi, this is a test message."}]},
-            resources=resources,
+            **authentication_kwargs
         )
     
     uc_registered_model_info = mlflow.register_model(

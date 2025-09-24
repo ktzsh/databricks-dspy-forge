@@ -1,4 +1,4 @@
-command: ["uv", "run", "dspy-forge"]
+command: ["uv", "run", "dspy-forge", "--workers", "4"]
 # databricks apps listen by default on port 8000
 
 env:

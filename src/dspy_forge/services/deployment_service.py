@@ -159,7 +159,7 @@ class DeploymentService:
             logger.info(f"Copied agent.py for workflow {workflow.id}")
             
             # Step 5: Generate resource list
-            resources = self._generate_resource_list(workflow)
+            system_policy, user_policy = self._generate_resource_list(workflow)
             
             # Step 6: Deploy using runner
             status.update({
@@ -182,7 +182,7 @@ class DeploymentService:
                 model_name=model_name,
                 catalog_name=catalog_name,
                 schema_name=schema_name,
-                resources=resources
+                auth_policy=(system_policy, user_policy)
             )
             logger.debug(f"Deployment info: {deployment_info}")
             
@@ -215,7 +215,8 @@ class DeploymentService:
     
     def _generate_resource_list(self, workflow: Workflow) -> List[Dict[str, Any]]:
         """Generate list of resources based on workflow components"""
-        resources = []
+        user_resource_scopes = []
+        system_resources = []
         
         # Track unique resources
         models_used = set()
@@ -250,30 +251,38 @@ class DeploymentService:
                 
                 elif retriever_type == 'StructuredRetrieve':
                     # Extract structured space info  
-                    space_id = node_data.get('space_id')
+                    space_id = node_data.get('genie_space_id')
                     if space_id:
                         structured_spaces.add(space_id)
         
         # Create resource entries
         for model in models_used:
-            resources.append(
+            system_resources.append(
                 DatabricksServingEndpoint(endpoint_name=model)
             )
         
         for catalog, schema, index_name in unstructured_indices:
-            resources.append(
+            system_resources.append(
                 DatabricksVectorSearchIndex(index_name=f"{catalog}.{schema}.{index_name}")
             )
         
         for space_id in structured_spaces:
-            resources.append(
-                DatabricksGenieSpace(space_id=space_id)
+            system_resources.append(
+                DatabricksGenieSpace(genie_space_id=space_id)
+            )
+            user_resource_scopes.extend(
+                [
+                    "dashboards.genie",
+                    "sql.warehouses",
+                    "sql.statement-execution"
+                ]
             )
         
-        logger.info(f"Generated {len(resources)} resources for deployment")
-        logger.debug(f"Resources: {resources}")
+        logger.info(f"Generated {len(system_resources)} system resources and {len(user_resource_scopes)} user resource scopes for deployment")
+        logger.debug(f"System Resources: {system_resources}")
+        logger.debug(f"User Resource Scopes: {user_resource_scopes}")
         
-        return resources
+        return system_resources, user_resource_scopes
 
 
 # Global deployment service instance
