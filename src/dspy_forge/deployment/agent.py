@@ -13,6 +13,9 @@ from mlflow.types.responses import (
     ResponsesAgentStreamEvent,
 )
 
+from databricks.sdk import WorkspaceClient
+from databricks_ai_bridge import ModelServingUserCredentials
+
 try:
     from program import CompoundProgram
 except ImportError:
@@ -27,14 +30,24 @@ except ImportError:
 mlflow.dspy.autolog()
 
 class DSPyResponseAgent(ResponsesAgent):
-    def __init__(self):
-        self.program = CompoundProgram()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # TODO add output field names to program and reference it here
+
+    def initialize_agent(self):
+        # For OBO Auth
+        user_authorized_client = WorkspaceClient(
+            credentials_strategy=ModelServingUserCredentials()
+        )
+        self.program = CompoundProgram(
+            user_authorized_client=user_authorized_client,
+        )
 
     def _convert_to_dspy_format(self, messages):
         question = messages[-1]['content']
 
         history = []
+        # TODO answer is hardcoded instead of using output fields
         for i in range(0, len(messages) - 1, 2):
             if i + 1 < len(messages):
                 history.append({
@@ -56,6 +69,8 @@ class DSPyResponseAgent(ResponsesAgent):
         request: ResponsesAgentRequest,
     ) -> Generator[ResponsesAgentStreamEvent, None, None]:
         cc_msgs = self.prep_msgs_for_cc_llm([i.model_dump() for i in request.input])
+        self.initialize_agent()
+
         dspy_msgs = self._convert_to_dspy_format(cc_msgs)
         
         output = self.program(*dspy_msgs)

@@ -129,9 +129,10 @@ class WorkflowCompilerService:
             
             # Generate CompoundProgram class
             code_lines.append("class CompoundProgram(dspy.Module):")
-            code_lines.append("    def __init__(self):")
+            code_lines.append("    def __init__(self, user_authorized_client: Any):")
             code_lines.append("        super().__init__()")
-            
+            code_lines.append("        self.user_authorized_client = user_authorized_client")
+
             # Add instance creation code
             for instance in instances:
                 if instance.strip():

@@ -28,12 +28,14 @@ def deploy_agent(
         logged_agent_info = mlflow.pyfunc.log_model(
             name="model",
             python_model=agent_file_path,
-            extra_pip_requirements=[
+            pip_requirements=[
                 f"databricks-ai-bridge=={get_distribution('databricks-ai-bridge').version}",
                 f"databricks-sdk=={get_distribution('databricks-sdk').version}",
                 f"dspy=={get_distribution('dspy').version}",
                 f"databricks-agents=={get_distribution('databricks-agents').version}",
-                f"mlflow=={get_distribution('mlflow').version}"
+                f"mlflow=={get_distribution('mlflow').version}",
+                f"pandas=={get_distribution('pandas').version}",
+                f"databricks-connect=={get_distribution('databricks-connect').version}",
             ],
             registered_model_name=f"{catalog_name}.{schema_name}.{model_name}",
             code_paths=[program_file_path],

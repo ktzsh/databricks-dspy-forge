@@ -175,15 +175,15 @@ class DeploymentService:
             program_file_path = await self._get_local_file_path(storage, f"workflows/{workflow.id}/program.py")
 
             # Call the deployment
-            deployment_info = deploy_agent(
-                workflow_id=workflow.id,
-                agent_file_path=agent_file_path,
-                program_file_path=program_file_path,
-                model_name=model_name,
-                catalog_name=catalog_name,
-                schema_name=schema_name,
-                resources=resources
-            )
+            # deployment_info = deploy_agent(
+            #     workflow_id=workflow.id,
+            #     agent_file_path=agent_file_path,
+            #     program_file_path=program_file_path,
+            #     model_name=model_name,
+            #     catalog_name=catalog_name,
+            #     schema_name=schema_name,
+            #     resources=resources
+            # )
             logger.debug(f"Deployment info: {deployment_info}")
             
             # Success - update status
