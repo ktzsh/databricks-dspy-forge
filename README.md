@@ -6,6 +6,12 @@ A visual platform for building, prototyping, and deploying multi-step agentic pr
 
 DSPy Forge provides a drag-and-drop interface for creating sophisticated AI workflows that combine retrieval, reasoning, and action components. Workflows are executed in an integrated playground and deployed as production Databricks agents.
 
+![DSPy Forge Interface](artifacts/forge.png)
+*Visual drag-and-drop interface for building DSPy workflows*
+
+![Execution Tracing](artifacts/trace.png)
+*Flow execution visualization with step-by-step traces*
+
 **Key Capabilities:**
 - Visual workflow design with DSPy modules (Predict, ChainOfThought)
 - Native Databricks integration (Vector Search, Unity Catalog, MLflow)
@@ -136,6 +142,8 @@ LOG_LEVEL=INFO
 ```
 
 ## Usage
+
+The DSPy Forge is meant to be run on your local with Databricks Volumes as persistent storage layer. Although it can be deployed on Databricks Apps as well, but then execution and deployment happens using App SP and not user. When running on local everything happens as user.
 
 ### Basic Workflow Patterns
 
