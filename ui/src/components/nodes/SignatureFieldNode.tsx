@@ -14,7 +14,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   const [isStart, setIsStart] = useState(nodeData.isStart || false);
   const [isEnd, setIsEnd] = useState(nodeData.isEnd || false);
   const [connectionMode, setConnectionMode] = useState<'whole' | 'field-level'>(nodeData.connectionMode || 'whole');
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, setNodes } = useReactFlow();
 
   // Check if this is the default start node
   const isDefaultStartNode = id === 'default-start-node';
@@ -64,22 +64,23 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   };
 
   const handleSave = () => {
-    // Update the node data
-    Object.assign(data, {
-      ...nodeData,
-      label: nodeLabel,
-      fields: fields,
-      connectionMode: connectionMode,
-      traceData,
-      onTraceClick
-    });
-
-    // For default start node, don't allow changing start/end status
-    if (!isDefaultStartNode) {
-      data.isStart = isStart;
-      data.isEnd = isEnd;
-    }
-
+    // Update the node data immutably using setNodes to ensure React Flow detects the change
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                label: nodeLabel,
+                fields: fields,
+                connectionMode: connectionMode,
+                ...(isDefaultStartNode ? {} : { isStart, isEnd }),
+              }
+            }
+          : node
+      )
+    );
     setIsEditing(false);
   };
 
@@ -99,14 +100,14 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
           {!isStart && (
             <Handle
               type="target"
-              position={Position.Left}
+              position={Position.Top}
               className="w-3 h-3 bg-blue-500"
             />
           )}
           {!isEnd && (
             <Handle
               type="source"
-              position={Position.Right}
+              position={Position.Bottom}
               className="w-3 h-3 bg-blue-500"
             />
           )}
@@ -119,8 +120,8 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
               key={`target-${field.name}`}
               id={`target-${field.name}`}
               type="target"
-              position={Position.Left}
-              style={{ top: `${120 + index * 40}px` }}
+              position={Position.Top}
+              style={{ left: `${50 + index * 40}px` }}
               className="w-2 h-2 bg-blue-500"
               title={`Input: ${field.name} (${field.type})`}
             />
@@ -130,8 +131,8 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
               key={`source-${field.name}`}
               id={`source-${field.name}`}
               type="source"
-              position={Position.Right}
-              style={{ top: `${120 + index * 40}px` }}
+              position={Position.Bottom}
+              style={{ left: `${50 + index * 40}px` }}
               className="w-2 h-2 bg-blue-500"
               title={`Output: ${field.name} (${field.type})`}
             />

@@ -25,29 +25,37 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData & { traceData?: any; o
   const [genieSpaceId, setGenieSpaceId] = useState(nodeData.genieSpaceId || '');
   const [parameters, setParameters] = useState(nodeData.parameters || {});
   
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, setNodes } = useReactFlow();
 
   const handleSave = () => {
-    Object.assign(data, {
-      ...nodeData,
-      label: nodeLabel,
-      retrieverType: retrieverType,
-      // Save UnstructuredRetrieve fields
-      catalogName: catalogName,
-      schemaName: schemaName,
-      indexName: indexName,
-      contentColumn: contentColumn,
-      idColumn: idColumn,
-      embeddingModel: embeddingModel,
-      queryType: queryType,
-      numResults: numResults,
-      scoreThreshold: scoreThreshold,
-      // Save StructuredRetrieve fields
-      genieSpaceId: genieSpaceId,
-      parameters: parameters,
-      traceData,
-      onTraceClick
-    });
+    // Update the node data immutably using setNodes to ensure React Flow detects the change
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                label: nodeLabel,
+                retrieverType: retrieverType,
+                // Save UnstructuredRetrieve fields
+                catalogName: catalogName,
+                schemaName: schemaName,
+                indexName: indexName,
+                contentColumn: contentColumn,
+                idColumn: idColumn,
+                embeddingModel: embeddingModel,
+                queryType: queryType,
+                numResults: numResults,
+                scoreThreshold: scoreThreshold,
+                // Save StructuredRetrieve fields
+                genieSpaceId: genieSpaceId,
+                parameters: parameters,
+              }
+            }
+          : node
+      )
+    );
     setIsEditing(false);
   };
 
@@ -75,12 +83,12 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData & { traceData?: any; o
       {/* Handles */}
       <Handle
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         className="w-3 h-3 bg-orange-500"
       />
       <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Bottom}
         className="w-3 h-3 bg-orange-500"
       />
 

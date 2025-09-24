@@ -28,20 +28,27 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
   const [model, setModel] = useState(nodeData.model || '');
   const [instruction, setInstruction] = useState(nodeData.instruction || '');
   const [parameters, setParameters] = useState(nodeData.parameters || {});
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, setNodes } = useReactFlow();
 
   const handleSave = () => {
-    // Update the original data object (which includes trace data)
-    Object.assign(data, {
-      ...nodeData,
-      label: nodeLabel,
-      moduleType: moduleType,
-      model: model,
-      instruction: instruction,
-      parameters: parameters,
-      traceData,
-      onTraceClick
-    });
+    // Update the node data immutably using setNodes to ensure React Flow detects the change
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                label: nodeLabel,
+                moduleType: moduleType,
+                model: model,
+                instruction: instruction,
+                parameters: parameters,
+              }
+            }
+          : node
+      )
+    );
     setIsEditing(false);
   };
 
@@ -69,12 +76,12 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
       {/* Handles */}
       <Handle
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         className="w-3 h-3 bg-green-500"
       />
       <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Bottom}
         className="w-3 h-3 bg-green-500"
       />
 

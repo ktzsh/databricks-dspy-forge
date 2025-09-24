@@ -122,7 +122,7 @@ const LogicNode: React.FC<NodeProps<LogicNodeData & { traceData?: any; onTraceCl
       {/* Handles */}
       <Handle
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         className="w-3 h-3 bg-purple-500"
       />
       
@@ -131,23 +131,23 @@ const LogicNode: React.FC<NodeProps<LogicNodeData & { traceData?: any; onTraceCl
         <>
           <Handle
             type="source"
-            position={Position.Right}
+            position={Position.Bottom}
             id="true"
-            style={{ top: '30%' }}
+            style={{ left: '30%' }}
             className="w-3 h-3 bg-green-500"
           />
           <Handle
             type="source"
-            position={Position.Right}
+            position={Position.Bottom}
             id="false"
-            style={{ top: '70%' }}
+            style={{ left: '70%' }}
             className="w-3 h-3 bg-red-500"
           />
         </>
       ) : (
         <Handle
           type="source"
-          position={Position.Right}
+          position={Position.Bottom}
           className="w-3 h-3 bg-purple-500"
         />
       )}
