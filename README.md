@@ -4,7 +4,7 @@ A visual platform for building, prototyping, and deploying multi-step agentic pr
 
 ## Overview
 
-DSPy Forge provides a drag-and-drop interface for creating sophisticated AI workflows that combine retrieval, reasoning, and action components. Workflows are executed in an integrated playground and deployed as production Databricks agents.
+DSPy Forge provides a drag-and-drop interface for creating sophisticated AI workflows that combine retrieval, reasoning, and action components. Program workflows are executed in an integrated playground and deployed as production Databricks agents.
 
 ![DSPy Forge Interface](artifacts/forge.png)
 *Visual drag-and-drop interface for building DSPy workflows*
@@ -13,10 +13,10 @@ DSPy Forge provides a drag-and-drop interface for creating sophisticated AI work
 *Flow execution visualization with step-by-step traces*
 
 **Key Capabilities:**
-- Visual workflow design with DSPy modules (Predict, ChainOfThought)
-- Native Databricks integration (Vector Search, Unity Catalog, MLflow)
-- Multi-step agentic flows with conditional logic and data transformation
-- One-click deployment to Databricks serving endpoints
+- Visual workflow design with DSPy modules
+- Native Databricks integration (Vector Search, Genie, Agent Framework, MLflow, Unity Catalog)
+- Multi-step agentic programs with conditional logic and data transformation
+- One-click deployment to Databricks serving endpoints using agent framework
 
 ## 🏗️ Architecture
 
