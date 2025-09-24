@@ -56,6 +56,11 @@ def create_app() -> FastAPI:
         """Serve React app for all routes not handled by API"""
         return FileResponse(str(static_dir / "index.html"))
 
+    @app.get("/dspy.png")
+    async def serve_dspy_image():
+        """Serve the dspy.png image"""
+        return FileResponse(str(static_dir / "dspy.png"))
+
     return app
 
 

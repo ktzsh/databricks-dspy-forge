@@ -12,6 +12,10 @@ from dspy_forge.services.validation_service import validation_service
 from dspy_forge.models.workflow import Workflow
 
 
+router = APIRouter()
+logger = get_logger(__name__)
+
+
 def _normalize_workflow_data(workflow_ir: Dict[str, Any]) -> Dict[str, Any]:
     """
     Normalize workflow IR data from frontend format to backend format.
@@ -92,9 +96,6 @@ def _normalize_workflow_data(workflow_ir: Dict[str, Any]) -> Dict[str, Any]:
         "nodes": normalized_nodes,
         "edges": workflow_ir.get("edges", [])
     }
-        
-router = APIRouter()
-logger = get_logger(__name__)
 
 
 def _process_playground_input(input_data: Dict[str, Any], conversation_history: list, workflow) -> Dict[str, Any]:
