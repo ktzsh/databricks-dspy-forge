@@ -1,6 +1,6 @@
 # DSPy Forge
 
-A visual platform for building, prototyping, and deploying multi-step agentic programs on Databricks using DSPy's prompting and reasoning primitives.
+A visual platform for building, prototyping, and deploying multi-step agentic programs on Databricks using DSPy's programming and signature based primitives.
 
 ## Overview
 
