@@ -4,7 +4,7 @@ A visual platform for building, prototyping, and deploying multi-step agentic pr
 
 ## Overview
 
-DSPy Forge provides a drag-and-drop interface for creating sophisticated AI workflows that combine retrieval, reasoning, and action components. Program workflows are executed in an integrated playground and deployed as production Databricks agents.
+DSPy Forge provides a drag-and-drop interface for creating sophisticated AI workflows that combine retrieval, reasoning, and action components. Program workflows are executed in an integrated playground and deployed to Databricks serving using Agent Framework.
 
 NOTE: The DSPy Forge is designed to only work with Models & Retrievers available on Databricks.
 
@@ -19,6 +19,7 @@ NOTE: The DSPy Forge is designed to only work with Models & Retrievers available
 - Native Databricks integration (Vector Search, Genie, Agent Framework, MLflow, Unity Catalog)
 - Multi-step agentic programs with conditional logic and data transformation
 - One-click deployment to Databricks serving endpoints using agent framework
+- OBO (on-behalf-of) Authentication for certain components (Genie)
 
 ## 🏗️ Architecture
 
