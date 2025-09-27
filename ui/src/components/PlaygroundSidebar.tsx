@@ -1,19 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Play, MessageSquare, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface PlaygroundSidebarProps {
   workflowId: string | null;
   workflowIR: { nodes: any[]; edges: any[] } | null;
+  workflowName: string;
   onClose: () => void;
   onExecute: (inputData: Record<string, any>) => void;
   onExecutionResults?: (results: any) => void;
+  onSaveWorkflow?: () => Promise<string | null>; // Returns workflowId if successful
 }
 
-const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workflowIR, onClose, onExecute, onExecutionResults }) => {
+const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workflowIR, workflowName, onClose, onExecute, onExecutionResults, onSaveWorkflow }) => {
   const [inputText, setInputText] = useState('');
-  const [chatHistory, setChatHistory] = useState<Array<{ 
-    role: 'user' | 'assistant' | 'system'; 
+  const [chatHistory, setChatHistory] = useState<Array<{
+    role: 'user' | 'assistant' | 'system';
     content: string;
     timestamp?: string;
     execution_id?: string;
@@ -21,6 +23,12 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
   }>>([]);
   const [conversationHistory, setConversationHistory] = useState<Array<Record<string, any>>>([]);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(workflowId);
+
+  // Update currentWorkflowId when workflowId prop changes
+  useEffect(() => {
+    setCurrentWorkflowId(workflowId);
+  }, [workflowId]);
 
   const clearPlayground = () => {
     setChatHistory([]);
@@ -30,12 +38,12 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
 
   const handleExecute = async () => {
     if (!inputText.trim() || isExecuting) return;
-    
+
     if (!workflowIR) {
       setChatHistory(prev => [
         ...prev,
-        { 
-          role: 'system', 
+        {
+          role: 'system',
           content: 'No workflow defined. Please create a workflow first.',
           error: true,
           timestamp: new Date().toISOString()
@@ -57,6 +65,49 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
     setInputText('');
 
     try {
+      let executionWorkflowId = currentWorkflowId;
+
+      // Auto-save workflow if it doesn't have an ID yet
+      if (!executionWorkflowId && onSaveWorkflow) {
+        setChatHistory(prev => [
+          ...prev,
+          {
+            role: 'system',
+            content: 'Saving workflow before execution...',
+            timestamp: new Date().toISOString()
+          }
+        ]);
+
+        try {
+          executionWorkflowId = await onSaveWorkflow();
+          if (executionWorkflowId) {
+            setCurrentWorkflowId(executionWorkflowId);
+            setChatHistory(prev => [
+              ...prev,
+              {
+                role: 'system',
+                content: `Workflow saved successfully as "${workflowName}". Proceeding with execution...`,
+                timestamp: new Date().toISOString()
+              }
+            ]);
+          } else {
+            throw new Error('Failed to save workflow');
+          }
+        } catch (saveError) {
+          setChatHistory(prev => [
+            ...prev,
+            {
+              role: 'system',
+              content: 'Failed to save workflow. Please save manually before executing.',
+              error: true,
+              timestamp: new Date().toISOString()
+            }
+          ]);
+          setIsExecuting(false);
+          return;
+        }
+      }
+
       // Call the playground execution endpoint with workflow IR, question, and history
       const response = await fetch('/api/v1/execution/playground', {
         method: 'POST',
@@ -64,7 +115,7 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          workflow_id: workflowId,
+          workflow_id: executionWorkflowId,
           workflow_ir: workflowIR,
           question: userInput,
           conversation_history: conversationHistory

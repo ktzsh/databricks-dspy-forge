@@ -805,6 +805,7 @@ const WorkflowBuilderContent: React.FC = () => {
             <PlaygroundSidebar
               workflowId={workflowId}
               workflowIR={{ nodes, edges }}
+              workflowName={workflowName}
               onClose={() => setIsPlaygroundOpen(false)}
               onExecute={(inputData) => {
                 console.log('Executing with input:', inputData);
@@ -812,6 +813,70 @@ const WorkflowBuilderContent: React.FC = () => {
               }}
               onExecutionResults={(results) => {
                 setLastExecutionResults(results);
+              }}
+              onSaveWorkflow={async () => {
+                try {
+                  // Create a modified save function that returns the ID
+                  const workflow = {
+                    name: workflowName,
+                    nodes: nodes.map(node => {
+                      // Convert frontend camelCase to backend snake_case
+                      let nodeData = { ...node.data };
+
+                      if (node.type === 'module' && nodeData.moduleType) {
+                        nodeData.module_type = nodeData.moduleType;
+                        delete nodeData.moduleType;
+                      }
+
+                      return {
+                        id: node.id,
+                        type: node.type,
+                        position: node.position,
+                        data: nodeData
+                      };
+                    }),
+                    edges: edges.map(edge => ({
+                      id: edge.id,
+                      source: edge.source,
+                      target: edge.target,
+                      sourceHandle: edge.sourceHandle,
+                      targetHandle: edge.targetHandle,
+                      type: edge.type
+                    }))
+                  };
+
+                  let response;
+                  if (workflowId) {
+                    // Update existing workflow
+                    response = await fetch(`/api/v1/workflows/${workflowId}`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify(workflow),
+                    });
+                  } else {
+                    // Create new workflow
+                    response = await fetch('/api/v1/workflows/', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify(workflow),
+                    });
+                  }
+
+                  if (response.ok) {
+                    const savedWorkflow = await response.json();
+                    setWorkflowId(savedWorkflow.id);
+                    return savedWorkflow.id;
+                  } else {
+                    throw new Error('Failed to save workflow');
+                  }
+                } catch (error) {
+                  console.error('Error saving workflow:', error);
+                  throw error;
+                }
               }}
             />
           </div>

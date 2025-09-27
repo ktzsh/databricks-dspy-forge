@@ -38,7 +38,7 @@ class WorkflowCompilerService:
                 for node in workflow.nodes
             )
 
-            # Check if workflow contains UnstructuredRetrieve nodes
+            # Check if workflow contains StructuredRetrieve nodes
             has_structured_retrieve = any(
                 node.type == NodeType.RETRIEVER and 
                 node.data.get('retriever_type') == 'StructuredRetrieve'
