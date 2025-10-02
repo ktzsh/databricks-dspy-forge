@@ -31,7 +31,29 @@ class BaseRetrieverTemplate(NodeTemplate):
 
 class UnstructuredRetrieveTemplate(BaseRetrieverTemplate):
     """Template for UnstructuredRetrieve nodes"""
-    
+
+    def initialize(self, context: Any):
+        """Initialize UnstructuredRetrieve as a DSPy retriever"""
+        catalog_name = self.node_data.get('catalog_name', '')
+        schema_name = self.node_data.get('schema_name', '')
+        index_name = self.node_data.get('index_name', '')
+        content_column = self.node_data.get('content_column', '')
+        id_column = self.node_data.get('id_column', '')
+        num_results = self.node_data.get('num_results', 3)
+
+        if not all([catalog_name, schema_name, index_name, content_column, id_column]):
+            return None
+
+        databricks_index_name = f"{catalog_name}.{schema_name}.{index_name}"
+
+        return DatabricksRM(
+            databricks_index_name=databricks_index_name,
+            text_column_name=content_column,
+            docs_id_column_name=id_column,
+            k=num_results,
+            use_with_databricks_agent_framework=False
+        )
+
     async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
         """Execute UnstructuredRetrieve node"""
         query = self._extract_query(inputs)
@@ -148,7 +170,21 @@ class UnstructuredRetrieveTemplate(BaseRetrieverTemplate):
 
 class StructuredRetrieveTemplate(BaseRetrieverTemplate):
     """Template for StructuredRetrieve nodes"""
-    
+
+    def initialize(self, context: Any):
+        """Initialize StructuredRetrieve as a DSPy retriever"""
+        genie_space_id = self.node_data.get('genie_space_id', '')
+
+        if not genie_space_id:
+            return None
+
+        from dspy_forge.components.genie.databricks_genie import DatabricksGenieRM
+
+        return DatabricksGenieRM(
+            databricks_genie_space_id=genie_space_id,
+            use_with_databricks_agent_framework=False
+        )
+
     async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
         """Execute StructuredRetrieve node"""
         query = self._extract_query(inputs)

@@ -152,7 +152,13 @@ class BaseModuleTemplate(NodeTemplate):
 
 class PredictTemplate(BaseModuleTemplate):
     """Template for Predict module nodes"""
-    
+
+    def initialize(self, context: Any):
+        """Initialize Predict module as a DSPy component"""
+        instruction = self.node_data.get('instruction', '')
+        signature_class = self._create_dynamic_signature(instruction)
+        return dspy.Predict(signature_class)
+
     async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
         """Execute Predict module node"""
         instruction = self.node_data.get('instruction', '')
@@ -201,7 +207,13 @@ class PredictTemplate(BaseModuleTemplate):
 
 class ChainOfThoughtTemplate(BaseModuleTemplate):
     """Template for ChainOfThought module nodes"""
-    
+
+    def initialize(self, context: Any):
+        """Initialize ChainOfThought module as a DSPy component"""
+        instruction = self.node_data.get('instruction', '')
+        signature_class = self._create_dynamic_signature(instruction)
+        return dspy.ChainOfThought(signature_class)
+
     async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
         """Execute ChainOfThought module node"""
         instruction = self.node_data.get('instruction', '')
