@@ -9,7 +9,7 @@ dspy==3.0.2
 fastapi==0.116.2
 fastmcp==2.2.6
 httpx==0.28.1
-mlflow==3.4.0
+mlflow[databricks]==3.4.0
 mcp==1.6.0
 pandas==2.2.3
 passlib[bcrypt]==1.7.4
