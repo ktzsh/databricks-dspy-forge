@@ -1,16 +1,69 @@
 from fastapi import APIRouter, HTTPException, status, BackgroundTasks
-from typing import List, Dict, Any
-from pydantic import BaseModel
+from typing import List, Dict, Optional, Literal
+from pydantic import BaseModel, Field, field_validator
 
 from dspy_forge.models.workflow import (
     Workflow, WorkflowCreateRequest, WorkflowUpdateRequest, DeploymentRequest
 )
 from dspy_forge.services.workflow_service import workflow_service
-from dspy_forge.services.validation_service import WorkflowValidationError
+from dspy_forge.services.validation_service import (
+    WorkflowValidationError,
+    validation_service,
+    optimization_validation_service
+)
 from dspy_forge.core.logging import get_logger
 
 router = APIRouter()
 logger = get_logger(__name__)
+
+
+# Optimization models
+class ScoringFunctionRequest(BaseModel):
+    type: Literal['Correctness', 'Guidelines']
+    name: str
+    guideline: Optional[str] = None
+    weightage: int = Field(..., ge=0, le=100)
+
+    @field_validator('guideline')
+    @classmethod
+    def validate_guideline(cls, v, info):
+        if info.data.get('type') == 'Guidelines' and not v:
+            raise ValueError('Guideline is required for Guidelines type scoring functions')
+        return v
+
+
+class DatasetLocation(BaseModel):
+    catalog: str
+    schema: str
+    table: str
+
+
+class OptimizationRequest(BaseModel):
+    workflow_id: str
+    optimizer_name: Literal['GEPA', 'BootstrapFewShotWithRandomSearch', 'MIPROv2']
+    optimizer_config: Dict[str, str] = Field(default_factory=dict)
+    scoring_functions: List[ScoringFunctionRequest]
+    training_data: DatasetLocation
+    validation_data: DatasetLocation
+
+    @field_validator('scoring_functions')
+    @classmethod
+    def validate_weightage_sum(cls, v):
+        total = sum(sf.weightage for sf in v)
+        if total != 100:
+            raise ValueError(f'Total weightage must equal 100, got {total}')
+        return v
+
+
+class OptimizationResponse(BaseModel):
+    optimization_id: str
+    status: str
+    message: str
+
+
+class ValidationErrorResponse(BaseModel):
+    detail: str
+    field_errors: Optional[Dict[str, str]] = None
 
 
 @router.post("/", response_model=Workflow, status_code=status.HTTP_201_CREATED)
@@ -228,15 +281,101 @@ async def get_deployment_status(deployment_id: str):
         )
 
 
-@router.post("/optimize/{workflow_id}")
-async def optimize_workflow(workflow_id: str, optimization_config: Dict[str, Any]):
-    """Optimize workflow performance"""
-    # TODO: Implement workflow optimization logic
-    return {
-        "workflow_id": workflow_id,
-        "status": "optimized",
-        "message": "Optimization not implemented yet"
-    }
+@router.post("/optimize", response_model=OptimizationResponse)
+async def optimize_workflow(request: OptimizationRequest):
+    """
+    Start optimization job for a workflow using DSPy optimizers.
+
+    Validates:
+    - Workflow structure and integrity
+    - Workflow exists and is valid
+    - Optimizer configuration is valid for the selected optimizer
+    - Dataset locations are properly specified
+    - Scoring functions are valid and sum to 100%
+    """
+    try:
+        logger.info(f"Starting optimization for workflow {request.workflow_id} with optimizer {request.optimizer_name}")
+
+        # Step 1: Validate workflow exists
+        workflow = await workflow_service.get_workflow(request.workflow_id)
+        if not workflow:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow not found",
+                headers={"X-Error-Field": "workflow_id"}
+            )
+
+        # Step 2: Validate workflow structure
+        workflow_errors = validation_service.validate_workflow(workflow)
+        if workflow_errors:
+            logger.warning(f"Workflow validation failed for {request.workflow_id}: {workflow_errors}")
+            error_response = ValidationErrorResponse(
+                detail=f"Workflow validation failed: {'; '.join(workflow_errors)}",
+                field_errors={"workflow": '; '.join(workflow_errors)}
+            )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=error_response.model_dump()
+            )
+
+        # Step 3: Validate optimization configuration
+        field_errors = optimization_validation_service.validate_optimization_request(
+            optimizer_name=request.optimizer_name,
+            optimizer_config=request.optimizer_config,
+            scoring_functions=[sf.model_dump() for sf in request.scoring_functions],
+            training_data=request.training_data.model_dump(),
+            validation_data=request.validation_data.model_dump()
+        )
+
+        if field_errors:
+            logger.warning(f"Optimization validation failed: {field_errors}")
+            error_response = ValidationErrorResponse(
+                detail="Optimization validation failed",
+                field_errors=field_errors
+            )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=error_response.model_dump()
+            )
+
+        # TODO: Implement actual optimization service
+        # This would:
+        # 1. Load training and validation datasets from Unity Catalog
+        # 2. Compile the workflow to DSPy program
+        # 3. Initialize the selected optimizer with config
+        # 4. Set up scoring functions (correctness metrics + guideline-based metrics)
+        # 5. Run optimization job (potentially as background task)
+        # 6. Save optimized program artifacts
+
+        optimization_id = f"opt_{request.workflow_id}_{request.optimizer_name.lower()}"
+
+        logger.info(f"Optimization job {optimization_id} validated and ready to start")
+
+        return OptimizationResponse(
+            optimization_id=optimization_id,
+            status="queued",
+            message=f"Optimization job started with {request.optimizer_name}. This is a stub - actual implementation pending."
+        )
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        # Pydantic validation errors
+        logger.warning(f"Validation error in optimization request: {str(e)}")
+        error_response = ValidationErrorResponse(
+            detail=str(e),
+            field_errors={}
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=error_response.model_dump()
+        )
+    except Exception as e:
+        logger.error(f"Failed to start optimization: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start optimization: {str(e)}"
+        )
 
 
 @router.get("/_health")
@@ -244,7 +383,6 @@ async def storage_health():
     """Get storage backend health status"""
     try:
         health_data = await workflow_service.get_storage_health()
-        status_code = status.HTTP_200_OK if health_data.get("status") == "healthy" else status.HTTP_503_SERVICE_UNAVAILABLE
         return health_data
     except Exception as e:
         raise HTTPException(

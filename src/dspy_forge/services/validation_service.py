@@ -373,5 +373,168 @@ class WorkflowValidationService:
         return graph
 
 
-# Global validation service instance
+class OptimizationValidationError(Exception):
+    """Raised when optimization validation fails"""
+    pass
+
+
+class OptimizationValidationService:
+    """Service for validating optimization configurations"""
+
+    # Define mandatory fields for each optimizer
+    OPTIMIZER_REQUIREMENTS = {
+        'GEPA': ['auto', 'reflection_lm'],
+        'BootstrapFewShotWithRandomSearch': ['max_rounds', 'max_bootstrapped_demos', 'max_labeled_demos', 'num_candidate_programs'],
+        'MIPROv2': ['num_candidates', 'init_temperature']
+    }
+
+    def validate_optimization_request(
+        self,
+        optimizer_name: str,
+        optimizer_config: Dict[str, str],
+        scoring_functions: List[Dict[str, Any]],
+        training_data: Dict[str, str],
+        validation_data: Dict[str, str]
+    ) -> Dict[str, str]:
+        """
+        Validate optimization request and return field-level errors
+
+        Args:
+            optimizer_name: Name of the optimizer
+            optimizer_config: Optimizer configuration parameters
+            scoring_functions: List of scoring functions
+            training_data: Training dataset location
+            validation_data: Validation dataset location
+
+        Returns:
+            Dictionary mapping field names to error messages
+        """
+        field_errors = {}
+
+        # Validate optimizer configuration
+        field_errors.update(self._validate_optimizer_config(optimizer_name, optimizer_config))
+
+        # Validate scoring functions
+        field_errors.update(self._validate_scoring_functions(scoring_functions))
+
+        # Validate dataset locations
+        field_errors.update(self._validate_dataset_location(training_data, 'train'))
+        field_errors.update(self._validate_dataset_location(validation_data, 'val'))
+
+        return field_errors
+
+    def _validate_optimizer_config(
+        self,
+        optimizer_name: str,
+        optimizer_config: Dict[str, str]
+    ) -> Dict[str, str]:
+        """Validate optimizer-specific configuration"""
+        errors = {}
+
+        # Check mandatory fields for the selected optimizer
+        mandatory_fields = self.OPTIMIZER_REQUIREMENTS.get(optimizer_name, [])
+
+        for field in mandatory_fields:
+            if field not in optimizer_config:
+                errors[f'optimizer_config.{field}'] = f'{field} is required for {optimizer_name}'
+            elif not optimizer_config[field]:
+                errors[f'optimizer_config.{field}'] = f'{field} cannot be empty'
+
+        # Validate numeric fields if present
+        numeric_fields = ['num_rounds', 'num_candidates', 'max_bootstrapped_demos', 'num_candidate_programs']
+        for field in numeric_fields:
+            if field in optimizer_config:
+                try:
+                    value = int(optimizer_config[field])
+                    if value <= 0:
+                        errors[f'optimizer_config.{field}'] = f'{field} must be a positive integer'
+                except ValueError:
+                    errors[f'optimizer_config.{field}'] = f'{field} must be a valid integer'
+
+        # Validate temperature fields if present
+        if 'init_temperature' in optimizer_config:
+            try:
+                value = float(optimizer_config['init_temperature'])
+                if value <= 0 or value > 1:
+                    errors['optimizer_config.init_temperature'] = 'init_temperature must be between 0 and 1'
+            except ValueError:
+                errors['optimizer_config.init_temperature'] = 'init_temperature must be a valid number'
+
+        # Validate GEPA-specific fields
+        if 'auto' in optimizer_config:
+            valid_auto_values = ['light', 'medium', 'heavy']
+            if optimizer_config['auto'] not in valid_auto_values:
+                errors['optimizer_config.auto'] = f'auto must be one of: {", ".join(valid_auto_values)}'
+
+        return errors
+
+    def _validate_scoring_functions(
+        self,
+        scoring_functions: List[Dict[str, Any]]
+    ) -> Dict[str, str]:
+        """Validate scoring functions"""
+        errors = {}
+
+        if not scoring_functions:
+            errors['scoring_functions'] = 'At least one scoring function is required'
+            return errors
+
+        total_weightage = 0
+
+        for i, sf in enumerate(scoring_functions):
+            # Validate required fields
+            if not sf.get('name'):
+                errors[f'scoring_function_{i}_name'] = 'Scoring function name is required'
+
+            if not sf.get('type'):
+                errors[f'scoring_function_{i}_type'] = 'Scoring function type is required'
+            elif sf['type'] not in ['Correctness', 'Guidelines']:
+                errors[f'scoring_function_{i}_type'] = 'Type must be either Correctness or Guidelines'
+
+            # Validate guideline for Guidelines type
+            if sf.get('type') == 'Guidelines' and not sf.get('guideline'):
+                errors[f'scoring_function_{i}_guideline'] = 'Guideline text is required for Guidelines type'
+
+            # Validate weightage
+            try:
+                weightage = int(sf.get('weightage', 0))
+                if weightage < 0 or weightage > 100:
+                    errors[f'scoring_function_{i}_weightage'] = 'Weightage must be between 0 and 100'
+                else:
+                    total_weightage += weightage
+            except (TypeError, ValueError):
+                errors[f'scoring_function_{i}_weightage'] = 'Weightage must be a valid integer'
+
+        # Validate total weightage equals 100
+        if total_weightage != 100:
+            errors['weightage'] = f'Total weightage must equal 100 (current: {total_weightage})'
+
+        return errors
+
+    def _validate_dataset_location(
+        self,
+        dataset: Dict[str, str],
+        prefix: str
+    ) -> Dict[str, str]:
+        """Validate dataset location (catalog, schema, table)"""
+        errors = {}
+
+        if not dataset.get('catalog'):
+            errors[f'{prefix}_catalog'] = f'{prefix.capitalize()} catalog is required'
+
+        if not dataset.get('schema'):
+            errors[f'{prefix}_schema'] = f'{prefix.capitalize()} schema is required'
+
+        if not dataset.get('table'):
+            errors[f'{prefix}_table'] = f'{prefix.capitalize()} table is required'
+
+        return errors
+
+    def get_optimizer_requirements(self, optimizer_name: str) -> List[str]:
+        """Get required configuration fields for an optimizer"""
+        return self.OPTIMIZER_REQUIREMENTS.get(optimizer_name, [])
+
+
+# Global validation service instances
 validation_service = WorkflowValidationService()
+optimization_validation_service = OptimizationValidationService()

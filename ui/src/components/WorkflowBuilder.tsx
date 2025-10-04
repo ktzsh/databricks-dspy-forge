@@ -13,12 +13,13 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
-import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash } from 'lucide-react';
+import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash, Zap } from 'lucide-react';
 
 import ComponentSidebar from './ComponentSidebar';
 import PlaygroundSidebar from './PlaygroundSidebar';
 import ToastContainer from './ToastContainer';
 import WorkflowList from './WorkflowList';
+import OptimizeModal from './OptimizeModal';
 import { nodeTypes } from './nodes';
 import { WorkflowNode, WorkflowEdge } from '../types/workflow';
 import { useToast } from '../hooks/useToast';
@@ -135,6 +136,7 @@ const WorkflowBuilderContent: React.FC = () => {
   const [showNodeExecutionModal, setShowNodeExecutionModal] = useState(false);
   const [selectedNodeExecution, setSelectedNodeExecution] = useState<any>(null);
   const [showDeployModal, setShowDeployModal] = useState(false);
+  const [showOptimizeModal, setShowOptimizeModal] = useState(false);
   const [nodesWithTraceData, setNodesWithTraceData] = useState<Node[]>([]);
   const [deploymentConfig, setDeploymentConfig] = useState({
     model_name: '',
@@ -698,6 +700,19 @@ const WorkflowBuilderContent: React.FC = () => {
             <span>{workflowId ? 'Update' : 'Save'}</span>
           </button>
           <button
+            onClick={() => {
+              if (!workflowId) {
+                showError('Save Required', 'Please save your workflow before optimizing.');
+                return;
+              }
+              setShowOptimizeModal(true);
+            }}
+            className="flex items-center space-x-2 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-slate-600 transition-all duration-200 shadow-soft font-medium"
+          >
+            <Zap size={16} />
+            <span>Optimize</span>
+          </button>
+          <button
             onClick={handleDeploy}
             className="flex items-center space-x-2 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-all duration-200 shadow-soft font-medium"
           >
@@ -893,6 +908,14 @@ const WorkflowBuilderContent: React.FC = () => {
         <WorkflowList
           onLoadWorkflow={handleLoadWorkflow}
           onClose={() => setIsWorkflowListOpen(false)}
+        />
+      )}
+
+      {/* Optimize Modal */}
+      {showOptimizeModal && (
+        <OptimizeModal
+          workflowId={workflowId}
+          onClose={() => setShowOptimizeModal(false)}
         />
       )}
 
