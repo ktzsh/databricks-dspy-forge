@@ -657,44 +657,49 @@ const WorkflowBuilderContent: React.FC = () => {
     <div className="h-screen flex flex-col">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700 px-6 py-4 flex items-center justify-between shadow-soft-lg">
         <div className="flex items-center space-x-4">
-          <input
-            type="text"
-            value={workflowName}
-            onChange={(e) => setWorkflowName(e.target.value)}
-            className="text-lg font-semibold bg-transparent border-none focus:outline-none focus:bg-gray-50 px-2 py-1 rounded"
-          />
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg flex items-center justify-center shadow-brand">
+              <span className="text-white font-bold text-sm">DF</span>
+            </div>
+            <input
+              type="text"
+              value={workflowName}
+              onChange={(e) => setWorkflowName(e.target.value)}
+              className="text-lg font-semibold bg-transparent border-none focus:outline-none focus:bg-slate-800/50 px-3 py-1.5 rounded-lg text-white placeholder-slate-400 transition-colors"
+            />
+          </div>
           {workflowId && (
-            <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              Loaded
+            <span className="text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full font-medium">
+              Saved
             </span>
           )}
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
           <button
             onClick={handleNewWorkflow}
-            className="flex items-center space-x-2 px-3 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            className="flex items-center space-x-2 px-4 py-2 bg-slate-700/80 text-slate-100 rounded-lg hover:bg-slate-700 transition-all duration-200 font-medium border border-slate-600/50"
           >
             <span>New</span>
           </button>
           <button
             onClick={() => setIsWorkflowListOpen(true)}
-            className="flex items-center space-x-2 px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+            className="flex items-center space-x-2 px-4 py-2 bg-slate-700/80 text-slate-100 rounded-lg hover:bg-slate-700 transition-all duration-200 font-medium border border-slate-600/50"
           >
             <FolderOpen size={16} />
             <span>Load</span>
           </button>
           <button
             onClick={handleSaveWorkflow}
-            className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="flex items-center space-x-2 px-4 py-2 bg-slate-700/80 text-slate-100 rounded-lg hover:bg-slate-700 transition-all duration-200 font-medium border border-slate-600/50"
           >
             <Save size={16} />
             <span>{workflowId ? 'Update' : 'Save'}</span>
           </button>
           <button
             onClick={handleDeploy}
-            className="flex items-center space-x-2 px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+            className="flex items-center space-x-2 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-all duration-200 shadow-soft font-medium"
           >
             <Settings size={16} />
             <span>Deploy</span>
@@ -705,7 +710,7 @@ const WorkflowBuilderContent: React.FC = () => {
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Components */}
-        <div className="w-80 border-r border-gray-200 bg-gray-50 flex-shrink-0 overflow-y-auto">
+        <div className="w-80 border-r border-slate-200 bg-gradient-to-b from-slate-50 to-white flex-shrink-0 overflow-y-auto">
           <ComponentSidebar onAddNode={(nodeData) => {
           const newNodeId = generateNodeId();
           
@@ -801,7 +806,7 @@ const WorkflowBuilderContent: React.FC = () => {
 
         {/* Right Sidebar - Playground */}
         {isPlaygroundOpen && (
-          <div className="w-96 border-l border-gray-200 bg-gray-50 flex-shrink-0 overflow-y-auto">
+          <div className="w-96 border-l border-slate-200 bg-white flex-shrink-0 overflow-y-auto">
             <PlaygroundSidebar
               workflowId={workflowId}
               workflowIR={{ nodes, edges }}

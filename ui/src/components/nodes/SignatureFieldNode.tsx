@@ -92,7 +92,9 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   };
 
   return (
-    <div className={`signature-field-node min-w-[250px] relative ${selected ? 'node-selected' : ''}`}>
+    <div className={`min-w-[280px] relative bg-white rounded-xl border-2 transition-all duration-200 shadow-soft-lg ${
+      selected ? 'border-sky-400 shadow-xl ring-2 ring-sky-200' : 'border-sky-200 hover:border-sky-300'
+    }`}>
       {/* Handles */}
       {connectionMode === 'whole' ? (
         // Whole-node connection mode
@@ -101,14 +103,14 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
             <Handle
               type="target"
               position={Position.Top}
-              className="w-3 h-3 bg-blue-500"
+              className="w-3 h-3 bg-sky-500 border-2 border-white shadow-soft"
             />
           )}
           {!isEnd && (
             <Handle
               type="source"
               position={Position.Bottom}
-              className="w-3 h-3 bg-blue-500"
+              className="w-3 h-3 bg-sky-500 border-2 border-white shadow-soft"
             />
           )}
         </>
@@ -141,25 +143,27 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between p-3 bg-blue-100 border-b border-blue-200">
-        <div className="flex flex-col">
+      <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-sky-50 to-sky-100/50 border-b border-sky-200 rounded-t-xl">
+        <div className="flex flex-col flex-1 min-w-0">
           <div className="flex items-center space-x-2">
-            <Database size={16} className="text-blue-600" />
-            <span className="font-medium text-blue-800">{nodeLabel}</span>
+            <div className="p-1.5 bg-white rounded-lg shadow-sm">
+              <Database size={16} className="text-sky-600" />
+            </div>
+            <span className="font-semibold text-sky-900 truncate">{nodeLabel}</span>
           </div>
-          <div className="text-xs text-blue-600 opacity-75 mt-1">SignatureField</div>
-          <div className="text-xs text-blue-600 opacity-75">{id}</div>
+          <div className="text-xs text-sky-600 font-medium mt-1.5">SignatureField</div>
+          <div className="text-xs text-slate-500 font-mono">{id}</div>
         </div>
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-1 ml-2">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setIsEditing(!isEditing);
             }}
-            className="p-1 hover:bg-blue-200 rounded"
+            className="p-1.5 hover:bg-sky-200/50 rounded-lg transition-colors"
             title="Edit node"
           >
-            <Edit3 size={14} className="text-blue-600" />
+            <Edit3 size={14} className="text-sky-700" />
           </button>
           {!isDefaultStartNode && (
             <button
@@ -167,10 +171,10 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                 e.stopPropagation();
                 handleDelete();
               }}
-              className="p-1 hover:bg-red-200 rounded"
+              className="p-1.5 hover:bg-coral-100 rounded-lg transition-colors"
               title="Delete node"
             >
-              <Trash2 size={14} className="text-red-600" />
+              <Trash2 size={14} className="text-coral-600" />
             </button>
           )}
         </div>

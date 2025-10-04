@@ -79,49 +79,53 @@ const RetrieverNode: React.FC<NodeProps<RetrieverNodeData & { traceData?: any; o
   };
 
   return (
-    <div className={`bg-orange-50 border-2 border-orange-200 rounded-lg shadow-sm min-w-[280px] relative ${selected ? 'ring-2 ring-blue-500 ring-opacity-50' : ''}`}>
+    <div className={`min-w-[280px] relative bg-white rounded-xl border-2 transition-all duration-200 shadow-soft-lg ${
+      selected ? 'border-amber-400 shadow-xl ring-2 ring-amber-200' : 'border-amber-200 hover:border-amber-300'
+    }`}>
       {/* Handles */}
       <Handle
         type="target"
         position={Position.Top}
-        className="w-3 h-3 bg-orange-500"
+        className="w-3 h-3 bg-amber-500 border-2 border-white shadow-soft"
       />
       <Handle
         type="source"
         position={Position.Bottom}
-        className="w-3 h-3 bg-orange-500"
+        className="w-3 h-3 bg-amber-500 border-2 border-white shadow-soft"
       />
 
       {/* Header */}
-      <div className="flex items-center justify-between p-3 bg-orange-100 border-b border-orange-200">
-        <div className="flex flex-col">
+      <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-amber-50 to-amber-100/50 border-b border-amber-200 rounded-t-xl">
+        <div className="flex flex-col flex-1 min-w-0">
           <div className="flex items-center space-x-2">
-            <Database size={16} className="text-orange-600" />
-            <span className="font-medium text-orange-800">{nodeLabel}</span>
+            <div className="p-1.5 bg-white rounded-lg shadow-sm">
+              <Database size={16} className="text-amber-600" />
+            </div>
+            <span className="font-semibold text-amber-900 truncate">{nodeLabel}</span>
           </div>
-          <div className="text-xs text-orange-600 opacity-75 mt-1">{retrieverType}</div>
-          <div className="text-xs text-orange-600 opacity-75">{id}</div>
+          <div className="text-xs text-amber-600 font-medium mt-1.5">{retrieverType}</div>
+          <div className="text-xs text-slate-500 font-mono">{id}</div>
         </div>
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-1 ml-2">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setIsEditing(!isEditing);
             }}
-            className="p-1 hover:bg-orange-200 rounded"
+            className="p-1.5 hover:bg-amber-200/50 rounded-lg transition-colors"
             title="Edit node"
           >
-            <Edit3 size={14} className="text-orange-600" />
+            <Edit3 size={14} className="text-amber-700" />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
               handleDelete();
             }}
-            className="p-1 hover:bg-red-200 rounded"
+            className="p-1.5 hover:bg-coral-100 rounded-lg transition-colors"
             title="Delete node"
           >
-            <Trash2 size={14} className="text-red-600" />
+            <Trash2 size={14} className="text-coral-600" />
           </button>
         </div>
       </div>

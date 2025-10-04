@@ -2,48 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 /* React Flow custom styles */
 .react-flow__minimap {
-  background-color: #f8fafc;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .react-flow__controls {
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
 }
 
 .react-flow__controls button {
   background: white;
   border-bottom: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
 }
 
 .react-flow__controls button:hover {
-  background: #f1f5f9;
+  background: #fef3f2;
+  color: #f97316;
 }
 
-/* Custom node styles */
+.react-flow__controls button:last-child {
+  border-bottom: none;
+}
+
+/* React Flow Background */
+.react-flow__background {
+  background-color: #fafafa;
+}
+
+/* React Flow Edges */
+.react-flow__edge-path {
+  stroke: #cbd5e1;
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #f97316;
+  stroke-width: 3;
+}
+
+/* Custom node styles - Legacy fallback */
 .signature-field-node {
-  @apply bg-blue-50 border-2 border-blue-200 rounded-lg shadow-sm;
+  @apply bg-white border-2 border-sky-200 rounded-xl shadow-soft-lg;
 }
 
 .module-node {
-  @apply bg-green-50 border-2 border-green-200 rounded-lg shadow-sm;
+  @apply bg-white border-2 border-emerald-200 rounded-xl shadow-soft-lg;
 }
 
 .logic-node {
-  @apply bg-purple-50 border-2 border-purple-200 rounded-lg shadow-sm;
+  @apply bg-white border-2 border-violet-200 rounded-xl shadow-soft-lg;
 }
 
 .node-selected {
-  @apply ring-2 ring-blue-500 ring-opacity-50;
+  @apply ring-2 ring-brand-400 ring-opacity-50;
 }
 
 /* Sidebar styles */
 .component-sidebar {
-  @apply w-64 bg-gray-50 border-r border-gray-200 h-full overflow-y-auto;
+  @apply w-80 bg-gradient-to-b from-slate-50 to-white border-r border-slate-200 h-full overflow-y-auto;
 }
 
 .playground-sidebar {
-  @apply w-96 bg-white border-l border-gray-200 h-full overflow-y-auto;
+  @apply w-96 bg-white border-l border-slate-200 h-full overflow-y-auto;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

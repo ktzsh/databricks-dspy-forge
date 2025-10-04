@@ -231,25 +231,28 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
 
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-        <h2 className="text-lg font-semibold text-gray-900">Playground</h2>
+    <div className="h-full flex flex-col bg-white">
+      <div className="bg-brand-500 px-5 py-4 flex items-center justify-between flex-shrink-0 shadow-soft-lg">
+        <div>
+          <h2 className="text-lg font-bold text-white">Playground</h2>
+          <p className="text-xs text-brand-100">Test your workflow in real-time</p>
+        </div>
         <div className="flex items-center space-x-2">
           {chatHistory.length > 0 && (
             <button
               onClick={clearPlayground}
-              className="p-1 hover:bg-gray-100 rounded flex items-center space-x-1 text-gray-500 hover:text-gray-700"
+              className="p-2 hover:bg-white/10 rounded-lg flex items-center space-x-1.5 text-white hover:text-white transition-colors"
               title="Clear conversation"
             >
               <Trash2 size={16} />
-              <span className="text-sm">Clear</span>
+              <span className="text-sm font-medium">Clear</span>
             </button>
           )}
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded"
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
           >
-            <X size={20} className="text-gray-500" />
+            <X size={20} className="text-white" />
           </button>
         </div>
       </div>
@@ -271,14 +274,14 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] p-3 rounded-lg ${
+                  className={`max-w-[80%] p-3.5 rounded-2xl shadow-soft ${
                     message.role === 'user'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-brand-500 text-white'
                       : message.role === 'system'
-                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
                       : message.error
-                      ? 'bg-red-100 text-red-800 border border-red-200'
-                      : 'bg-gray-100 text-gray-900'
+                      ? 'bg-coral-50 text-coral-800 border border-coral-200'
+                      : 'bg-slate-100 text-slate-900'
                   }`}
                 >
                   <div className="flex items-start space-x-2">
@@ -337,14 +340,13 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
 
 
         {/* Input Area */}
-        <div className="p-4 border-t border-gray-200 bg-white flex-shrink-0">
-          
-          <div className="flex space-x-2">
+        <div className="p-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
+          <div className="flex space-x-3">
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Enter your input here..."
-              className="flex-1 p-2 border border-gray-300 rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Type your message here..."
+              className="flex-1 p-3 border border-slate-300 rounded-xl resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all bg-white shadow-soft text-slate-900 placeholder-slate-400"
               rows={3}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -356,12 +358,12 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
             <button
               onClick={handleExecute}
               disabled={!inputText.trim() || isExecuting}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
+              className="px-5 py-2 bg-brand-500 text-white rounded-xl hover:bg-brand-600 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center transition-all shadow-soft disabled:shadow-none font-medium"
             >
               {isExecuting ? (
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2 size={18} className="animate-spin" />
               ) : (
-                <Play size={16} />
+                <Play size={18} />
               )}
             </button>
           </div>
