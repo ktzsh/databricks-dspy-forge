@@ -1,6 +1,7 @@
 # Custom
 artifacts/workflows
 artifacts/deployments
+artifacts/optimizations/
 mlruns/
 uv.lock
 *.js.map
