@@ -36,19 +36,25 @@ class BaseLogicTemplate(NodeTemplate):
 
 class IfElseTemplate(BaseLogicTemplate):
     """Template for IfElse logic nodes"""
-    
-    async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
-        """Execute IfElse logic node"""
+
+    def initialize(self, context: Any):
+        """Return self to provide call/acall interface"""
+        return self
+
+    def call(self, **inputs) -> Dict[str, Any]:
+        """Synchronous execution"""
         condition = self.node_data.get('condition', '')
-        
-        # Evaluate condition
         condition_result = self._evaluate_condition(condition, inputs)
-        
+
         return {
             'condition_result': condition_result,
             'branch': 'true' if condition_result else 'false',
-            **inputs  # Pass through inputs
+            **inputs
         }
+
+    async def acall(self, **inputs) -> Dict[str, Any]:
+        """Async execution - logic is sync anyway"""
+        return self.call(**inputs)
     
     def generate_code(self, context: CodeGenerationContext) -> Dict[str, Any]:
         """Generate code for IfElse logic node"""
@@ -75,10 +81,18 @@ class IfElseTemplate(BaseLogicTemplate):
 
 class MergeTemplate(BaseLogicTemplate):
     """Template for Merge logic nodes"""
-    
-    async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
-        """Execute Merge logic node (simple merge - combine all inputs)"""
+
+    def initialize(self, context: Any):
+        """Return self to provide call/acall interface"""
+        return self
+
+    def call(self, **inputs) -> Dict[str, Any]:
+        """Synchronous execution - merge all inputs"""
         return inputs
+
+    async def acall(self, **inputs) -> Dict[str, Any]:
+        """Async execution - logic is sync anyway"""
+        return self.call(**inputs)
     
     def generate_code(self, context: CodeGenerationContext) -> Dict[str, Any]:
         """Generate code for Merge logic node"""
@@ -100,17 +114,20 @@ class MergeTemplate(BaseLogicTemplate):
 
 class FieldSelectorTemplate(BaseLogicTemplate):
     """Template for FieldSelector logic nodes"""
-    
-    async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
-        """Execute FieldSelector logic node"""
-        logger.info(f"FieldSelector data: {self.node_data}")
+
+    def initialize(self, context: Any):
+        """Return self to provide call/acall interface"""
+        return self
+
+    def call(self, **inputs) -> Dict[str, Any]:
+        """Synchronous execution"""
         selected_fields = self.node_data.get('selected_fields', [])
         field_mappings = self.node_data.get('field_mappings', {})
-        logger.info(f"FieldSelector selected fields: {selected_fields}, mappings: {field_mappings}")
+
         if not selected_fields:
             # If no fields are explicitly selected, pass through all inputs
             return inputs
-        
+
         # Filter inputs to only include selected fields
         outputs = {}
         for field_name in selected_fields:
@@ -118,8 +135,12 @@ class FieldSelectorTemplate(BaseLogicTemplate):
                 # Use mapped name if provided, otherwise use original name
                 output_name = field_mappings.get(field_name, field_name)
                 outputs[output_name] = inputs[field_name]
-        
+
         return outputs
+
+    async def acall(self, **inputs) -> Dict[str, Any]:
+        """Async execution - logic is sync anyway"""
+        return self.call(**inputs)
     
     def generate_code(self, context: CodeGenerationContext) -> Dict[str, Any]:
         """Generate code for FieldSelector logic node"""

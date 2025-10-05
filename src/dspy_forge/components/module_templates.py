@@ -154,51 +154,13 @@ class PredictTemplate(BaseModuleTemplate):
     """Template for Predict module nodes"""
 
     def initialize(self, context: Any):
-        """Initialize Predict module as a DSPy component"""
+        """
+        Initialize Predict module as a DSPy component.
+        Returns a DSPy.Predict instance which has built-in call() and acall() methods.
+        """
         instruction = self.node_data.get('instruction', '')
         signature_class = self._create_dynamic_signature(instruction)
         return dspy.Predict(signature_class)
-
-    async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
-        """Execute Predict module node"""
-        instruction = self.node_data.get('instruction', '')
-        model_name = self.node_data.get('model', '')
-        
-        # Create dynamic signature
-        signature_class = self._create_dynamic_signature(instruction)
-        
-        # Create and execute predictor
-        predictor = dspy.Predict(signature_class)
-        
-        # Execute with model context if specified
-        if model_name and model_name != 'default':
-            try:
-                with dspy.context(lm=dspy.LM(f'databricks/{model_name}')):
-                    result = predictor(**inputs)
-            except Exception as e:
-                logger.warning(f"Failed to use model {model_name}, falling back to default: {e}")
-                result = predictor(**inputs)
-        else:
-            result = predictor(**inputs)
-        
-        # Extract actual output fields from DSPy result
-        output_fields = {}
-        
-        # Approach 1: Direct attribute access - get field names from workflow IR
-        output_field_names = self._get_connected_fields(is_input=False)
-        logger.debug(f"Output fields from workflow IR: {output_field_names}")
-        
-        for field_name in output_field_names:
-            if hasattr(result, field_name):
-                field_value = getattr(result, field_name)
-                logger.debug(f"Found field {field_name}: {repr(field_value)} (type: {type(field_value)})")
-                if field_value is not None and field_value != "":
-                    output_fields[field_name] = field_value
-            else:
-                logger.debug(f"Field {field_name} NOT found in result object")
-        
-        logger.debug(f"Final output_fields: {output_fields}")
-        return output_fields
     
     def _generate_instance_code(self, instance_var: str, signature_name: str) -> str:
         """Generate Predict instance creation code"""
@@ -209,55 +171,13 @@ class ChainOfThoughtTemplate(BaseModuleTemplate):
     """Template for ChainOfThought module nodes"""
 
     def initialize(self, context: Any):
-        """Initialize ChainOfThought module as a DSPy component"""
+        """
+        Initialize ChainOfThought module as a DSPy component.
+        Returns a DSPy.ChainOfThought instance which has built-in call() and acall() methods.
+        """
         instruction = self.node_data.get('instruction', '')
         signature_class = self._create_dynamic_signature(instruction)
         return dspy.ChainOfThought(signature_class)
-
-    async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
-        """Execute ChainOfThought module node"""
-        instruction = self.node_data.get('instruction', '')
-        model_name = self.node_data.get('model', '')
-        
-        # Create dynamic signature
-        signature_class = self._create_dynamic_signature(instruction)
-        
-        # Create and execute chain of thought
-        cot = dspy.ChainOfThought(signature_class)
-        
-        # Execute with model context if specified
-        if model_name and model_name != 'default':
-            try:
-                with dspy.context(lm=dspy.LM(f'databricks/{model_name}')):
-                    result = cot(**inputs)
-            except Exception as e:
-                logger.warning(f"Failed to use model {model_name}, falling back to default: {e}")
-                result = cot(**inputs)
-        else:
-            result = cot(**inputs)
-        
-        # Extract actual output fields from DSPy result
-        output_fields = {}
-        
-        # Approach 1: Direct attribute access - get field names from workflow IR
-        output_field_names = self._get_connected_fields(is_input=False)
-        logger.debug(f"CoT output fields from workflow IR: {output_field_names}")
-
-        # Add rationale for chain of thought
-        all_field_names = ['rationale'] + output_field_names
-        
-        logger.debug(f"Expected CoT output fields: {all_field_names}")        
-        for field_name in all_field_names:
-            if hasattr(result, field_name):
-                field_value = getattr(result, field_name)
-                logger.debug(f"Found CoT field {field_name}: {repr(field_value)} (type: {type(field_value)})")
-                if field_value is not None and field_value != "":
-                    output_fields[field_name] = field_value
-            else:
-                logger.debug(f"CoT field {field_name} NOT found in result object")
-        
-        logger.debug(f"Final CoT output_fields: {output_fields}")
-        return output_fields
     
     def _add_module_specific_fields(self, signature_class):
         """Add rationale field for chain of thought"""

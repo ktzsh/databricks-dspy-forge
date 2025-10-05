@@ -20,6 +20,10 @@ elif settings.databricks_host and settings.databricks_token:
     os.environ["MLFLOW_ENABLE_DB_SDK"]  = "true"
     os.environ["DATABRICKS_HOST"] = settings.databricks_host
     os.environ["DATABRICKS_TOKEN"] = settings.databricks_token
+elif (os.environ.get("DATABRICKS_CLIENT_ID", None) and 
+      os.environ.get("DATABRICKS_CLIENT_SECRET", None)):
+    # App is running on Databricks Apps
+    pass
 else:
     raise ValueError("Databricks configuration not provided in environment variables.")
 

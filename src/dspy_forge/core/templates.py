@@ -51,27 +51,21 @@ class NodeTemplate(ABC):
         self.node_type = node.type
         self.node_data = node.data
     
-    def initialize(self, context: Any) -> Optional[Any]:
-        """Initialize the component as a DSPy module (optional)
-
-        Args:
-            context: Execution context containing workflow state
-
-        Returns:
-            DSPy module instance if this component should be a module, None otherwise
-        """
-        return None
-
     @abstractmethod
-    async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
-        """Execute the node with given inputs
+    def initialize(self, context: Any) -> Optional[Any]:
+        """
+        Initialize and return a component with call/acall interface.
 
         Args:
-            inputs: Input data for the node
             context: Execution context containing workflow state
 
         Returns:
-            Dict containing the execution results
+            Component instance (DSPy module, wrapper, or self) with call() and acall() methods.
+            Can be:
+            - DSPy module (Predict, ChainOfThought) - has built-in call/acall
+            - Wrapper component (retrievers) - custom call/acall
+            - Self (logic, signature fields) - implements call/acall
+            - None if component cannot be initialized
         """
         pass
     

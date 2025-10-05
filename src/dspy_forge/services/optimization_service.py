@@ -2,7 +2,6 @@ import dspy
 import asyncio
 import tempfile
 import os
-import json
 import shutil
 
 from datetime import datetime
@@ -347,20 +346,29 @@ class OptimizationService:
 
             logger.info(f"Starting optimization for workflow {workflow.id}")
 
-            # Run optimization based on optimizer type
-            if optimizer_name in ['BootstrapFewShotWithRandomSearch', 'MIPROv2']:
-                optimized_program = optimizer.compile(
-                    program,
-                    trainset=trainset,
-                )
-            elif optimizer_name == 'GEPA':
-                optimized_program = optimizer.compile(
-                    program,
-                    trainset=trainset,
-                    valset=valset,
-                )
-            else:
-                raise ValueError(f"Unknown optimizer type: {optimizer_name}")
+            # Run optimization in a thread pool to avoid event loop conflicts
+            # The optimizer is synchronous and calls program.forward() which uses asyncio.run()
+            # Running in a thread ensures there's no event loop conflict
+            def _run_optimizer():
+                """Run optimizer in a separate thread (outside event loop)"""
+                if optimizer_name in ['BootstrapFewShotWithRandomSearch', 'MIPROv2']:
+                    return optimizer.compile(
+                        program,
+                        trainset=trainset,
+                    )
+                elif optimizer_name == 'GEPA':
+                    return optimizer.compile(
+                        program,
+                        trainset=trainset,
+                        valset=valset,
+                    )
+                else:
+                    raise ValueError(f"Unknown optimizer type: {optimizer_name}")
+
+            # Run in thread pool (outside event loop)
+            # This is because node templates are async for effecient flow exection but dspy optimizers exepct sync methods for programs
+            # So we run the optimizer in a separate thread to avoid event loop conflicts
+            optimized_program = await asyncio.to_thread(_run_optimizer)
 
             # Step 6: Save optimized program
             status.update({
@@ -377,23 +385,25 @@ class OptimizationService:
             # Create temp directory for optimized program
             # Note: DSPy's save with save_program=True requires a directory, not a file
             temp_dir = tempfile.mkdtemp()
+            state_file = os.path.join(temp_dir, "program.json")
 
             try:
-                # Save optimized program to temp directory (includes architecture and state)
-                # Using save_program=True to save the complete program, not just state
-                optimized_program.save(temp_dir, save_program=True)
+                # Log what predictors are found in the optimized program
+                predictors = list(optimized_program.named_predictors())
+                logger.info(f"Optimized program has {len(predictors)} predictors: {[name for name, _ in predictors]}")
 
-                # DSPy saves to program.json in the directory when save_program=True
-                state_file = os.path.join(temp_dir, "program.json")
+                # Check if there are demos
+                for name, predictor in predictors:
+                    if hasattr(predictor, 'demos'):
+                        logger.info(f"Predictor '{name}' has {len(predictor.demos)} demos")
 
-                if os.path.exists(state_file):
-                    with open(state_file, 'r') as f:
-                        optimized_content = f.read()
-                else:
-                    # Fallback: If program.json doesn't exist, save the state dict as JSON
-                    logger.warning("program.json not found in temp directory, saving state dict directly")
-                    state_dict = optimized_program.dump_state()
-                    optimized_content = json.dumps(state_dict, indent=2, default=str)
+                # Save optimized program to temp directory
+                optimized_program.save(state_file, save_program=False)
+
+                with open(state_file, 'r') as f:
+                    optimized_content = f.read()
+
+                logger.debug(f"Saved file size: {len(optimized_content)} bytes")
 
                 # Save to storage backend
                 optimized_path = f"workflows/{workflow.id}/optimized_program.json"

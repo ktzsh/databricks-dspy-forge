@@ -4,16 +4,19 @@ Retriever component templates.
 Handles UnstructuredRetrieve and StructuredRetrieve node types.
 """
 import os, ast
+import dspy
 
 from typing import Dict, Any
-from dspy_forge.core.templates import NodeTemplate, CodeGenerationContext
 
+from dspy_forge.core.templates import NodeTemplate, CodeGenerationContext
 from dspy.retrievers.databricks_rm import DatabricksRM
+from dspy_forge.components.genie.databricks_genie import DatabricksGenieRM
 
 class BaseRetrieverTemplate(NodeTemplate):
     """Base template for retriever nodes"""
-    
-    def _extract_query(self, inputs: Dict[str, Any]) -> str:
+
+    @staticmethod
+    def _extract_query(inputs: Dict[str, Any]) -> str:
         """Extract query from inputs"""
         query = inputs.get('query', inputs.get('question', ''))
         if not query:
@@ -22,18 +25,20 @@ class BaseRetrieverTemplate(NodeTemplate):
                 if isinstance(value, str) and value.strip():
                     query = value
                     break
-        
+
         if not query:
             raise ValueError("No query found in inputs for retriever")
-        
-        return query
 
+        return query
 
 class UnstructuredRetrieveTemplate(BaseRetrieverTemplate):
     """Template for UnstructuredRetrieve nodes"""
 
     def initialize(self, context: Any):
-        """Initialize UnstructuredRetrieve as a DSPy retriever"""
+        """Initialize UnstructuredRetrieve component with call/acall interface"""
+        self.query_type = self.node_data.get('query_type', '')
+
+        # Initialize retriever once
         catalog_name = self.node_data.get('catalog_name', '')
         schema_name = self.node_data.get('schema_name', '')
         index_name = self.node_data.get('index_name', '')
@@ -42,80 +47,42 @@ class UnstructuredRetrieveTemplate(BaseRetrieverTemplate):
         num_results = self.node_data.get('num_results', 3)
 
         if not all([catalog_name, schema_name, index_name, content_column, id_column]):
-            return None
+            raise ValueError("UnstructuredRetrieve requires catalog_name, schema_name, index_name, content_column, and id_column")
 
         databricks_index_name = f"{catalog_name}.{schema_name}.{index_name}"
 
-        return DatabricksRM(
+        self.retriever = DatabricksRM(
             databricks_index_name=databricks_index_name,
             text_column_name=content_column,
             docs_id_column_name=id_column,
             k=num_results,
             use_with_databricks_agent_framework=False
         )
+        return self
 
-    async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
-        """Execute UnstructuredRetrieve node"""
+    def call(self, **inputs) -> dspy.Prediction:
+        """Synchronous call for optimization"""
         query = self._extract_query(inputs)
-        
-        query_type = self.node_data.get('query_type', '')
-        catalog_name = self.node_data.get('catalog_name', '')
-        schema_name = self.node_data.get('schema_name', '')
-        index_name = self.node_data.get('index_name', '')
-        content_column = self.node_data.get('content_column', '')
-        id_column = self.node_data.get('id_column', '')
-        num_results = self.node_data.get('num_results', 3)
-        score_threshold = self.node_data.get('score_threshold', 0.0)
-        
-        # Validate mandatory fields
-        if not all([catalog_name, schema_name, index_name, content_column, id_column]):
-            raise ValueError("UnstructuredRetrieve requires catalog_name, schema_name, index_name, content_column, and id_column")
-        
-        try:            
-            # Construct full index name
-            databricks_index_name = f"{catalog_name}.{schema_name}.{index_name}"
-            
-            # Initialize the retriever
-            retriever = DatabricksRM(
-                databricks_index_name=databricks_index_name,
-                text_column_name=content_column,
-                docs_id_column_name=id_column,
-                k=num_results,
-                use_with_databricks_agent_framework=False
-            )
-            
-            # Execute retrieval
-            passages = retriever(query, query_type=query_type).docs
-            
-            # Extract content from passages
-            if hasattr(passages, 'passages'):
-                # If passages is a dspy.Prediction object
-                context_list = [passage for passage in passages.passages]
-            elif isinstance(passages, list):
-                # If passages is already a list
-                context_list = passages
-            else:
-                # Fallback
-                context_list = [str(passages)]
-            
-            # Apply score threshold if needed (Note: DatabricksRM may not return scores)
-            # For now, we'll include all results as DatabricksRM handles relevance internally
-            
-            return {
-                'context': context_list,  # Return as list[str] as expected by signature field
-                'passages': context_list,  # Keep for backwards compatibility
-                'query': query,
-                'retriever_config': {
-                    'databricks_index_name': databricks_index_name,
-                    'text_column_name': content_column,
-                    'docs_id_column_name': id_column,
-                    'k': num_results,
-                    'score_threshold': score_threshold
-                }
-            }
-        except Exception as e:
-            # Handle any other errors gracefully
-            raise ValueError(f"UnstructuredRetrieve execution failed: {str(e)}")
+        result = self.retriever(query, query_type=self.query_type)
+
+        # Extract passages
+        passages = result.docs
+        if hasattr(passages, 'passages'):
+            context_list = [passage for passage in passages.passages]
+        elif isinstance(passages, list):
+            context_list = passages
+        else:
+            context_list = [str(passages)]
+
+        return dspy.Prediction(
+            context=context_list,
+            passages=context_list,
+            query=query
+        )
+
+    async def acall(self, **inputs) -> dspy.Prediction:
+        """Async call for playground - retrievers are sync anyway"""
+        return self.call(**inputs)
     
     def generate_code(self, context: CodeGenerationContext) -> Dict[str, Any]:
         """Generate code for UnstructuredRetrieve node"""
@@ -172,63 +139,41 @@ class StructuredRetrieveTemplate(BaseRetrieverTemplate):
     """Template for StructuredRetrieve nodes"""
 
     def initialize(self, context: Any):
-        """Initialize StructuredRetrieve as a DSPy retriever"""
+        """Initialize StructuredRetrieve component with call/acall interface"""
         genie_space_id = self.node_data.get('genie_space_id', '')
 
         if not genie_space_id:
-            return None
+            raise ValueError("StructuredRetrieve requires genie_space_id")
 
-        from dspy_forge.components.genie.databricks_genie import DatabricksGenieRM
-
-        return DatabricksGenieRM(
+        # Initialize Genie retriever once
+        self.retriever = DatabricksGenieRM(
             databricks_genie_space_id=genie_space_id,
             use_with_databricks_agent_framework=False
         )
+        return self
 
-    async def execute(self, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
-        """Execute StructuredRetrieve node"""
+    def call(self, **inputs) -> dspy.Prediction:
+        """Synchronous call for optimization"""
         query = self._extract_query(inputs)
-        
-        genie_space_id = self.node_data.get('genie_space_id', '')
-        
-        # Validate mandatory fields
-        if not genie_space_id:
-            raise ValueError("StructuredRetrieve requires genie_space_id")
-        
-        try:
-            # Import and initialize DatabricksGenieRM
-            from dspy_forge.components.genie.databricks_genie import DatabricksGenieRM
-            
-            # Initialize the retriever
-            retriever = DatabricksGenieRM(
-                databricks_genie_space_id=genie_space_id,
-                use_with_databricks_agent_framework=False
-            )
-            
-            # Execute retrieval with Genie
-            result = retriever(query)
-            
-            # Extract fields from the Prediction object
-            context_list = result.result
-            sql_query = getattr(result, 'query_sql', '')
-            query_description = getattr(result, 'query_reasoning', '')
-            conversation_id = getattr(result, 'conversation_id', '')
+        result = self.retriever(query)
 
-            return {
-                'context': context_list,  # SQL results in markdown format
-                'sql_query': sql_query,  # Generated SQL query
-                'query_description': query_description,  # Description of the generated SQL query
-                'conversation_id': conversation_id,  # Genie conversation ID
-                'query': query,
-                'retriever_config': {
-                    'genie_space_id': genie_space_id,
-                    'retriever_type': 'StructuredRetrieve'
-                }
-            }
-        except Exception as e:
-            # Handle any other errors gracefully
-            raise ValueError(f"StructuredRetrieve execution failed: {str(e)}")
+        # Extract fields from the Prediction object
+        context_list = result.result
+        sql_query = getattr(result, 'query_sql', '')
+        query_description = getattr(result, 'query_reasoning', '')
+        conversation_id = getattr(result, 'conversation_id', '')
 
+        return dspy.Prediction(
+            context=context_list,
+            sql_query=sql_query,
+            query_description=query_description,
+            conversation_id=conversation_id,
+            query=query
+        )
+
+    async def acall(self, **inputs) -> dspy.Prediction:
+        """Async call for playground - Genie is sync anyway"""
+        return self.call(**inputs)
     
     def generate_code(self, context: CodeGenerationContext) -> Dict[str, Any]:
         """Generate code for StructuredRetrieve node"""

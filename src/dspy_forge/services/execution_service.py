@@ -70,8 +70,8 @@ class WorkflowExecutionEngine:
             # Create and execute CompoundProgram
             program = CompoundProgram(workflow, context)
 
-            # Execute the program with input data using async call
-            await program.acall(**input_data)
+            # Execute the program with input data using async forward
+            await program.aforward(**input_data)
 
             # Get final outputs from end nodes
             end_nodes = find_end_nodes(workflow)

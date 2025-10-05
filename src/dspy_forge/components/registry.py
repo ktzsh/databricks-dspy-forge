@@ -32,10 +32,10 @@ def register_all_templates():
 
 class ModuleTemplateDispatcher:
     """Dispatcher for different module template types"""
-    
+
     def __init__(self, node, workflow):
         module_type = node.data.get('module_type')
-        
+
         if module_type == ModuleType.PREDICT.value:
             self._template = PredictTemplate(node, workflow)
         elif module_type == ModuleType.CHAIN_OF_THOUGHT.value:
@@ -43,20 +43,20 @@ class ModuleTemplateDispatcher:
         else:
             # Default to PredictTemplate for unknown types
             self._template = PredictTemplate(node, workflow)
-    
-    async def execute(self, inputs, context):
-        return await self._template.execute(inputs, context)
-    
+
+    def initialize(self, context):
+        """Initialize returns DSPy component with built-in call/acall"""
+        return self._template.initialize(context)
+
     def generate_code(self, context):
         return self._template.generate_code(context)
 
-
 class RetrieverTemplateDispatcher:
     """Dispatcher for different retriever template types"""
-    
+
     def __init__(self, node, workflow):
         retriever_type = node.data.get('retriever_type')
-        
+
         if retriever_type == RetrieverType.UNSTRUCTURED_RETRIEVE.value:
             self._template = UnstructuredRetrieveTemplate(node, workflow)
         elif retriever_type == RetrieverType.STRUCTURED_RETRIEVE.value:
@@ -64,20 +64,21 @@ class RetrieverTemplateDispatcher:
         else:
             # Default to UnstructuredRetrieveTemplate for unknown types
             self._template = UnstructuredRetrieveTemplate(node, workflow)
-    
-    async def execute(self, inputs, context):
-        return await self._template.execute(inputs, context)
-    
+
+    def initialize(self, context):
+        """Initialize returns wrapper component with call/acall"""
+        return self._template.initialize(context)
+
     def generate_code(self, context):
         return self._template.generate_code(context)
 
 
 class LogicTemplateDispatcher:
     """Dispatcher for different logic template types"""
-    
+
     def __init__(self, node, workflow):
         logic_type = node.data.get('logic_type')
-        
+
         if logic_type == LogicType.IF_ELSE.value:
             self._template = IfElseTemplate(node, workflow)
         elif logic_type == LogicType.MERGE.value:
@@ -87,10 +88,11 @@ class LogicTemplateDispatcher:
         else:
             # Default to MergeTemplate for unknown types
             self._template = MergeTemplate(node, workflow)
-    
-    async def execute(self, inputs, context):
-        return await self._template.execute(inputs, context)
-    
+
+    def initialize(self, context):
+        """Initialize returns self (template) with call/acall"""
+        return self._template.initialize(context)
+
     def generate_code(self, context):
         return self._template.generate_code(context)
 
