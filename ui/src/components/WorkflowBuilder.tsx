@@ -146,6 +146,7 @@ const WorkflowBuilderContent: React.FC = () => {
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentStatus, setDeploymentStatus] = useState<any>(null);
   const [deploymentTimeoutId, setDeploymentTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [activeOptimizationId, setActiveOptimizationId] = useState<string | null>(null);
   const { toasts, removeToast, showSuccess, showError } = useToast();
   const fitViewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -655,6 +656,80 @@ const WorkflowBuilderContent: React.FC = () => {
     showError('Deployment Cancelled', 'Deployment has been cancelled.');
   };
 
+  const pollOptimizationStatus = async (optimizationId: string) => {
+    const maxAttempts = 120; // Poll for up to 20 minutes (10s intervals)
+    let attempts = 0;
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 3;
+
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        showError('Optimization Timeout', 'Optimization is taking longer than expected. Please check manually.');
+        setActiveOptimizationId(null);
+        return;
+      }
+
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        showError('Optimization Error', 'Unable to check optimization status. Please check manually.');
+        setActiveOptimizationId(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/v1/workflows/optimize/status/${optimizationId}`);
+
+        if (response.ok) {
+          consecutiveErrors = 0;
+          const status = await response.json();
+
+          if (status.status === 'completed') {
+            showSuccess('Optimization Complete', 'Your workflow has been optimized successfully!');
+            setActiveOptimizationId(null);
+            return;
+          } else if (status.status === 'failed') {
+            showError('Optimization Failed', status.message || 'Optimization failed');
+            setActiveOptimizationId(null);
+            return;
+          } else {
+            // Continue polling for in-progress states
+            attempts++;
+            setTimeout(poll, 10000);
+          }
+        } else if (response.status === 404) {
+          consecutiveErrors++;
+          attempts++;
+          setTimeout(poll, 5000);
+        } else {
+          consecutiveErrors++;
+          const errorData = await response.json().catch(() => ({}));
+          console.error('HTTP Error polling optimization status:', response.status, errorData);
+          attempts++;
+          setTimeout(poll, 10000);
+        }
+      } catch (error) {
+        consecutiveErrors++;
+        console.error('Network error polling optimization status:', error);
+        attempts++;
+        setTimeout(poll, 10000);
+      }
+    };
+
+    // Start polling
+    setTimeout(poll, 2000);
+  };
+
+  const handleOptimizeSuccess = (optimizationId: string) => {
+    // Check if optimization is already running
+    if (activeOptimizationId) {
+      showError('Optimization In Progress', 'An optimization is already running for this workflow.');
+      return;
+    }
+
+    setActiveOptimizationId(optimizationId);
+    showSuccess('Optimization Started', 'Optimization job has been queued.');
+    pollOptimizationStatus(optimizationId);
+  };
+
   return (
     <div className="h-screen flex flex-col">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -705,12 +780,21 @@ const WorkflowBuilderContent: React.FC = () => {
                 showError('Save Required', 'Please save your workflow before optimizing.');
                 return;
               }
+              if (activeOptimizationId) {
+                showError('Optimization In Progress', 'An optimization is already running for this workflow.');
+                return;
+              }
               setShowOptimizeModal(true);
             }}
-            className="flex items-center space-x-2 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-slate-600 transition-all duration-200 shadow-soft font-medium"
+            disabled={!!activeOptimizationId}
+            className={`flex items-center space-x-2 px-4 py-2 ${
+              activeOptimizationId
+                ? 'bg-slate-400 cursor-not-allowed'
+                : 'bg-brand-500 hover:bg-brand-600'
+            } text-white rounded-lg transition-all duration-200 shadow-soft font-medium`}
           >
-            <Zap size={16} />
-            <span>Optimize</span>
+            <Zap size={16} className={activeOptimizationId ? 'animate-pulse' : ''} />
+            <span>{activeOptimizationId ? 'Optimizing...' : 'Optimize'}</span>
           </button>
           <button
             onClick={handleDeploy}
@@ -915,7 +999,10 @@ const WorkflowBuilderContent: React.FC = () => {
       {showOptimizeModal && (
         <OptimizeModal
           workflowId={workflowId}
+          workflowIR={{ nodes, edges }}
           onClose={() => setShowOptimizeModal(false)}
+          onOptimizationStart={handleOptimizeSuccess}
+          isOptimizationActive={!!activeOptimizationId}
         />
       )}
 

@@ -19,7 +19,10 @@ interface FormErrors {
 
 interface OptimizeModalProps {
   workflowId: string | null;
+  workflowIR: { nodes: any[], edges: any[] } | null;
   onClose: () => void;
+  onOptimizationStart?: (optimizationId: string) => void;
+  isOptimizationActive?: boolean;
 }
 
 const OptimizerTypes = ['GEPA', 'BootstrapFewShotWithRandomSearch', 'MIPROv2'] as const;
@@ -43,7 +46,13 @@ const DEFAULT_OPTIMIZER_CONFIGS: Record<OptimizerType, OptimizerConfig> = {
   }
 };
 
-const OptimizeModal: React.FC<OptimizeModalProps> = ({ workflowId, onClose }) => {
+const OptimizeModal: React.FC<OptimizeModalProps> = ({
+  workflowId,
+  workflowIR,
+  onClose,
+  onOptimizationStart,
+  isOptimizationActive = false
+}) => {
   const [optimizerName, setOptimizerName] = useState<OptimizerType>('BootstrapFewShotWithRandomSearch');
   const [optimizerConfig, setOptimizerConfig] = useState<OptimizerConfig>(
     DEFAULT_OPTIMIZER_CONFIGS['BootstrapFewShotWithRandomSearch']
@@ -116,6 +125,16 @@ const OptimizeModal: React.FC<OptimizeModalProps> = ({ workflowId, onClose }) =>
       return;
     }
 
+    if (!workflowIR) {
+      setErrors({ general: 'Workflow data is not available.' });
+      return;
+    }
+
+    if (isOptimizationActive) {
+      setErrors({ general: 'An optimization is already running for this workflow. Please wait for it to complete.' });
+      return;
+    }
+
     // Clear previous errors
     setErrors({});
 
@@ -130,6 +149,7 @@ const OptimizeModal: React.FC<OptimizeModalProps> = ({ workflowId, onClose }) =>
     try {
       const payload = {
         workflow_id: workflowId,
+        workflow_ir: workflowIR,
         optimizer_name: optimizerName,
         optimizer_config: optimizerConfig,
         scoring_functions: scoringFunctions.map(sf => ({
@@ -161,7 +181,10 @@ const OptimizeModal: React.FC<OptimizeModalProps> = ({ workflowId, onClose }) =>
       const result = await response.json();
 
       if (response.ok) {
-        // Success - close modal or show success message
+        // Success - notify parent and close modal
+        if (onOptimizationStart && result.optimization_id) {
+          onOptimizationStart(result.optimization_id);
+        }
         onClose();
       } else {
         // Handle validation errors from backend

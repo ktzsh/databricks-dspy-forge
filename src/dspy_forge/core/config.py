@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     databricks_config_profile: Optional[str] = None
     databricks_host: Optional[str] = None
     databricks_token: Optional[str] = None
+    databricks_warehouse_id: Optional[str] = None
     
     # CORS settings
     allowed_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]

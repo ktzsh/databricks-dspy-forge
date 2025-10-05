@@ -46,8 +46,28 @@ class CompoundProgram(dspy.Module):
                 if component:
                     self.components[node_id] = component
 
-    async def forward(self, **inputs):
-        """Execute the workflow with given inputs"""
+    def forward(self, **inputs):
+        """
+        Synchronous execution for DSPy optimizers.
+        Runs the async aforward() in a synchronous context.
+        """
+        import asyncio
+
+        # Try to get existing event loop, create new one if needed
+        try:
+            asyncio.get_running_loop()
+            # If we're already in an async context, we can't use run_until_complete
+            # This should not happen in optimization context, but handle it gracefully
+            raise RuntimeError("forward() called from async context - use aforward() instead")
+        except RuntimeError:
+            # No running loop - create one and run aforward()
+            return asyncio.run(self.aforward(**inputs))
+
+    async def aforward(self, **inputs):
+        """
+        Asynchronous execution for playground/real-time usage.
+        This is the main execution implementation.
+        """
         # Execute nodes in order
         for node_id in self.execution_order:
             start_time = datetime.now()

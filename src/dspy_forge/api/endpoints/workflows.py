@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, BackgroundTasks
-from typing import List, Dict, Optional, Literal
+from typing import List, Dict, Optional, Literal, Any
 from pydantic import BaseModel, Field, field_validator
 
 from dspy_forge.models.workflow import (
@@ -40,6 +40,7 @@ class DatasetLocation(BaseModel):
 
 class OptimizationRequest(BaseModel):
     workflow_id: str
+    workflow_ir: Optional[Dict[str, Any]] = None
     optimizer_name: Literal['GEPA', 'BootstrapFewShotWithRandomSearch', 'MIPROv2']
     optimizer_config: Dict[str, str] = Field(default_factory=dict)
     scoring_functions: List[ScoringFunctionRequest]
@@ -282,7 +283,7 @@ async def get_deployment_status(deployment_id: str):
 
 
 @router.post("/optimize", response_model=OptimizationResponse)
-async def optimize_workflow(request: OptimizationRequest):
+async def optimize_workflow(request: OptimizationRequest, background_tasks: BackgroundTasks):
     """
     Start optimization job for a workflow using DSPy optimizers.
 
@@ -338,23 +339,29 @@ async def optimize_workflow(request: OptimizationRequest):
                 detail=error_response.model_dump()
             )
 
-        # TODO: Implement actual optimization service
-        # This would:
-        # 1. Load training and validation datasets from Unity Catalog
-        # 2. Compile the workflow to DSPy program
-        # 3. Initialize the selected optimizer with config
-        # 4. Set up scoring functions (correctness metrics + guideline-based metrics)
-        # 5. Run optimization job (potentially as background task)
-        # 6. Save optimized program artifacts
+        # Step 4: Start background optimization task
+        from dspy_forge.services.optimization_service import optimization_service
 
         optimization_id = f"opt_{request.workflow_id}_{request.optimizer_name.lower()}"
 
-        logger.info(f"Optimization job {optimization_id} validated and ready to start")
+        # Add optimization task to background
+        background_tasks.add_task(
+            optimization_service.optimize_workflow_async,
+            workflow,
+            request.optimizer_name,
+            request.optimizer_config,
+            [sf.model_dump() for sf in request.scoring_functions],
+            request.training_data.model_dump(),
+            request.validation_data.model_dump(),
+            optimization_id
+        )
+
+        logger.info(f"Optimization job {optimization_id} queued for background execution")
 
         return OptimizationResponse(
             optimization_id=optimization_id,
             status="queued",
-            message=f"Optimization job started with {request.optimizer_name}. This is a stub - actual implementation pending."
+            message=f"Optimization job started with {request.optimizer_name}. Check status using optimization_id."
         )
 
     except HTTPException:
@@ -375,6 +382,34 @@ async def optimize_workflow(request: OptimizationRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to start optimization: {str(e)}"
+        )
+
+
+@router.get("/optimize/status/{optimization_id}")
+async def get_optimization_status(optimization_id: str):
+    """Get optimization status"""
+    try:
+        logger.info(f"Getting optimization status for {optimization_id}")
+        from dspy_forge.services.optimization_service import optimization_service
+        status_info = await optimization_service.get_optimization_status(optimization_id)
+
+        if not status_info:
+            logger.warning(f"Optimization status not found for {optimization_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Optimization not found"
+            )
+
+        logger.info(f"Found optimization status for {optimization_id}: {status_info.get('status')}")
+        return status_info
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get optimization status for {optimization_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get optimization status: {str(e)}"
         )
 
 

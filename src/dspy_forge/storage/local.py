@@ -280,3 +280,37 @@ class LocalDirectoryStorage(StorageBackend):
         """Check if file exists"""
         file_path = self.storage_path / path
         return file_path.exists()
+
+    async def save_optimization_status(self, optimization_id: str, status: Dict[str, Any]) -> bool:
+        """Save optimization status to optimizations directory"""
+        try:
+            optimizations_dir = self.storage_path / "optimizations"
+            optimizations_dir.mkdir(parents=True, exist_ok=True)
+
+            status_file = optimizations_dir / f"{optimization_id}.json"
+            status_json = json.dumps(status, indent=2, default=str)
+
+            async with aiofiles.open(status_file, 'w') as f:
+                await f.write(status_json)
+
+            self.logger.debug(f"Saved optimization status for {optimization_id}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to save optimization status for {optimization_id}: {e}")
+            return False
+
+    async def get_optimization_status(self, optimization_id: str) -> Optional[Dict[str, Any]]:
+        """Get optimization status from optimizations directory"""
+        try:
+            optimizations_dir = self.storage_path / "optimizations"
+            status_file = optimizations_dir / f"{optimization_id}.json"
+
+            if not status_file.exists():
+                return None
+
+            async with aiofiles.open(status_file, 'r') as f:
+                content = await f.read()
+                return json.loads(content)
+        except Exception as e:
+            self.logger.error(f"Failed to get optimization status for {optimization_id}: {e}")
+            return None

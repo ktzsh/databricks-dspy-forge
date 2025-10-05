@@ -200,6 +200,33 @@ class StorageBackend(ABC):
         """
         pass
 
+    @abstractmethod
+    async def save_optimization_status(self, optimization_id: str, status: Dict[str, Any]) -> bool:
+        """
+        Save optimization status
+
+        Args:
+            optimization_id: The optimization ID
+            status: Status information to save
+
+        Returns:
+            True if successful, False otherwise
+        """
+        pass
+
+    @abstractmethod
+    async def get_optimization_status(self, optimization_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get optimization status
+
+        Args:
+            optimization_id: The optimization ID
+
+        Returns:
+            Status information if found, None otherwise
+        """
+        pass
+
 
 # Backward compatibility alias
 WorkflowStorageBackend = StorageBackend

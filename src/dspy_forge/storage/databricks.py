@@ -424,3 +424,53 @@ class DatabricksVolumeStorage(StorageBackend):
             return await loop.run_in_executor(None, _check_file)
         except Exception:
             return False
+
+    async def save_optimization_status(self, optimization_id: str, status: Dict[str, Any]) -> bool:
+        """Save optimization status to volume"""
+        try:
+            file_path = f"{self.volume_path}/optimizations/{optimization_id}.json"
+            status_json = json.dumps(status, indent=2, default=str)
+
+            # Run in thread pool since databricks SDK is synchronous
+            loop = asyncio.get_event_loop()
+
+            def _save_file():
+                self.client.files.upload(
+                    file_path=file_path,
+                    contents=status_json.encode('utf-8'),
+                    overwrite=True
+                )
+                return True
+
+            await loop.run_in_executor(None, _save_file)
+
+            self.logger.debug(f"Saved optimization status for {optimization_id} to volume")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to save optimization status for {optimization_id}: {e}")
+            return False
+
+    async def get_optimization_status(self, optimization_id: str) -> Optional[Dict[str, Any]]:
+        """Get optimization status from volume"""
+        try:
+            file_path = f"{self.volume_path}/optimizations/{optimization_id}.json"
+
+            # Run in thread pool since databricks SDK is synchronous
+            loop = asyncio.get_event_loop()
+
+            def _read_file():
+                try:
+                    with self.client.files.download(file_path).contents as f:
+                        content = f.read()
+                    return content.decode('utf-8')
+                except Exception:
+                    return None
+
+            content = await loop.run_in_executor(None, _read_file)
+
+            if content:
+                return json.loads(content)
+            return None
+        except Exception as e:
+            self.logger.error(f"Failed to get optimization status for {optimization_id}: {e}")
+            return None
