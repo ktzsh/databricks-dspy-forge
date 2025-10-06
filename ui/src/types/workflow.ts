@@ -34,8 +34,21 @@ export type LogicType = 'IfElse' | 'Merge' | 'FieldSelector';
 
 export type NodeType = 'signature_field' | 'module' | 'logic' | 'retriever';
 
+export interface OptimizationData {
+  demos: Array<Record<string, any>>;
+  signature: {
+    instructions: string;
+    fields: Array<{
+      prefix: string;
+      description: string;
+    }>;
+  };
+  has_optimization: boolean;
+}
+
 export interface BaseNodeData {
   label?: string;
+  optimization_data?: OptimizationData;
 }
 
 export interface SignatureFieldNodeData extends BaseNodeData {

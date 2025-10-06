@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { Edit3, Brain, Settings, Trash2 } from 'lucide-react';
 import { ModuleNodeData, ModuleType } from '../../types/workflow';
 import TraceIndicator from './TraceIndicator';
+import OptimizationFooter from './OptimizationFooter';
 
 const moduleTypes: ModuleType[] = [
   'Predict',
@@ -285,6 +286,11 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
           </div>
         )}
       </div>
+
+      {/* Optimization Footer */}
+      {nodeData.optimization_data && (
+        <OptimizationFooter optimizationData={nodeData.optimization_data} />
+      )}
 
       {/* Trace Indicator */}
       {traceData && (

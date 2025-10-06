@@ -2,6 +2,7 @@ import uuid
 import time
 import random
 import string
+import json
 from typing import List, Optional
 from datetime import datetime
 
@@ -67,10 +68,54 @@ class WorkflowService:
             raise
 
     async def get_workflow(self, workflow_id: str) -> Optional[Workflow]:
-        """Get a workflow by ID"""
+        """Get a workflow by ID, enriched with optimization data if available"""
         try:
             storage = await get_storage_backend()
-            return await storage.get_workflow(workflow_id)
+            workflow = await storage.get_workflow(workflow_id)
+
+            if not workflow:
+                return None
+
+            # Check if program.json exists for this workflow
+            program_json_path = f"workflows/{workflow_id}/program.json"
+            program_content = await storage.get_file(program_json_path)
+
+            if program_content:
+                try:
+                    # Parse program.json
+                    program_data = json.loads(program_content)
+                    self.logger.debug(f"Found program.json for workflow {workflow_id}")
+
+                    # Merge optimization data into workflow nodes
+                    workflow_dict = workflow.model_dump()
+
+                    for node in workflow_dict.get('nodes', []):
+                        node_id = node.get('id')
+                        # Look for component data matching this node ID
+                        component_key = f"components['{node_id}']"
+
+                        if component_key in program_data:
+                            component_data = program_data[component_key]
+
+                            # Add optimization data to node
+                            node['data']['optimization_data'] = {
+                                'demos': component_data.get('demos', []),
+                                'signature': component_data.get('signature', {}),
+                                'has_optimization': True
+                            }
+
+                            self.logger.debug(f"Merged optimization data for node {node_id}")
+
+                    # Create new Workflow object with enriched data
+                    workflow = Workflow(**workflow_dict)
+
+                except json.JSONDecodeError as e:
+                    self.logger.warning(f"Failed to parse program.json for workflow {workflow_id}: {e}")
+                except Exception as e:
+                    self.logger.warning(f"Failed to merge optimization data for workflow {workflow_id}: {e}")
+
+            return workflow
+
         except Exception as e:
             self.logger.error(f"Failed to get workflow {workflow_id}: {e}")
             return None
@@ -98,6 +143,10 @@ class WorkflowService:
             workflow_data['id'] = workflow_id
             workflow_data['updated_at'] = datetime.now()
             workflow_data['created_at'] = existing_workflow.created_at
+
+            for node in workflow_data.get("nodes", []):
+                if node["data"].get("optimization_data", None):
+                    node["data"].pop("optimization_data")
             
             # Create updated workflow object
             workflow = Workflow(**workflow_data)
