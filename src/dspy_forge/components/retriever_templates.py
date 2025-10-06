@@ -195,7 +195,7 @@ class StructuredRetrieveTemplate(BaseRetrieverTemplate):
             f"        # Initialize DatabricksGenieRM retriever",
             f"        self.{instance_var} = DatabricksGenieRM(",
             f"            databricks_genie_space_id=\"{genie_space_id}\",",
-            f"            databricks_workspace_client=self.user_authorized_client,",
+            f"            databricks_workspace_client=get_user_authorized_client(),",
             f"            use_with_databricks_agent_framework=False",
             f"        )"
         ]

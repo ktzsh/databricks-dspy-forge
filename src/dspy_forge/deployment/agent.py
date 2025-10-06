@@ -14,9 +14,6 @@ from mlflow.types.responses import (
     ResponsesAgentStreamEvent,
 )
 
-from databricks.sdk import WorkspaceClient
-from databricks_ai_bridge import ModelServingUserCredentials
-
 try:
     from program import CompoundProgram
 except ImportError:
@@ -41,13 +38,7 @@ class DSPyResponseAgent(ResponsesAgent):
             self.program_state_path = context.artifacts.get("program_state_path", None)
 
     def initialize_agent(self):
-        # For OBO Auth
-        user_authorized_client = WorkspaceClient(
-            credentials_strategy=ModelServingUserCredentials()
-        )
-        self.program = CompoundProgram(
-            user_authorized_client=user_authorized_client,
-        )
+        self.program = CompoundProgram()
 
         # Load optimizations from program.json if available
         if self.program_state_path and os.path.exists(self.program_state_path):

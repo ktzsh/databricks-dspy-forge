@@ -60,10 +60,19 @@ class WorkflowCompilerService:
             if has_structured_retrieve:
                 code_lines.extend([
                     "from databricks_ai_bridge.genie import Genie",
-                    "from dspy.primitives.prediction import Prediction"
+                    "from dspy.primitives.prediction import Prediction",
+                    "from databricks_ai_bridge import ModelServingUserCredentials",
+                    "from databricks.sdk import WorkspaceClient",
+                    "",
+                    "def get_user_authorized_client() -> Any:",
+                    "    user_authorized_client = WorkspaceClient(",
+                    "        credentials_strategy=ModelServingUserCredentials()",
+                    "    )",
+                    "    return user_authorized_client"
                 ])
-            code_lines.append("")
             
+            code_lines.append("")
+
             # Find start and end nodes
             signature_field_nodes = [node for node in workflow.nodes if node.type == NodeType.SIGNATURE_FIELD]
             start_nodes = [node for node in signature_field_nodes if node.data.get('is_start', False) or node.data.get('isStart', False)]
@@ -129,9 +138,8 @@ class WorkflowCompilerService:
             
             # Generate CompoundProgram class
             code_lines.append("class CompoundProgram(dspy.Module):")
-            code_lines.append("    def __init__(self, user_authorized_client: Any):")
+            code_lines.append("    def __init__(self):")
             code_lines.append("        super().__init__()")
-            code_lines.append("        self.user_authorized_client = user_authorized_client")
 
             # Add instance creation code
             for instance in instances:
