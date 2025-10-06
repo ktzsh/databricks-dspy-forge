@@ -342,7 +342,7 @@ async def optimize_workflow(request: OptimizationRequest, background_tasks: Back
         # Step 4: Start background optimization task
         from dspy_forge.services.optimization_service import optimization_service
 
-        optimization_id = f"opt_{request.workflow_id}_{request.optimizer_name.lower()}"
+        optimization_id = f"opt_{request.workflow_id}"
 
         # Add optimization task to background
         background_tasks.add_task(

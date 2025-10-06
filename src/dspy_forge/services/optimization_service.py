@@ -148,8 +148,13 @@ class OptimizationService:
     def _create_scoring_metric(self, scoring_functions: List[Dict[str, Any]]) -> callable:
         """Create a composite scoring metric from scoring function configurations"""
 
-        def metric(example, pred, trace=None):  # noqa: ARG001
-            """Composite metric that combines multiple scoring functions"""
+        def metric(example, pred, trace=None, pred_name=None, pred_trace=None):  # noqa: ARG001
+            """Composite metric that combines multiple scoring functions
+
+            Compatible with all DSPy optimizers:
+            - Bootstrap/MIPROv2: Called with (example, pred, trace)
+            - GEPA: Called with (gold, pred, trace, pred_name, pred_trace)
+            """
             total_score = 0.0
             feedback_parts = []
 
@@ -219,11 +224,10 @@ class OptimizationService:
 
         if optimizer_name == 'BootstrapFewShotWithRandomSearch':
             # Parse config parameters with defaults
-            max_rounds = int(optimizer_config.get('max_rounds', 1))
-            max_bootstrapped_demos = int(optimizer_config.get('max_bootstrapped_demos', 4))
-            max_labeled_demos = int(optimizer_config.get('max_labeled_demos', 16))
-            num_candidate_programs = int(optimizer_config.get('num_candidate_programs', 16))
-            num_threads = int(optimizer_config.get('num_threads', 4))
+            max_rounds = int(optimizer_config.get('max_rounds'))
+            max_bootstrapped_demos = int(optimizer_config.get('max_bootstrapped_demos'))
+            max_labeled_demos = int(optimizer_config.get('max_labeled_demos'))
+            num_candidate_programs = int(optimizer_config.get('num_candidate_programs'))
 
             return BootstrapFewShotWithRandomSearch(
                 metric=metric,
@@ -231,19 +235,15 @@ class OptimizationService:
                 max_bootstrapped_demos=max_bootstrapped_demos,
                 max_labeled_demos=max_labeled_demos,
                 num_candidate_programs=num_candidate_programs,
-                num_threads=num_threads
             )
 
         elif optimizer_name == 'GEPA':
             # Parse config parameters with defaults
-            auto = optimizer_config.get('auto', 'light')
-            num_threads = int(optimizer_config.get('num_threads', 1))
-            track_stats = optimizer_config.get('track_stats', 'true').lower() == 'true'
-            use_merge = optimizer_config.get('use_merge', 'false').lower() == 'true'
-            reflection_lm_model = optimizer_config.get('reflection_lm', 'databricks/databricks-llama-4-maverick')
+            auto = optimizer_config.get('auto')
+            reflection_lm_model = optimizer_config.get('reflection_lm')
 
             reflection_lm = dspy.LM(
-                model=reflection_lm_model,
+                model=f"databricks/{reflection_lm_model}",
                 temperature=1.0,
                 max_tokens=8192
             )
@@ -251,23 +251,18 @@ class OptimizationService:
             return GEPA(
                 metric=metric,
                 auto=auto,
-                num_threads=num_threads,
-                track_stats=track_stats,
-                use_merge=use_merge,
                 reflection_lm=reflection_lm
             )
 
         elif optimizer_name == 'MIPROv2':
             # Parse config parameters with defaults
-            num_candidates = int(optimizer_config.get('num_candidates', 10))
-            init_temperature = float(optimizer_config.get('init_temperature', 0.7))
-            num_threads = int(optimizer_config.get('num_threads', 4))
+            num_candidates = int(optimizer_config.get('num_candidates'))
+            init_temperature = float(optimizer_config.get('init_temperature'))
 
             return MIPROv2(
                 metric=metric,
                 num_candidates=num_candidates,
                 init_temperature=init_temperature,
-                num_threads=num_threads
             )
 
         else:
@@ -376,17 +371,7 @@ class OptimizationService:
             # Note: DSPy's save with save_program=True requires a directory, not a file
             temp_dir = tempfile.mkdtemp()
             state_file = os.path.join(temp_dir, "program.json")
-
             try:
-                # Log what predictors are found in the optimized program
-                predictors = list(optimized_program.named_predictors())
-                logger.info(f"Optimized program has {len(predictors)} predictors: {[name for name, _ in predictors]}")
-
-                # Check if there are demos
-                for name, predictor in predictors:
-                    if hasattr(predictor, 'demos'):
-                        logger.info(f"Predictor '{name}' has {len(predictor.demos)} demos")
-
                 # Save optimized program to temp directory
                 optimized_program.save(state_file, save_program=False)
 

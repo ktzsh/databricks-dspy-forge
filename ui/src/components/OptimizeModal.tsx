@@ -25,17 +25,17 @@ interface OptimizeModalProps {
   isOptimizationActive?: boolean;
 }
 
-const OptimizerTypes = ['GEPA', 'BootstrapFewShotWithRandomSearch', 'MIPROv2'] as const;
+const OptimizerTypes = ['GEPA', 'MIPROv2'] as const;
 type OptimizerType = typeof OptimizerTypes[number];
 
 // Default configurations for each optimizer
 const DEFAULT_OPTIMIZER_CONFIGS: Record<OptimizerType, OptimizerConfig> = {
-  'BootstrapFewShotWithRandomSearch': {
-    'max_rounds': '1',
-    'max_bootstrapped_demos': '4',
-    'max_labeled_demos': '16',
-    'num_candidate_programs': '16',
-  },
+  // 'BootstrapFewShotWithRandomSearch': {
+  //   'max_rounds': '1',
+  //   'max_bootstrapped_demos': '4',
+  //   'max_labeled_demos': '16',
+  //   'num_candidate_programs': '16',
+  // },
   'GEPA': {
     'auto': 'light',
     'reflection_lm': 'databricks-claude-3-7-sonnet'
@@ -53,9 +53,9 @@ const OptimizeModal: React.FC<OptimizeModalProps> = ({
   onOptimizationStart,
   isOptimizationActive = false
 }) => {
-  const [optimizerName, setOptimizerName] = useState<OptimizerType>('BootstrapFewShotWithRandomSearch');
+  const [optimizerName, setOptimizerName] = useState<OptimizerType>('GEPA');
   const [optimizerConfig, setOptimizerConfig] = useState<OptimizerConfig>(
-    DEFAULT_OPTIMIZER_CONFIGS['BootstrapFewShotWithRandomSearch']
+    DEFAULT_OPTIMIZER_CONFIGS['GEPA']
   );
   const [scoringFunctions, setScoringFunctions] = useState<ScoringFunction[]>([
     { id: '1', type: 'Correctness', name: 'Correctness', weightage: 100 }
