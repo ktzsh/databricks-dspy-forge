@@ -9,17 +9,14 @@ DSPy Forge provides a drag-and-drop interface for creating sophisticated AI work
 NOTE: The DSPy Forge is designed to only work with Models & Retrievers available on Databricks.
 
 ![DSPy Forge Dashboard](artifacts/home.png)
-*Build, prototype, optimize and deploy programs
-
 ![Canvas](artifacts/canvas.png)
-*Visual drag-and-drop interface for building DSPy workflows*
 
-**Key Capabilities:**
-- Visual workflow design with DSPy modules
-- Native Databricks integration (Vector Search, Genie, Agent Framework, MLflow, Unity Catalog)
-- Multi-step agentic programs with conditional logic and data transformation
-- One-click deployment to Databricks serving endpoints using agent framework
-- OBO (on-behalf-of) Authentication for certain components (Genie)
+**Key Features:**
+- Visual drag-and-drop workflow builder with DSPy modules (Predict, ChainOfThought, React, ReAct, ProgramOfThought, Refine, BestOfN)
+- Native Databricks integration: Vector Search, Genie Spaces, Unity Catalog, MLflow, Agent Framework
+- DSPy optimization: GEPA, MIPROv2 with custom scoring functions
+- Integrated playground for testing with execution traces
+- One-click deployment to Databricks serving endpoints with OBO authentication
 
 ## 🏗️ Architecture
 
@@ -146,57 +143,97 @@ LOG_LEVEL=INFO
 
 ## Usage
 
-The DSPy Forge is meant to be run on your local with Databricks Volumes as persistent storage layer. Although it can be deployed on Databricks Apps as well, but then execution and deployment happens using App SP and not user. When running on local everything happens as user.
-
-### Basic Workflow Patterns
-
-**Simple Prediction:**
+**Workflow Patterns:**
 ```
-Input → Predict → Output
-```
-
-**RAG with Vector Search:**
-```
-Input → UnstructuredRetrieve → Predict → Output
+Simple:       Input → Predict → Output
+RAG:          Input → UnstructuredRetrieve → Predict → Output
+Multi-Step:   Input → ChainOfThought → FieldSelector → Predict → Output
+SQL:          Question → StructuredRetrieve → Predict → Output
 ```
 
-**Multi-Step Reasoning:**
-```
-Input → ChainOfThought → Field Selector → Predict → Output
-```
+**Workflow:** Dashboard → Create → Drag components → Configure → Connect → Test (Playground) → Optimize → Deploy
 
-**SQL Generation:**
-```
-Question → StructuredRetrieve → Predict → Output
-```
+**Deployment:** Run locally for user auth, or on Databricks Apps with service principal. Use Unity Catalog Volumes for shared storage.
 
-## Components
+## 🧩 Components
 
-**Signature:** Signature Fields
-**DSPy Modules:** Predict, ChainOfThought, React, Refine, BestOfN
-**Retrievers:** UnstructuredRetrieve (Vector Search), StructuredRetrieve (Genie Spaces)
-**Logic:** If-Else, Field Selector, Merge
-**Types:** str, int, bool, float, list[str], list[int], dict
+**Signature Fields:** Define I/O specs with types (`str`, `int`, `bool`, `float`, `list[str]`, `list[int]`, `dict`)
+
+**DSPy Modules:**
+- **Predict** - Basic LLM prediction
+- **ChainOfThought** - Step-by-step reasoning
+- **React** - Reason + Act pattern
+- **ReAct with Tools** - React with tool integration
+- **ProgramOfThought** - Code generation for reasoning
+- **Refine** - Iterative output improvement
+- **BestOfN** - Generate N candidates, select best
+
+**Retrievers:**
+- **UnstructuredRetrieve** - Databricks Vector Search integration
+- **StructuredRetrieve** - Genie Spaces for NL-to-SQL (OBO auth)
+
+**Logic:**
+- **If-Else** - Conditional branching
+- **Field Selector** - Extract/rename fields
+- **Merge** - Combine parallel outputs
+
+## 🎯 Optimization
+
+**Optimizers:**
+- **GEPA** - Gradient-free prompt optimization for structured tasks
+- **BootstrapFewShotWithRandomSearch** - Bootstrap few-shot examples from training data
+- **MIPROv2** - Multi-prompt instruction + few-shot co-optimization
+
+**Scoring Functions:** Correctness (binary w/ ground truth), Guidelines (LLM-based qualitative). Total weightage must = 100.
+
+**Training Data:** Delta tables with input columns matching workflow signature. Optional output columns for ground truth.
+
+**Process:** Build → Test → Click "Optimize" → Configure (optimizer, scoring, data tables) → Run on SQL Warehouse → Apply results
+
+**Output:** Optimized prompts, few-shot examples, performance metrics
 
 ## API
 
-**Workflows:** CRUD operations (`/api/v1/workflows/`)
-**Execution:** Playground testing (`/api/v1/execution/playground`)
-**Deployment:** Deploy to Databricks (`/api/v1/workflows/deploy/{id}`)
+### Workflow Management
+- `POST /api/v1/workflows/` - Create new workflow
+- `GET /api/v1/workflows/` - List all workflows
+- `GET /api/v1/workflows/{id}` - Get workflow by ID
+- `GET /api/v1/workflows/{id}/history` - Get workflow version history
+- `PUT /api/v1/workflows/{id}` - Update workflow
+- `DELETE /api/v1/workflows/{id}` - Delete workflow
+- `POST /api/v1/workflows/{id}/duplicate` - Duplicate workflow
+- `POST /api/v1/workflows/{id}/validate` - Validate workflow structure
 
-## Deployment
+### Execution
+- `POST /api/v1/execution/playground` - Execute workflow in playground
 
-Workflows are automatically compiled to DSPy programs and deployed as Databricks agents:
+### Deployment
+- `POST /api/v1/workflows/deploy/{id}` - Deploy workflow to Databricks
+- `GET /api/v1/workflows/deploy/status/{deployment_id}` - Check deployment status
 
-1. Workflow validation and code generation
-2. MLflow model packaging with dependencies
-3. Unity Catalog registration
-4. Serving endpoint deployment with auto-scaling
+### Optimization
+- `POST /api/v1/workflows/optimize` - Start optimization job
+- `GET /api/v1/workflows/optimize/status/{optimization_id}` - Check optimization status
 
-**Generated Resources:**
-- MLflow Model: `{catalog}.{schema}.{model_name}`
-- Serving Endpoint: `agents_{model_name}`
-- Auth policies for Vector Search/Genie access
+### Health
+- `GET /api/v1/workflows/_health` - Health check endpoint
+
+## Development
+
+### Adding New DSPy Modules
+
+1. Create template in `src/dspy_forge/components/module_templates.py`
+2. Implement `initialize()`, `acall()` and `call()` methods
+3. Add to `TemplateFactory` in `registry.py`
+4. Create UI node component in `ui/src/components/nodes/`
+5. Register node type in `ComponentSidebar.tsx`
+
+### Adding New Optimizers
+
+1. Add optimizer to `optimization_service.py`
+2. Update `OptimizationRequest` model in `api/endpoints/workflows.py`
+3. Add UI option in `OptimizeModal.tsx`
+4. Document configuration parameters
 
 ## Technology Stack
 
