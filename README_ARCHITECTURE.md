@@ -1,7 +1,7 @@
 
 # DSPy Forge Architecture Diagram
 
-## Execution Flow with CompoundProgram
+## Execution Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -15,9 +15,13 @@
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │  1. Create ExecutionContext(workflow, input_data)         │  │
 │  │  2. Create CompoundProgram(workflow, context)             │  │
-│  │  3. Execute: program.aforward(**input_data)               │  │
-│  │  4. Extract final outputs from end nodes                  │  │
-│  │  5. Return WorkflowExecution with results & traces        │  │
+│  │  3. Load optimized state if available:                    │  │
+│  │     • Check storage for program.json                      │  │
+│  │     • If found: program.load(program.json)                │  │
+│  │     • Loads optimized prompts & few-shot examples         │  │
+│  │  4. Execute: program.aforward(**input_data)               │  │
+│  │  5. Extract final outputs from end nodes                  │  │
+│  │  6. Return WorkflowExecution with results & traces        │  │
 │  └───────────────────────────────────────────────────────────┘  │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
@@ -39,16 +43,22 @@
 │  │        self.components[node_id] = component               │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │  aforward(**inputs):                                      │  │
+│  │  forward(**inputs):  [SYNC - for DSPy optimizers]        │  │
 │  │    for each node in execution_order:                      │  │
 │  │      node_inputs = _get_node_inputs(node_id, inputs)      │  │
-│  │      if node_id in components:                            │  │
-│  │        result = await self.components[node_id].acall(...) │  │
-│  │      else:                                                │  │
-│  │        result = await template.execute(node_inputs, ctx)  │  │
+│  │      result = self.components[node_id].call(**inputs)     │  │
 │  │      context.set_node_output(node_id, outputs)            │  │
 │  │      context.add_trace_entry(...)                         │  │
-│  │    return final_outputs                                   │  │
+│  │    return dspy.Prediction(**final_outputs)                │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  aforward(**inputs):  [ASYNC - for playground/deploy]    │  │
+│  │    for each node in execution_order:                      │  │
+│  │      node_inputs = _get_node_inputs(node_id, inputs)      │  │
+│  │      result = await self.components[node_id].acall(...)   │  │
+│  │      context.set_node_output(node_id, outputs)            │  │
+│  │      context.add_trace_entry(...)                         │  │
+│  │    return dspy.Prediction(**final_outputs)                │  │
 │  └───────────────────────────────────────────────────────────┘  │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
@@ -69,91 +79,202 @@
 └─────────────────────────────┘   └─────────────────────────────┘
 ```
 
-## Component Template Structure
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                    NodeTemplate (Base Class)                   │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  initialize(context) -> Optional[dspy.Module]            │  │
-│  │    • Returns DSPy module instance OR None                │  │
-│  │    • Override in subclasses that need module init        │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  call/acall(inputs, context) -> Dict[str, Any]           │  │
-│  │    • Executes node logic                                 │  │
-│  │    • Required for all templates                          │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  generate_code(context) -> Dict[str, Any]                │  │
-│  │    • Generates deployment code                           │  │
-│  │    • Required for all templates                          │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────┘
-                              │
-                 ┌────────────┴────────────┐
-                 │                         │
-                 ▼                         ▼
-    ┌─────────────────────────┐  ┌─────────────────────────┐
-    │   Module Templates      │  │   Logic Templates       │
-    │                         │  │                         │
-    │  ✓ initialize() → DSPy  │  │  ✗ initialize() → None  │
-    │  ✓ call/acall()         │  │  ✓ acall/call()         │
-    │  ✓ generate_code()      │  │  ✓ generate_code()      │
-    └─────────────────────────┘  └─────────────────────────┘
-```
-
-## Data Flow Through Workflow
+## Optimization Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                          Input Data                             │
-│                    { question: "...", ... }                     │
+│                   POST /api/v1/workflows/optimize               │
+│           OptimizationService.optimize_workflow_async()         │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Start Signature Field Node                   │
-│                     (No execution, just passthrough)            │
+│  Status: initializing                                           │
+│  • Save initial status to storage backend                       │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
-                ┌───────────────┴───────────────┐
-                │                               │
-                ▼                               ▼
-    ┌─────────────────────┐         ┌─────────────────────┐
-    │   Retriever Node    │         │   Module Node       │
-    │                     │         │                     │
-    │  Input: question    │         │  Input: question    │
-    │  Output: context    │         │  Output: answer     │
-    └──────────┬──────────┘         └──────────┬──────────┘
-               │                               │
-               └───────────────┬───────────────┘
-                               │
-                               ▼
-                ┌─────────────────────────────┐
-                │   FieldSelector/Merge Node  │
-                │                             │
-                │  Input: context, answer     │
-                │  Output: selected fields    │
-                └──────────────┬──────────────┘
-                               │
-                               ▼
-                ┌─────────────────────────────┐
-                │     Final Module Node       │
-                │                             │
-                │  Input: selected fields     │
-                │  Output: final_answer       │
-                └──────────────┬──────────────┘
-                               │
-                               ▼
-                ┌─────────────────────────────┐
-                │    End Signature Field      │
-                │                             │
-                │  Output: { final_answer }   │
-                └─────────────────────────────┘
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Status: loading_data                                           │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Load datasets from Unity Catalog via SQL connector:     │  │
+│  │  • Requires DATABRICKS_WAREHOUSE_ID env variable         │  │
+│  │  • Query: SELECT inputs, expectations FROM {table}       │  │
+│  │  • Parse inputs/expectations into dspy.Example objects   │  │
+│  │  • Mark input fields with .with_inputs()                 │  │
+│  │  • Load both trainset and valset                         │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Status: building_program                                       │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Create CompoundProgram:                                  │  │
+│  │  • temp_context = ExecutionContext(workflow, {})          │  │
+│  │  • program = CompoundProgram(workflow, temp_context)      │  │
+│  │  • Initialize all components via template system         │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Create Composite Scoring Metric:                        │  │
+│  │  • For each scoring function (Correctness/Guidelines):   │  │
+│  │    - Correctness: MLflow is_correct judge                │  │
+│  │    - Guidelines: MLflow meets_guidelines judge           │  │
+│  │  • Weighted composite: sum(score * weightage)            │  │
+│  │  • Return dspy.Prediction(score, feedback)               │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Create Optimizer Instance:                              │  │
+│  │  • GEPA(metric, auto, reflection_lm)                     │  │
+│  │  • BootstrapFewShotWithRandomSearch(metric, ...)         │  │
+│  │  • MIPROv2(metric, auto, prompt_model, task_model)       │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Status: optimizing                                             │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Run Optimization:                                        │  │
+│  │  • Bootstrap/MIPROv2: optimizer.compile(program, trainset)│  │
+│  │  • GEPA: optimizer.compile(program, trainset, valset)    │  │
+│  │  • Returns optimized_program with updated prompts/demos  │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Status: saving_results                                         │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Save Optimized Program:                                  │  │
+│  │  • Create temp directory                                  │  │
+│  │  • optimized_program.save(temp_file, save_program=False) │  │
+│  │  • Read program.json content                             │  │
+│  │  • Save to storage: workflows/{id}/program.json          │  │
+│  │  • Keys format: components['node-id']                    │  │
+│  │  • Cleanup temp directory                                │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Status: completed                                              │
+│  • Update status with completion timestamp                      │
+│  • Include optimized_program_path in status                     │
+│  • Client can now deploy or test optimized workflow             │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## ExecutionContext State Management
+
+## Deployment Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 POST /api/v1/workflows/deploy/{id}              │
+│          DeploymentService.deploy_workflow_async()              │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Status: validating                                             │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Validate Workflow:                                       │  │
+│  │  • Check workflow structure                               │  │
+│  │  • Verify all required fields                            │  │
+│  │  • Ensure valid connections                              │  │
+│  │  • If validation fails, abort deployment                 │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Status: compiling                                              │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Compile Workflow to DSPy Code:                          │  │
+│  │  • compiler_service.compile_workflow_to_code(workflow)   │  │
+│  │  • Returns: (workflow_code, node_to_var_mapping)         │  │
+│  │  • Mapping example: {'node-123': 'predict_1', ...}       │  │
+│  │  • Add header with workflow ID & timestamp               │  │
+│  │  • Save to storage: workflows/{id}/program.py            │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Copy Agent Wrapper:                                      │  │
+│  │  • Read deployment/agent.py source                        │  │
+│  │  • Save to storage: workflows/{id}/agent.py              │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Transform program.json (if exists) - CRITICAL STEP             │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Load Optimized State:                                    │  │
+│  │  • Check for workflows/{id}/program.json                  │  │
+│  │  • If not found, skip transformation                      │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Transform Keys from Node IDs → Variable Names:          │  │
+│  │  • Original: {"components['node-123']": {...}}           │  │
+│  │  • Transform using node_mapping from compiler            │  │
+│  │  • Result: {"predict_1": {...}}                          │  │
+│  │  • Keep non-component keys as-is                         │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Save Transformed State:                                  │  │
+│  │  • Write to temp file: program.json                       │  │
+│  │  • This file will be packaged with agent deployment      │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Generate Resource Lists & Auth Policies                        │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  System Resources (accessed with system credentials):    │  │
+│  │  • DatabricksServingEndpoint (LLM models)                │  │
+│  │  • DatabricksVectorSearchIndex (retrievers)              │  │
+│  │  • DatabricksGenieSpace (structured retrievers)          │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  User Resource Scopes (OBO authentication):              │  │
+│  │  • dashboards.genie (for Genie Spaces)                   │  │
+│  │  • sql.warehouses (for Genie Spaces)                     │  │
+│  │  • sql.statement-execution (for Genie Spaces)            │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Status: deploying                                              │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Deploy to Databricks via runner.deploy_agent():        │  │
+│  │  • Package files: agent.py, program.py, program.json     │  │
+│  │  • mlflow.pyfunc.log_model() with:                       │  │
+│  │    - python_model = agent.py                             │  │
+│  │    - code_paths = [program.py]                           │  │
+│  │    - artifacts = {program_state_path: program.json}      │  │
+│  │    - resources = system_resources                        │  │
+│  │    - auth_policy = (system, user)                        │  │
+│  │  • Register model to Unity Catalog                       │  │
+│  │  • Deploy to serving endpoint with agents.deploy()       │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Status: completed                                              │
+│  • Update status with completion timestamp                      │
+│  • Include endpoint_url and review_app_url                      │
+│  • Cleanup temporary files                                      │
+│  • Agent is now live and ready to serve requests                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+
+## State Management
+
+### ExecutionContext State Management
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -187,71 +308,120 @@
 └────────────────────────────────────────────────────────────────┘
 ```
 
+### Program State Management
 
-## Optimization Flow
+The `program.json` file is central to optimization and deployment, storing learned prompts and few-shot examples.
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                 DSPy Optimization Integration                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  1. Create CompoundProgram from workflow                 │  │
-│  │     program = CompoundProgram(workflow, context)         │  │
-│  │  2. Prepare training data (Delta tables, etc.)           │  │
-│  │     trainset = [dspy.Example(...), ...]                  │  │
-│  │  3. Define metric function (correctness, guidelines)     │  │
-│  │  4. Create optimizer (GEPA, BootstrapFewShot, MIPROv2)   │  │
-│  │  5. optimizer.compile(program, trainset, ...)            │  │
-│  │  6. Save optimized program, update workflow              │  │
-│  │  7. Return metrics, optimized prompts, few-shot examples │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────┘
-```
-
-## Deployment Flow
+#### State Lifecycle
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                Workflow Deployment to Databricks                │
+│                      OPTIMIZATION PHASE                         │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │  1. Compile workflow to agent code                        │  │
-│  │  2. Call deployment_service.deploy_workflow()             │  │
-│  │  3. Use runner.deploy_agent() to push to Databricks       │  │
-│  │  4. Unity Catalog Volumes for storage (if configured)     │  │
-│  │  5. OBO authentication for secure access                  │  │
-│  │  6. Track deployment status via API                       │  │
+│  │  Optimizer runs on CompoundProgram                        │  │
+│  │  • Updates prompts, adds few-shot demonstrations          │  │
+│  │  • Learns best instruction templates                      │  │
+│  │  • Stores state in program components                     │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Save with Node ID Keys:                                  │  │
+│  │  • optimized_program.save(path, save_program=False)       │  │
+│  │  • Format: {"components['node-123']": {...}, ...}        │  │
+│  │  • Storage: workflows/{id}/program.json                   │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       EXECUTION PHASE                           │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Load Optimized State (if available):                     │  │
+│  │  • program = CompoundProgram(workflow, context)           │  │
+│  │  • if program.json exists:                                │  │
+│  │      program.load(program.json)                           │  │
+│  │  • Uses node IDs to map state to components              │  │
+│  │  • Format: components['node-123'] matches workflow nodes  │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      DEPLOYMENT PHASE                           │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Transform for Deployment:                                │  │
+│  │  • Compiler generates: (code, node_to_var_mapping)        │  │
+│  │  • Example mapping: {'node-123': 'predict_1'}            │  │
+│  │  • Load program.json from storage                         │  │
+│  │  • Transform keys:                                        │  │
+│  │      "components['node-123']" → "predict_1"              │  │
+│  │  • Deployed code uses variable names, not node IDs       │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  Package for Serving:                                     │  │
+│  │  • agent.py loads: from program import CompoundProgram   │  │
+│  │  • program.py defines: class CompoundProgram(dspy.Module)│  │
+│  │  • program.json loaded via: program.load(artifacts_path) │  │
+│  │  • Variable names in program.json match program.py       │  │
 │  └───────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 
-## Key Design Decisions
+## Templates
 
-### 1. Component Initialization
-- **DSPy Modules** (Predict, ChainOfThought, Retrievers):
-  - Initialized in `initialize()` method
-  - Stored in `CompoundProgram.components` dict
-  - Executed via `.acall()` or `.call()`
+### Component Templates
 
-- **Logic Components** (IfElse, Merge, FieldSelector):
-  - Not stored in components dict
-  - Executed via `template.execute()`
+```
+┌────────────────────────────────────────────────────────────────┐
+│                    NodeTemplate (Base Class)                   │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │  initialize(context) -> Optional[dspy.Module]            │  │
+│  │    • Returns DSPy module instance OR None                │  │
+│  │    • Override in subclasses that need module init        │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │  call/acall(inputs, context) -> Dict[str, Any]           │  │
+│  │    • Executes node logic                                 │  │
+│  │    • Required for all templates                          │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │  generate_code(context) -> Dict[str, Any]                │  │
+│  │    • Generates deployment code                           │  │
+│  │    • Required for all templates                          │  │
+│  └──────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────┘
+                              │
+                 ┌────────────┴────────────┐
+                 │                         │
+                 ▼                         ▼
+    ┌─────────────────────────┐  ┌─────────────────────────┐
+    │   Module Templates      │  │   Logic Templates       │
+    │                         │  │                         │
+    │  ✓ initialize() → DSPy  │  │  ✗ initialize() → None  │
+    │  ✓ call/acall()         │  │  ✓ acall/call()         │
+    │  ✓ generate_code()      │  │  ✓ generate_code()      │
+    └─────────────────────────┘  └─────────────────────────┘
+```
 
-### 2. Input/Output Mapping
-- **Field-level connections**: Map specific fields via edge handles
-- **Node-level connections**: Merge all outputs from source node
-- **Start nodes**: Use initial workflow input_data
-- **End nodes**: Extract from context.node_outputs
 
-### 3. Trace Generation
-- **Captured for each node**:
-  - node_id, node_type
-  - inputs (what went in)
-  - outputs (what came out)
-  - execution_time (how long it took)
-  - timestamp (when it happened)
+## Additional Notes
 
-### 4. Backward Compatibility
-- **Execution API**: Unchanged interface
-- **Template system**: Both `initialize()` and `execute()` supported
-- **Code generation**: Unaffected by changes
-- **Playground API**: Works without modifications
+### Key Transformations
+
+| Phase | Key Format | Example | Purpose |
+|-------|------------|---------|---------|
+| **Optimization** | `components['node-id']` | `components['node-123']` | Maps to workflow IR node IDs |
+| **Execution** | `components['node-id']` | `components['node-123']` | Same as optimization, no transform needed |
+| **Deployment** | `variable_name` | `predict_1` | Maps to generated code variable names |
+
+### Why Transformation is Needed
+
+**During Optimization/Execution:**
+- CompoundProgram uses `self.components[node_id]` to access components
+- Workflow IR uses node IDs like 'node-123' to identify nodes
+- program.json keys must match: `components['node-123']`
+
+**During Deployment:**
+- Generated code uses descriptive variable names: `self.predict_1`, `self.retriever_1`
+- program.json must match variable names for correct state loading
+- Transformation maps: `components['node-123']` → `predict_1`
