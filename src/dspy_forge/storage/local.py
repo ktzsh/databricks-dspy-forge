@@ -324,7 +324,7 @@ class LocalDirectoryStorage(StorageBackend):
                 return optimizations
 
             # Scan for files matching pattern: opt_{workflow_id}_*.json
-            pattern = f"opt_{workflow_id}_*.json"
+            pattern = f"opt_{workflow_id}*.json"
             for file_path in optimizations_dir.glob(pattern):
                 try:
                     async with aiofiles.open(file_path, 'r') as f:

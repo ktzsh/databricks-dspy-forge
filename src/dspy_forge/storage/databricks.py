@@ -489,7 +489,7 @@ class DatabricksVolumeStorage(StorageBackend):
                     # List all files in optimizations directory
                     files = self.client.files.list_directory_contents(optimizations_dir)
                     # Filter files matching pattern: opt_{workflow_id}_*.json
-                    prefix = f"opt_{workflow_id}_"
+                    prefix = f"opt_{workflow_id}"
                     matching_files = []
                     for file_info in files:
                         if file_info.path.endswith('.json') and prefix in file_info.path:

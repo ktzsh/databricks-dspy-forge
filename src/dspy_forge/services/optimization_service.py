@@ -241,7 +241,6 @@ class OptimizationService:
             # Parse config parameters with defaults
             auto = optimizer_config.get('auto')
             reflection_lm_model = optimizer_config.get('reflection_lm')
-
             reflection_lm = dspy.LM(
                 model=f"databricks/{reflection_lm_model}",
                 temperature=1.0,
@@ -256,13 +255,23 @@ class OptimizationService:
 
         elif optimizer_name == 'MIPROv2':
             # Parse config parameters with defaults
-            num_candidates = int(optimizer_config.get('num_candidates'))
-            init_temperature = float(optimizer_config.get('init_temperature'))
+            auto = optimizer_config.get('auto')
+            prompt_model = dspy.LM(
+                model=f"databricks/{optimizer_config.get('prompt_model')}",
+                temperature=1.0,
+                max_tokens=8192
+            )
+            task_model = dspy.LM(
+                model=f"databricks/{optimizer_config.get('task_model')}",
+                temperature=1.0,
+                max_tokens=8192
+            )
 
             return MIPROv2(
                 metric=metric,
-                num_candidates=num_candidates,
-                init_temperature=init_temperature,
+                auto=auto,
+                prompt_model=prompt_model,
+                task_model=task_model
             )
 
         else:

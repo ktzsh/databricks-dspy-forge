@@ -385,7 +385,7 @@ class OptimizationValidationService:
     OPTIMIZER_REQUIREMENTS = {
         'GEPA': ['auto', 'reflection_lm'],
         'BootstrapFewShotWithRandomSearch': ['max_rounds', 'max_bootstrapped_demos', 'max_labeled_demos', 'num_candidate_programs'],
-        'MIPROv2': ['num_candidates', 'init_temperature']
+        'MIPROv2': ['auto', 'task_model', 'prompt_model']
     }
 
     def validate_optimization_request(

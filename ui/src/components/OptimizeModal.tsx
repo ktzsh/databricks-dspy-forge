@@ -41,8 +41,9 @@ const DEFAULT_OPTIMIZER_CONFIGS: Record<OptimizerType, OptimizerConfig> = {
     'reflection_lm': 'databricks-claude-3-7-sonnet'
   },
   'MIPROv2': {
-    'num_candidates': '10',
-    'init_temperature': '0.7'
+    'auto': 'light',
+    'prompt_model': 'databricks-claude-3-7-sonnet',
+    'task_model': 'databricks-claude-3-7-sonnet'
   }
 };
 
