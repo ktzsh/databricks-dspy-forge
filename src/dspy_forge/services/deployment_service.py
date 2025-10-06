@@ -1,4 +1,6 @@
 import os
+import json
+import shutil
 import tempfile
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -128,8 +130,8 @@ class DeploymentService:
             await self._save_deployment_status(deployment_id, status)
             
             logger.info(f"Compiling workflow {workflow.id}")
-            workflow_code = compiler_service.compile_workflow_to_code(workflow)
-            
+            workflow_code, node_mapping = compiler_service.compile_workflow_to_code(workflow)
+
             # Step 3: Save compiled workflow code using storage backend
             storage = await get_storage_backend()
 
@@ -157,19 +159,64 @@ class DeploymentService:
                 raise RuntimeError("Failed to save agent.py")
 
             logger.info(f"Copied agent.py for workflow {workflow.id}")
-            
+
+            # Step 4b: Transform program.json if it exists
+            transformed_program_json_path = None
+            program_json_content = await storage.get_file(f"workflows/{workflow.id}/program.json")
+
+            if program_json_content:
+                logger.info(f"Found program.json for workflow {workflow.id}, transforming for deployment")
+
+                # Parse program.json
+                program_data = json.loads(program_json_content)
+
+                # Transform keys from node IDs to variable names
+                transformed_data = {}
+                for key, value in program_data.items():
+                    if key.startswith("components['") and key.endswith("']"):
+                        # Extract node ID from key like "components['node-123']"
+                        node_id = key.split("'")[1]
+                        var_name = node_mapping[node_id]
+                        transformed_data[var_name] = value
+                    else:
+                        # Keep non-component keys as-is (e.g., metadata)
+                        transformed_data[key] = value
+
+                # TODO FIXME Hack since components implements retrievers incorrectly 
+                # so when saving they are not saved into program.json
+                for key, value in node_mapping.items():
+                    if value.startswith("retriever"):
+                        transformed_data[value] = {
+                            "traces": [],
+                            "train": [],
+                            "demos": [],
+                            "signature": {},
+                            "lm": None
+                        }
+
+                # Create temp directory if needed
+                if self._temp_dir is None:
+                    self._temp_dir = tempfile.mkdtemp()
+
+                # Save transformed program.json to temp file
+                transformed_program_json_path = os.path.join(self._temp_dir, "program.json")
+                with open(transformed_program_json_path, 'w') as f:
+                    json.dump(transformed_data, f, indent=2)
+
+                logger.info(f"Created transformed program.json at {transformed_program_json_path}")
+
             # Step 5: Generate resource list
             system_policy, user_policy = self._generate_resource_list(workflow)
-            
+
             # Step 6: Deploy using runner
             status.update({
                 "status": "deploying",
                 "message": "Deploying to Databricks"
             })
             await self._save_deployment_status(deployment_id, status)
-            
-            logger.info(f"Starting Databricks deployment for {model_name}")            
-            
+
+            logger.info(f"Starting Databricks deployment for {model_name}")
+
             # Get file paths for deployment - check if storage is local or create temp files
             agent_file_path = await self._get_local_file_path(storage, f"workflows/{workflow.id}/agent.py")
             program_file_path = await self._get_local_file_path(storage, f"workflows/{workflow.id}/program.py")
@@ -179,6 +226,7 @@ class DeploymentService:
                 workflow_id=workflow.id,
                 agent_file_path=agent_file_path,
                 program_file_path=program_file_path,
+                program_json_path=transformed_program_json_path,
                 model_name=model_name,
                 catalog_name=catalog_name,
                 schema_name=schema_name,
@@ -197,17 +245,27 @@ class DeploymentService:
             await self._save_deployment_status(deployment_id, status)
             
             logger.info(f"Successfully deployed workflow {workflow.id} as {catalog_name}.{schema_name}.{model_name}")
-            
+
         except Exception as e:
             error_msg = f"Deployment failed: {str(e)}"
             logger.error(f"Deployment failed for {deployment_id}: {error_msg}", exc_info=True)
-            
+
             status.update({
                 "status": "failed",
                 "message": error_msg,
                 "completed_at": datetime.now().isoformat()
             })
             await self._save_deployment_status(deployment_id, status)
+
+        finally:
+            # Cleanup temp directory
+            if self._temp_dir and os.path.exists(self._temp_dir):
+                try:
+                    shutil.rmtree(self._temp_dir)
+                    logger.info(f"Cleaned up temporary directory {self._temp_dir}")
+                    self._temp_dir = None
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp directory: {e}")
     
     async def get_deployment_status(self, deployment_id: str) -> Optional[Dict[str, Any]]:
         """Get deployment status by ID"""

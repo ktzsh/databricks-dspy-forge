@@ -12,12 +12,13 @@ from dspy_forge.models.workflow import NodeType
 
 class CodeGenerationContext:
     """Context for code generation tracking"""
-    
+
     def __init__(self):
         self.signatures_created = set()
         self.node_counts = {}
         self.result_count = 0
         self.signature_names = {}
+        self.node_to_var_mapping = {}  # Maps node_id -> instance_var for optimization loading
     
     def get_signature_name(self, signature_key: tuple) -> str:
         """Get or create unique signature name"""

@@ -115,6 +115,10 @@ class BaseModuleTemplate(NodeTemplate):
         # Generate instance code
         node_count = context.get_node_count(module_type_str)
         instance_var = f"{module_type_str.lower()}_{node_count}"
+
+        # Store mapping for optimization loading
+        context.node_to_var_mapping[self.node_id] = instance_var
+
         instance_code = self._generate_instance_code(instance_var, signature_name)
         
         # Generate forward method code

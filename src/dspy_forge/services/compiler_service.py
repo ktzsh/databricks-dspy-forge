@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from datetime import datetime
 
 from dspy_forge.models.workflow import Workflow, NodeType
@@ -17,15 +17,15 @@ class WorkflowCompilerService:
     def __init__(self):
         self.compiled_workflows: Dict[str, str] = {}  # Cache compiled code
     
-    def compile_workflow_to_code(self, workflow: Workflow) -> str:
+    def compile_workflow_to_code(self, workflow: Workflow) -> Tuple[str, Dict[str, str]]:
         """
         Compile a workflow to optimized DSPy code using template system
-        
+
         Args:
             workflow: The workflow to compile
-            
+
         Returns:
-            Generated DSPy code as string
+            Tuple of (generated DSPy code as string, node_id to variable name mapping)
         """
         try:
             # Initialize code generation context
@@ -156,11 +156,12 @@ class WorkflowCompilerService:
             self._generate_main_method(start_fields, code_lines)
             
             compiled_code = '\n'.join(code_lines)
-            
+
             # Cache the compiled code
             self.compiled_workflows[workflow.id] = compiled_code
-            
-            return compiled_code
+
+            # Return code and node-to-variable mapping
+            return compiled_code, context.node_to_var_mapping
             
         except Exception as e:
             logger.error(f"Failed to compile workflow {workflow.id}: {e}")

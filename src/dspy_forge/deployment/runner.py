@@ -1,7 +1,7 @@
 import os
 import mlflow
 
-from typing import Any
+from typing import Any, Optional
 from pkg_resources import get_distribution
 
 from mlflow.models.auth_policy import AuthPolicy, SystemAuthPolicy, UserAuthPolicy
@@ -24,8 +24,9 @@ def deploy_agent(
         program_file_path: str,
         model_name: str,
         schema_name: str,
-        catalog_name:str ,
-        auth_policy: tuple[list[Any], list[Any]]
+        catalog_name: str,
+        auth_policy: tuple[list[Any], list[Any]],
+        program_json_path: Optional[str] = None
     ):
     mlflow.set_experiment(
         f"/Users/{current_user}/DSPy-Forge-Experiment-{workflow_id}"
@@ -68,6 +69,7 @@ def deploy_agent(
             ],
             registered_model_name=f"{catalog_name}.{schema_name}.{model_name}",
             code_paths=[program_file_path],
+            artifacts={"program_state_path": program_json_path} if program_json_path else None,
             input_example={"input": [{"role": "user", "content": "Hi, this is a test message."}]},
             **authentication_kwargs
         )

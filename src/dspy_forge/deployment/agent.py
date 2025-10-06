@@ -1,5 +1,6 @@
 import json
 import mlflow
+import os
 
 from uuid import uuid4
 from typing import (
@@ -34,6 +35,11 @@ class DSPyResponseAgent(ResponsesAgent):
         super().__init__(*args, **kwargs)
         # TODO add output field names to program and reference it here
 
+    def load_context(self, context):
+        self.program_state_path = None
+        if context.artifacts:
+            self.program_state_path = context.artifacts.get("program_state_path", None)
+
     def initialize_agent(self):
         # For OBO Auth
         user_authorized_client = WorkspaceClient(
@@ -42,6 +48,11 @@ class DSPyResponseAgent(ResponsesAgent):
         self.program = CompoundProgram(
             user_authorized_client=user_authorized_client,
         )
+
+        # Load optimizations from program.json if available
+        if self.program_state_path and os.path.exists(self.program_state_path):
+            self.program.load(self.program_state_path)
+            print(f"Loaded program state from {self.program_state_path}")
 
     def _convert_to_dspy_format(self, messages):
         question = messages[-1]['content']

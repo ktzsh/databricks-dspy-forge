@@ -97,9 +97,12 @@ class UnstructuredRetrieveTemplate(BaseRetrieverTemplate):
         # Get input and output fields
         input_fields = self._get_connected_fields(is_input=True)
         output_fields = self._get_connected_fields(is_input=False)
-        
+
         instance_var = f"retriever_{context.get_node_count('unstructured_retrieve')}"
-        
+
+        # Store mapping for optimization loading
+        context.node_to_var_mapping[self.node_id] = instance_var
+
         # Construct full index name
         databricks_index_name = f"{catalog_name}.{schema_name}.{index_name}"
         
@@ -181,9 +184,12 @@ class StructuredRetrieveTemplate(BaseRetrieverTemplate):
         
         # Get input fields
         input_fields = self._get_connected_fields(is_input=True)
-        
+
         instance_var = f"genie_retriever_{context.get_node_count('structured_retrieve')}"
-        
+
+        # Store mapping for optimization loading
+        context.node_to_var_mapping[self.node_id] = instance_var
+
         # Generate instance initialization
         instance_lines = [
             f"        # Initialize DatabricksGenieRM retriever",
