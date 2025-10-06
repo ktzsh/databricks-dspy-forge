@@ -1,3 +1,4 @@
+import os
 import mlflow
 
 from typing import Any
@@ -9,17 +10,13 @@ from mlflow.models.resources import DatabricksServingEndpoint
 from databricks import agents
 from databricks.sdk import WorkspaceClient
 
+from dspy_forge.core.config import settings
 from dspy_forge.core.logging import get_logger
 
 logger = get_logger(__name__)
 
 w = WorkspaceClient()
-        
-# Get current user information
 current_user = w.current_user.me().user_name
-
-mlflow.set_tracking_uri("databricks")
-mlflow.set_registry_uri("databricks-uc")
 
 def deploy_agent(
         workflow_id: str,
@@ -30,7 +27,9 @@ def deploy_agent(
         catalog_name:str ,
         auth_policy: tuple[list[Any], list[Any]]
     ):
-    mlflow.set_experiment(f"/Users/{current_user}/DSPy-Forge-Experiment-{workflow_id}")
+    mlflow.set_experiment(
+        f"/Users/{current_user}/DSPy-Forge-Experiment-{workflow_id}"
+    )
 
     authentication_kwargs = {}
     if auth_policy[1]:

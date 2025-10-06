@@ -8,11 +8,11 @@ DSPy Forge provides a drag-and-drop interface for creating sophisticated AI work
 
 NOTE: The DSPy Forge is designed to only work with Models & Retrievers available on Databricks.
 
-![DSPy Forge Interface](artifacts/forge.png)
-*Visual drag-and-drop interface for building DSPy workflows*
+![DSPy Forge Dashboard](artifacts/home.png)
+*Build, prototype, optimize and deploy programs
 
-![Execution Tracing](artifacts/trace.png)
-*Flow execution visualization with step-by-step traces*
+![Canvas](artifacts/canvas.png)
+*Visual drag-and-drop interface for building DSPy workflows*
 
 **Key Capabilities:**
 - Visual workflow design with DSPy modules

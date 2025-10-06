@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Edit3, Copy, Trash2, MoreVertical, Clock, Calendar, Zap, Cloud, Hash } from 'lucide-react';
 import { WorkflowCardData } from '../types/dashboard';
-import { useToast } from '../hooks/useToast';
 
 interface WorkflowCardProps {
   workflow: WorkflowCardData;
@@ -13,7 +12,6 @@ interface WorkflowCardProps {
 
 const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onDelete, onDuplicate, onShowDetails }) => {
   const navigate = useNavigate();
-  const { showSuccess } = useToast();
   const [showActions, setShowActions] = useState(false);
 
   const formatDate = (dateString: string) => {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Loader, FolderOpen } from 'lucide-react';
+import { Plus, Search, Loader } from 'lucide-react';
 import WorkflowCard from './WorkflowCard';
 import WorkflowDetailsModal from './WorkflowDetailsModal';
 import ToastContainer from './ToastContainer';

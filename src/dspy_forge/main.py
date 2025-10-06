@@ -12,21 +12,6 @@ from dspy_forge.core.config import settings
 from dspy_forge.core.logging import setup_logging, get_logger
 from dspy_forge.api.routes import router as api_router
 
-# Set Databricks SDK environment variables from settings
-if settings.databricks_config_profile:
-    os.environ["MLFLOW_ENABLE_DB_SDK"]  = "true"
-    os.environ["DATABRICKS_CONFIG_PROFILE"] = settings.databricks_config_profile
-elif settings.databricks_host and settings.databricks_token:
-    os.environ["MLFLOW_ENABLE_DB_SDK"]  = "true"
-    os.environ["DATABRICKS_HOST"] = settings.databricks_host
-    os.environ["DATABRICKS_TOKEN"] = settings.databricks_token
-elif (os.environ.get("DATABRICKS_CLIENT_ID", None) and 
-      os.environ.get("DATABRICKS_CLIENT_SECRET", None)):
-    # App is running on Databricks Apps
-    pass
-else:
-    raise ValueError("Databricks configuration not provided in environment variables.")
-
 # Initialize logging
 setup_logging(
     level=settings.log_level,
