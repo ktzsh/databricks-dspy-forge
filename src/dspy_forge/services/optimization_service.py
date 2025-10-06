@@ -390,7 +390,7 @@ class OptimizationService:
                 logger.debug(f"Saved file size: {len(optimized_content)} bytes")
 
                 # Save to storage backend
-                optimized_path = f"workflows/{workflow.id}/optimized_program.json"
+                optimized_path = f"workflows/{workflow.id}/program.json"
                 success = await storage.save_file(optimized_path, optimized_content)
 
                 if not success:

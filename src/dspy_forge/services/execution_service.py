@@ -1,8 +1,11 @@
+import os
 import uuid
+import tempfile
 
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
+from dspy_forge.storage.factory import get_storage_backend
 from dspy_forge.core.logging import get_logger
 from dspy_forge.utils.workflow_utils import find_end_nodes
 from dspy_forge.models.workflow import Workflow, WorkflowExecution
@@ -64,11 +67,25 @@ class WorkflowExecutionEngine:
             # Update status to running
             execution.status = "running"
 
+            storage = await get_storage_backend()
+            content = await storage.get_file(
+                f"workflows/{workflow.id}/program.json")
+
             # Create execution context
             context = ExecutionContext(workflow, input_data)
 
             # Create and execute CompoundProgram
             program = CompoundProgram(workflow, context)
+
+            if content:
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".json").name
+                try:
+                    with open(temp_file, 'w') as fh:
+                        fh.write(content)
+                    program.load(temp_file)
+                finally:
+                    os.remove(temp_file)
+                logger.info(f"Loaded optimized program for workflow {workflow.id}")
 
             # Execute the program with input data using async forward
             await program.aforward(**input_data)
