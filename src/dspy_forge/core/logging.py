@@ -33,6 +33,8 @@ def setup_logging(
 
     # Set the logger level
     logger.setLevel(getattr(logging, level.upper()))
+    logging.getLogger('databricks.sql').setLevel(logging.WARNING)
+    logging.getLogger('databricks.sdk').setLevel(logging.WARNING)
 
     if log_file:
         # If log file is specified, clear existing handlers and create new ones

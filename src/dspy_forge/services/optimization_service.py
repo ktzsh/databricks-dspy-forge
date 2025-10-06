@@ -346,29 +346,19 @@ class OptimizationService:
 
             logger.info(f"Starting optimization for workflow {workflow.id}")
 
-            # Run optimization in a thread pool to avoid event loop conflicts
-            # The optimizer is synchronous and calls program.forward() which uses asyncio.run()
-            # Running in a thread ensures there's no event loop conflict
-            def _run_optimizer():
-                """Run optimizer in a separate thread (outside event loop)"""
-                if optimizer_name in ['BootstrapFewShotWithRandomSearch', 'MIPROv2']:
-                    return optimizer.compile(
-                        program,
-                        trainset=trainset,
-                    )
-                elif optimizer_name == 'GEPA':
-                    return optimizer.compile(
-                        program,
-                        trainset=trainset,
-                        valset=valset,
-                    )
-                else:
-                    raise ValueError(f"Unknown optimizer type: {optimizer_name}")
-
-            # Run in thread pool (outside event loop)
-            # This is because node templates are async for effecient flow exection but dspy optimizers exepct sync methods for programs
-            # So we run the optimizer in a separate thread to avoid event loop conflicts
-            optimized_program = await asyncio.to_thread(_run_optimizer)
+            if optimizer_name in ['BootstrapFewShotWithRandomSearch', 'MIPROv2']:
+                optimized_program = optimizer.compile(
+                    program,
+                    trainset=trainset,
+                )
+            elif optimizer_name == 'GEPA':
+                optimized_program = optimizer.compile(
+                    program,
+                    trainset=trainset,
+                    valset=valset,
+                )
+            else:
+                raise ValueError(f"Unknown optimizer type: {optimizer_name}")
 
             # Step 6: Save optimized program
             status.update({

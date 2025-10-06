@@ -44,10 +44,6 @@ class CompoundProgram(dspy.Module):
             if hasattr(template, 'initialize'):
                 component = template.initialize(self.context)
                 if component:
-                    # Register component as a module attribute for proper state saving
-                    # DSPy's save() relies on named_predictors() which scans __dict__
-                    safe_attr_name = f"node_{node_id.replace('-', '_')}"
-                    setattr(self, safe_attr_name, component)
                     self.components[node_id] = component
 
     def forward(self, **inputs):
