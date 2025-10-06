@@ -34,6 +34,7 @@ dspy-forge/
 │   │   ├── execution_service.py   # Workflow execution engine
 │   │   ├── compiler_service.py    # DSPy code generation
 │   │   ├── validation_service.py  # Workflow validation
+│   │   ├── optimization_service.py# Workflow optimization
 │   │   └── deployment_service.py  # Databricks deployment
 │   ├── components/                # DSPy component templates
 │   │   ├── registry.py            # Template factory & dispatchers
@@ -147,23 +148,22 @@ LOG_LEVEL=INFO
 ```
 Simple:       Input → Predict → Output
 RAG:          Input → UnstructuredRetrieve → Predict → Output
+RAG:          Input → StructuredRetrieve → Predict → Output
 Multi-Step:   Input → ChainOfThought → FieldSelector → Predict → Output
-SQL:          Question → StructuredRetrieve → Predict → Output
 ```
 
 **Workflow:** Dashboard → Create → Drag components → Configure → Connect → Test (Playground) → Optimize → Deploy
 
 **Deployment:** Run locally for user auth, or on Databricks Apps with service principal. Use Unity Catalog Volumes for shared storage.
 
-## 🧩 Components
+## Components
 
-**Signature Fields:** Define I/O specs with types (`str`, `int`, `bool`, `float`, `list[str]`, `list[int]`, `dict`)
+**Signature Fields:** Define I/O specs with types
 
 **DSPy Modules:**
 - **Predict** - Basic LLM prediction
 - **ChainOfThought** - Step-by-step reasoning
-- **React** - Reason + Act pattern
-- **ReAct with Tools** - React with tool integration
+- **ReAct with Tools** - Reason + Act with tool integration
 - **ProgramOfThought** - Code generation for reasoning
 - **Refine** - Iterative output improvement
 - **BestOfN** - Generate N candidates, select best

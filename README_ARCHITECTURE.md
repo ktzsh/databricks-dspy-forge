@@ -1,28 +1,29 @@
+
 # DSPy Forge Architecture Diagram
 
-## New Execution Flow with CompoundProgram
+## Execution Flow with CompoundProgram
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Playground API Request                       │
-│                 /api/v1/execution/playground                     │
+│                     Playground API Request                      │
+│                 /api/v1/execution/playground                    │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              WorkflowExecutionEngine.execute_workflow()          │
+│              WorkflowExecutionEngine.execute_workflow()         │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │  1. Create ExecutionContext(workflow, input_data)         │  │
 │  │  2. Create CompoundProgram(workflow, context)             │  │
-│  │  3. Execute: program.forward(**input_data)                │  │
-│  │  4. Extract final outputs from context                    │  │
+│  │  3. Execute: program.aforward(**input_data)               │  │
+│  │  4. Extract final outputs from end nodes                  │  │
 │  │  5. Return WorkflowExecution with results & traces        │  │
 │  └───────────────────────────────────────────────────────────┘  │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    CompoundProgram (dspy.Module)                 │
+│                    CompoundProgram (dspy.Module)                │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │  __init__(workflow, context):                             │  │
 │  │    • Parse workflow structure                             │  │
@@ -38,16 +39,16 @@
 │  │        self.components[node_id] = component               │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │  forward(**inputs):                                       │  │
+│  │  aforward(**inputs):                                      │  │
 │  │    for each node in execution_order:                      │  │
 │  │      node_inputs = _get_node_inputs(node_id, inputs)      │  │
 │  │      if node_id in components:                            │  │
-│  │        result = self.components[node_id](**node_inputs)   │  │
+│  │        result = await self.components[node_id].acall(...) │  │
 │  │      else:                                                │  │
-│  │        result = template.execute(node_inputs, context)    │  │
+│  │        result = await template.execute(node_inputs, ctx)  │  │
 │  │      context.set_node_output(node_id, outputs)            │  │
 │  │      context.add_trace_entry(...)                         │  │
-│  │    return dspy.Prediction(**final_outputs)                │  │
+│  │    return final_outputs                                   │  │
 │  └───────────────────────────────────────────────────────────┘  │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
@@ -58,16 +59,13 @@
 │   DSPy Module Components    │   │   Logic Components          │
 │                             │   │                             │
 │  • PredictTemplate          │   │  • IfElseTemplate           │
-│    └─> dspy.Predict()       │   │    └─> template.execute()  │
-│                             │   │                             │
+│    └─> dspy.Predict()       │   │    └─> template.execute()   │
 │  • ChainOfThoughtTemplate   │   │  • MergeTemplate            │
-│    └─> dspy.ChainOfThought()│   │    └─> template.execute()  │
-│                             │   │                             │
+│    └─> dspy.ChainOfThought()│   │    └─> template.execute()   │
 │  • UnstructuredRetrieve     │   │  • FieldSelectorTemplate    │
-│    └─> DatabricksRM()       │   │    └─> template.execute()  │
-│                             │   │                             │
+│    └─> DatabricksRM()       │   │    └─> template.execute()   │
 │  • StructuredRetrieve       │   │  • SignatureField           │
-│    └─> DatabricksGenieRM()  │   │    └─> template.execute()  │
+│    └─> DatabricksGenieRM()  │   │    └─> template.execute()   │
 └─────────────────────────────┘   └─────────────────────────────┘
 ```
 
@@ -75,14 +73,14 @@
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                    NodeTemplate (Base Class)                    │
+│                    NodeTemplate (Base Class)                   │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │  initialize(context) -> Optional[dspy.Module]            │  │
 │  │    • Returns DSPy module instance OR None                │  │
 │  │    • Override in subclasses that need module init        │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │  execute(inputs, context) -> Dict[str, Any]              │  │
+│  │  call/acall(inputs, context) -> Dict[str, Any]           │  │
 │  │    • Executes node logic                                 │  │
 │  │    • Required for all templates                          │  │
 │  └──────────────────────────────────────────────────────────┘  │
@@ -100,7 +98,7 @@
     │   Module Templates      │  │   Logic Templates       │
     │                         │  │                         │
     │  ✓ initialize() → DSPy  │  │  ✗ initialize() → None  │
-    │  ✓ execute()            │  │  ✓ execute()            │
+    │  ✓ call/acall()         │  │  ✓ acall/call()         │
     │  ✓ generate_code()      │  │  ✓ generate_code()      │
     └─────────────────────────┘  └─────────────────────────┘
 ```
@@ -109,14 +107,14 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                          Input Data                              │
-│                    { question: "...", ... }                      │
+│                          Input Data                             │
+│                    { question: "...", ... }                     │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Start Signature Field Node                    │
-│                     (No execution, just passthrough)             │
+│                    Start Signature Field Node                   │
+│                     (No execution, just passthrough)            │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
                 ┌───────────────┴───────────────┐
@@ -159,7 +157,7 @@
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                      ExecutionContext                           │
+│                      ExecutionContext                          │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │  workflow: Workflow                                      │  │
 │  │    • Nodes, edges, workflow structure                    │  │
@@ -189,45 +187,54 @@
 └────────────────────────────────────────────────────────────────┘
 ```
 
-## DSPy Optimization Integration
+
+## Optimization Flow
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                    Future: DSPy Optimization                    │
+│                 DSPy Optimization Integration                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │  1. Create CompoundProgram from workflow                 │  │
 │  │     program = CompoundProgram(workflow, context)         │  │
-│  │                                                          │  │
-│  │  2. Prepare training data                                │  │
+│  │  2. Prepare training data (Delta tables, etc.)           │  │
 │  │     trainset = [dspy.Example(...), ...]                  │  │
-│  │                                                          │  │
-│  │  3. Define metric function                               │  │
-│  │     def metric(example, prediction): ...                 │  │
-│  │                                                          │  │
-│  │  4. Create optimizer                                     │  │
-│  │     optimizer = BootstrapFewShot(metric=metric)          │  │
-│  │                                                          │  │
-│  │  5. Compile/optimize program                             │  │
-│  │     optimized = optimizer.compile(program, trainset)     │  │
-│  │                                                          │  │
-│  │  6. Use optimized program                                │  │
-│  │     result = optimized(**inputs)                         │  │
+│  │  3. Define metric function (correctness, guidelines)     │  │
+│  │  4. Create optimizer (GEPA, BootstrapFewShot, MIPROv2)   │  │
+│  │  5. optimizer.compile(program, trainset, ...)            │  │
+│  │  6. Save optimized program, update workflow              │  │
+│  │  7. Return metrics, optimized prompts, few-shot examples │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────┘
 ```
+
+## Deployment Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                Workflow Deployment to Databricks                │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  1. Compile workflow to agent code                        │  │
+│  │  2. Call deployment_service.deploy_workflow()             │  │
+│  │  3. Use runner.deploy_agent() to push to Databricks       │  │
+│  │  4. Unity Catalog Volumes for storage (if configured)     │  │
+│  │  5. OBO authentication for secure access                  │  │
+│  │  6. Track deployment status via API                       │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 
 ## Key Design Decisions
 
 ### 1. Component Initialization
 - **DSPy Modules** (Predict, ChainOfThought, Retrievers):
-  - Initialize in `initialize()` method
+  - Initialized in `initialize()` method
   - Stored in `CompoundProgram.components` dict
-  - Executed via direct call: `component(**inputs)`
+  - Executed via `.acall()` or `.call()`
 
 - **Logic Components** (IfElse, Merge, FieldSelector):
-  - Return `None` from `initialize()`
   - Not stored in components dict
-  - Executed via `template.execute()` method
+  - Executed via `template.execute()`
 
 ### 2. Input/Output Mapping
 - **Field-level connections**: Map specific fields via edge handles
