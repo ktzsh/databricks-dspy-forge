@@ -314,3 +314,63 @@ class LocalDirectoryStorage(StorageBackend):
         except Exception as e:
             self.logger.error(f"Failed to get optimization status for {optimization_id}: {e}")
             return None
+
+    async def list_workflow_optimizations(self, workflow_id: str) -> List[Dict[str, Any]]:
+        """List all optimization runs for a workflow"""
+        optimizations = []
+        try:
+            optimizations_dir = self.storage_path / "optimizations"
+            if not optimizations_dir.exists():
+                return optimizations
+
+            # Scan for files matching pattern: opt_{workflow_id}_*.json
+            pattern = f"opt_{workflow_id}_*.json"
+            for file_path in optimizations_dir.glob(pattern):
+                try:
+                    async with aiofiles.open(file_path, 'r') as f:
+                        content = await f.read()
+                        optimization_data = json.loads(content)
+                        # Add the optimization_id from filename
+                        optimization_data['optimization_id'] = file_path.stem
+                        optimizations.append(optimization_data)
+                except Exception as e:
+                    self.logger.warning(f"Failed to load optimization from {file_path}: {e}")
+                    continue
+
+            # Sort by started_at in descending order (most recent first)
+            optimizations.sort(key=lambda o: o.get('started_at', ''), reverse=True)
+
+        except Exception as e:
+            self.logger.error(f"Failed to list optimizations for workflow {workflow_id}: {e}")
+
+        return optimizations
+
+    async def list_workflow_deployments(self, workflow_id: str) -> List[Dict[str, Any]]:
+        """List all deployments for a workflow"""
+        deployments = []
+        try:
+            deployments_dir = self.storage_path / "deployments"
+            if not deployments_dir.exists():
+                return deployments
+
+            # Scan for files matching pattern: deploy_{workflow_id}_*.json
+            pattern = f"deploy_{workflow_id}_*.json"
+            for file_path in deployments_dir.glob(pattern):
+                try:
+                    async with aiofiles.open(file_path, 'r') as f:
+                        content = await f.read()
+                        deployment_data = json.loads(content)
+                        # Add the deployment_id from filename
+                        deployment_data['deployment_id'] = file_path.stem
+                        deployments.append(deployment_data)
+                except Exception as e:
+                    self.logger.warning(f"Failed to load deployment from {file_path}: {e}")
+                    continue
+
+            # Sort by started_at in descending order (most recent first)
+            deployments.sort(key=lambda d: d.get('started_at', ''), reverse=True)
+
+        except Exception as e:
+            self.logger.error(f"Failed to list deployments for workflow {workflow_id}: {e}")
+
+        return deployments

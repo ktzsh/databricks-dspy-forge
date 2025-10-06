@@ -118,6 +118,42 @@ async def get_workflow(workflow_id: str):
     return workflow
 
 
+@router.get("/{workflow_id}/history")
+async def get_workflow_history(workflow_id: str):
+    """Get workflow with optimization and deployment history"""
+    try:
+        # Get workflow
+        workflow = await workflow_service.get_workflow(workflow_id)
+        if not workflow:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow not found"
+            )
+
+        # Get storage backend
+        from dspy_forge.storage.factory import get_storage_backend
+        storage = await get_storage_backend()
+
+        # Get optimization and deployment history
+        optimizations = await storage.list_workflow_optimizations(workflow_id)
+        deployments = await storage.list_workflow_deployments(workflow_id)
+
+        return {
+            "workflow_id": workflow_id,
+            "workflow": workflow.model_dump(),
+            "optimizations": optimizations,
+            "deployments": deployments
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get workflow history for {workflow_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get workflow history: {str(e)}"
+        )
+
+
 @router.put("/{workflow_id}", response_model=Workflow)
 async def update_workflow(workflow_id: str, workflow_request: WorkflowUpdateRequest):
     """Update an existing workflow"""

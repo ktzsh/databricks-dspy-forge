@@ -227,6 +227,32 @@ class StorageBackend(ABC):
         """
         pass
 
+    @abstractmethod
+    async def list_workflow_optimizations(self, workflow_id: str) -> List[Dict[str, Any]]:
+        """
+        List all optimization runs for a workflow
+
+        Args:
+            workflow_id: The workflow ID
+
+        Returns:
+            List of optimization status objects
+        """
+        pass
+
+    @abstractmethod
+    async def list_workflow_deployments(self, workflow_id: str) -> List[Dict[str, Any]]:
+        """
+        List all deployments for a workflow
+
+        Args:
+            workflow_id: The workflow ID
+
+        Returns:
+            List of deployment status objects
+        """
+        pass
+
 
 # Backward compatibility alias
 WorkflowStorageBackend = StorageBackend

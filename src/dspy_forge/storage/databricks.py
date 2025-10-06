@@ -474,3 +474,115 @@ class DatabricksVolumeStorage(StorageBackend):
         except Exception as e:
             self.logger.error(f"Failed to get optimization status for {optimization_id}: {e}")
             return None
+
+    async def list_workflow_optimizations(self, workflow_id: str) -> List[Dict[str, Any]]:
+        """List all optimization runs for a workflow in volume"""
+        optimizations = []
+        try:
+            optimizations_dir = f"{self.volume_path}/optimizations"
+
+            # Run in thread pool since databricks SDK is synchronous
+            loop = asyncio.get_event_loop()
+
+            def _list_files():
+                try:
+                    # List all files in optimizations directory
+                    files = self.client.files.list_directory_contents(optimizations_dir)
+                    # Filter files matching pattern: opt_{workflow_id}_*.json
+                    prefix = f"opt_{workflow_id}_"
+                    matching_files = []
+                    for file_info in files:
+                        if file_info.path.endswith('.json') and prefix in file_info.path:
+                            matching_files.append(file_info.path)
+                    return matching_files
+                except Exception:
+                    return []
+
+            file_paths = await loop.run_in_executor(None, _list_files)
+
+            # Load each file
+            for file_path in file_paths:
+                try:
+                    def _read_file():
+                        try:
+                            with self.client.files.download(file_path).contents as f:
+                                content = f.read()
+                            return content.decode('utf-8')
+                        except Exception:
+                            return None
+
+                    content = await loop.run_in_executor(None, _read_file)
+
+                    if content:
+                        optimization_data = json.loads(content)
+                        # Extract optimization_id from file path
+                        filename = file_path.split('/')[-1]
+                        optimization_data['optimization_id'] = filename.replace('.json', '')
+                        optimizations.append(optimization_data)
+                except Exception as e:
+                    self.logger.warning(f"Failed to load optimization from {file_path}: {e}")
+                    continue
+
+            # Sort by started_at in descending order (most recent first)
+            optimizations.sort(key=lambda o: o.get('started_at', ''), reverse=True)
+
+        except Exception as e:
+            self.logger.error(f"Failed to list optimizations for workflow {workflow_id}: {e}")
+
+        return optimizations
+
+    async def list_workflow_deployments(self, workflow_id: str) -> List[Dict[str, Any]]:
+        """List all deployments for a workflow in volume"""
+        deployments = []
+        try:
+            deployments_dir = f"{self.volume_path}/deployments"
+
+            # Run in thread pool since databricks SDK is synchronous
+            loop = asyncio.get_event_loop()
+
+            def _list_files():
+                try:
+                    # List all files in deployments directory
+                    files = self.client.files.list_directory_contents(deployments_dir)
+                    # Filter files matching pattern: deploy_{workflow_id}_*.json
+                    prefix = f"deploy_{workflow_id}_"
+                    matching_files = []
+                    for file_info in files:
+                        if file_info.path.endswith('.json') and prefix in file_info.path:
+                            matching_files.append(file_info.path)
+                    return matching_files
+                except Exception:
+                    return []
+
+            file_paths = await loop.run_in_executor(None, _list_files)
+
+            # Load each file
+            for file_path in file_paths:
+                try:
+                    def _read_file():
+                        try:
+                            with self.client.files.download(file_path).contents as f:
+                                content = f.read()
+                            return content.decode('utf-8')
+                        except Exception:
+                            return None
+
+                    content = await loop.run_in_executor(None, _read_file)
+
+                    if content:
+                        deployment_data = json.loads(content)
+                        # Extract deployment_id from file path
+                        filename = file_path.split('/')[-1]
+                        deployment_data['deployment_id'] = filename.replace('.json', '')
+                        deployments.append(deployment_data)
+                except Exception as e:
+                    self.logger.warning(f"Failed to load deployment from {file_path}: {e}")
+                    continue
+
+            # Sort by started_at in descending order (most recent first)
+            deployments.sort(key=lambda d: d.get('started_at', ''), reverse=True)
+
+        except Exception as e:
+            self.logger.error(f"Failed to list deployments for workflow {workflow_id}: {e}")
+
+        return deployments

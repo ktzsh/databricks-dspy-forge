@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, {
   Node,
   Edge,
@@ -13,7 +14,7 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
-import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash, Zap } from 'lucide-react';
+import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash, Zap, Home } from 'lucide-react';
 
 import ComponentSidebar from './ComponentSidebar';
 import PlaygroundSidebar from './PlaygroundSidebar';
@@ -117,6 +118,8 @@ const findAvailablePosition = (existingNodes: Node[], preferredX: number = 100, 
 };
 
 const WorkflowBuilderContent: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const reactFlowInstance = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -149,6 +152,61 @@ const WorkflowBuilderContent: React.FC = () => {
   const [activeOptimizationId, setActiveOptimizationId] = useState<string | null>(null);
   const { toasts, removeToast, showSuccess, showError } = useToast();
   const fitViewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadedWorkflowRef = useRef<string | null>(null);
+  const [shouldFitView, setShouldFitView] = useState(false);
+
+  // Load workflow from URL params on mount
+  useEffect(() => {
+    const loadWorkflowFromUrl = async () => {
+      if (id && id !== 'new' && loadedWorkflowRef.current !== id) {
+        loadedWorkflowRef.current = id;
+        try {
+          const response = await fetch(`/api/v1/workflows/${id}`);
+          if (response.ok) {
+            const workflow = await response.json();
+            setWorkflowName(workflow.name);
+            setWorkflowId(workflow.id);
+
+            const loadedNodes = ensureDefaultStartNode(workflow.nodes);
+            setNodes(loadedNodes);
+            setEdges(workflow.edges || []);
+
+            showSuccess('Workflow Loaded', `"${workflow.name}" loaded successfully`);
+
+            // Mark that we should fit view once ReactFlow is ready
+            setShouldFitView(true);
+          } else {
+            showError('Load Failed', 'Workflow not found');
+            navigate('/');
+          }
+        } catch (error) {
+          console.error('Failed to load workflow:', error);
+          showError('Load Failed', 'Unable to load workflow');
+          navigate('/');
+        }
+      }
+    };
+
+    loadWorkflowFromUrl();
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fit view when nodes are loaded and ReactFlow is ready
+  useEffect(() => {
+    if (shouldFitView && nodes.length > 0) {
+      if (fitViewTimeoutRef.current) {
+        clearTimeout(fitViewTimeoutRef.current);
+      }
+      fitViewTimeoutRef.current = setTimeout(() => {
+        reactFlowInstance.fitView({
+          padding: 0.1,
+          duration: 800,
+          minZoom: 0.3,
+          maxZoom: 1.2
+        });
+        setShouldFitView(false);
+      }, 150);
+    }
+  }, [shouldFitView, nodes, reactFlowInstance]);
 
   // Function to ensure default start node exists and is the only start node
   const ensureDefaultStartNode = useCallback((nodes: Node[]) => {
@@ -736,6 +794,13 @@ const WorkflowBuilderContent: React.FC = () => {
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700 px-6 py-4 flex items-center justify-between shadow-soft-lg">
         <div className="flex items-center space-x-4">
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center space-x-2 px-3 py-2 bg-slate-700/60 text-slate-300 rounded-lg hover:bg-slate-700 hover:text-white transition-all duration-200 font-medium border border-slate-600/50"
+            title="Back to Dashboard"
+          >
+            <Home size={18} />
+          </button>
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg flex items-center justify-center shadow-brand">
               <span className="text-white font-bold text-sm">DF</span>

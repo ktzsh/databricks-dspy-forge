@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Dict, List, Any, Optional, Union, Literal
 from enum import Enum
 from datetime import datetime
@@ -120,13 +120,15 @@ class Edge(BaseModel):
 
 
 class Workflow(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str
     name: str
     description: Optional[str] = None
     nodes: List[Union[SignatureFieldNode, ModuleNode, LogicNode, RetrieverNode]]
     edges: List[Edge]
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=datetime.now, serialization_alias="createdAt")
+    updated_at: datetime = Field(default_factory=datetime.now, serialization_alias="updatedAt")
 
 
 class WorkflowExecution(BaseModel):
