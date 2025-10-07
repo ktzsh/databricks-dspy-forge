@@ -54,7 +54,8 @@ def _normalize_workflow_data(workflow_ir: Dict[str, Any]) -> Dict[str, Any]:
             # Convert other camelCase fields
             camel_to_snake_mappings = {
                 "selectedFields": "selected_fields",
-                "fieldMappings": "field_mappings", 
+                "fieldMappings": "field_mappings",
+                "conditionConfig": "condition_config",
             }
             
             for camel_case, snake_case in camel_to_snake_mappings.items():

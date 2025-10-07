@@ -30,7 +30,7 @@ class DSPyModuleType(str, Enum):
 
 class DSPyLogicType(str, Enum):
     """Logic component types for workflow control flow"""
-    IF_ELSE = "IfElse"
+    ROUTER = "Router"
     MERGE = "Merge"
     FIELD_SELECTOR = "FieldSelector"
     PARALLEL = "Parallel"

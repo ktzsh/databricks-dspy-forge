@@ -8,16 +8,16 @@ both execution and code generation for different node types.
 from .signature_field import SignatureFieldTemplate
 from .module_templates import PredictTemplate, ChainOfThoughtTemplate
 from .retriever_templates import UnstructuredRetrieveTemplate, StructuredRetrieveTemplate
-from .logic_templates import IfElseTemplate, MergeTemplate, FieldSelectorTemplate
+from .logic_templates import RouterTemplate, MergeTemplate, FieldSelectorTemplate
 from . import registry  # This will auto-register all templates
 
 __all__ = [
     'SignatureFieldTemplate',
-    'PredictTemplate', 
+    'PredictTemplate',
     'ChainOfThoughtTemplate',
     'UnstructuredRetrieveTemplate',
-    'StructuredRetrieveTemplate', 
-    'IfElseTemplate',
+    'StructuredRetrieveTemplate',
+    'RouterTemplate',
     'MergeTemplate',
     'FieldSelectorTemplate'
 ]

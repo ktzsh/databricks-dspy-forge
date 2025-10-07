@@ -1,19 +1,21 @@
-export type FieldType = 
-  | 'str' 
-  | 'int' 
-  | 'bool' 
-  | 'float' 
-  | 'list[str]' 
-  | 'list[int]' 
-  | 'dict' 
+export type FieldType =
+  | 'str'
+  | 'int'
+  | 'bool'
+  | 'float'
+  | 'list[str]'
+  | 'list[int]'
+  | 'dict'
   | 'list[dict[str, Any]]'
-  | 'Any';
+  | 'Any'
+  | 'enum';
 
 export interface SignatureField {
   name: string;
   type: FieldType;
   description?: string;
   required: boolean;
+  enumValues?: string[];  // For enum type fields
 }
 
 export interface NodePosition {
@@ -30,9 +32,51 @@ export type ModuleType =
 
 export type RetrieverType = 'UnstructuredRetrieve' | 'StructuredRetrieve';
 
-export type LogicType = 'IfElse' | 'Merge' | 'FieldSelector';
+export type LogicType = 'Router' | 'Merge' | 'FieldSelector';
 
 export type NodeType = 'signature_field' | 'module' | 'logic' | 'retriever';
+
+export type ComparisonOperator =
+  | '=='
+  | '!='
+  | '>'
+  | '<'
+  | '>='
+  | '<='
+  | 'contains'
+  | 'not_contains'
+  | 'in'
+  | 'not_in'
+  | 'startswith'
+  | 'endswith'
+  | 'is_empty'
+  | 'is_not_empty';
+
+export type LogicalOperator = 'AND' | 'OR';
+
+export interface StructuredCondition {
+  field: string;
+  operator: ComparisonOperator;
+  value?: string | number | boolean | any[];
+  logicalOp?: LogicalOperator;
+}
+
+export interface ConditionConfig {
+  mode: 'structured' | 'expression';
+  structuredConditions?: StructuredCondition[];
+  expression?: string;
+}
+
+export interface RouterBranch {
+  branchId: string;
+  label: string;
+  conditionConfig: ConditionConfig;
+  isDefault?: boolean;
+}
+
+export interface RouterConfig {
+  branches: RouterBranch[];
+}
 
 export interface OptimizationData {
   demos: Array<Record<string, any>>;
@@ -67,7 +111,8 @@ export interface ModuleNodeData extends BaseNodeData {
 
 export interface LogicNodeData extends BaseNodeData {
   logicType: LogicType;
-  condition?: string;
+  condition?: string;  // Legacy text condition
+  routerConfig?: RouterConfig;  // Router configuration with multiple branches
   parameters: Record<string, any>;
   // FieldSelector specific data
   selectedFields?: string[];

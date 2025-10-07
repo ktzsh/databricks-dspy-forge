@@ -29,7 +29,7 @@ def build_workflow_graph(workflow: Workflow) -> nx.DiGraph:
     # Add edges
     for edge in workflow.edges:
         graph.add_edge(edge.source, edge.target)
-    
+
     return graph
 
 
@@ -38,7 +38,7 @@ def get_execution_order(workflow: Workflow) -> List[str]:
     graph = build_workflow_graph(workflow)
     
     try:
-        return list(nx.topological_sort(graph))
+        return list(nx.topological_sort(graph)), graph
     except nx.NetworkXError as e:
         raise WorkflowValidationError(f"Cannot determine execution order: {e}")
 

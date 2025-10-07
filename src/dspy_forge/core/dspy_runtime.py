@@ -25,7 +25,7 @@ class CompoundProgram(dspy.Module):
         self.workflow = workflow
         self.context = context
         self.components = {}
-        self.execution_order = get_execution_order(workflow)
+        self.execution_order, _ = get_execution_order(workflow)
 
         # Initialize all components
         self._initialize_components()

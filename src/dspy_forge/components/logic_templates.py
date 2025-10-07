@@ -1,78 +1,183 @@
 """
 Logic component templates.
 
-Handles IfElse, Merge, FieldSelector, and other logic node types.
+Handles Router, Merge, FieldSelector, and other logic node types.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List, Union
 from dspy_forge.core.templates import NodeTemplate, CodeGenerationContext
 from dspy_forge.core.dspy_types import DSPyLogicType
 from dspy_forge.core.logging import get_logger
+from dspy_forge.models.workflow import ComparisonOperator
 
 logger = get_logger(__name__)
 
 class BaseLogicTemplate(NodeTemplate):
     """Base template for logic nodes"""
-    
-    def _evaluate_condition(self, condition: str, inputs: Dict[str, Any]) -> bool:
-        """Evaluate a condition string (simplified implementation)"""
-        if not condition:
-            return True
-        
+
+    def _safe_evaluate_operator(self, field_value: Any, operator: str, compare_value: Any) -> bool:
+        """Safely evaluate a single operator comparison"""
         try:
-            # Replace field names with actual values
-            eval_string = condition
-            for key, value in inputs.items():
-                eval_string = eval_string.replace(key, str(value))
-            
-            # Basic safety check - only allow simple comparisons
-            if any(op in eval_string for op in ['import', 'exec', 'eval', '__']):
-                return True  # Default to true for unsafe conditions
-            
-            return bool(eval(eval_string))
-        except:
-            return True  # Default to true if evaluation fails
+            if operator == "==":
+                return field_value == compare_value
+            elif operator == "!=":
+                return field_value != compare_value
+            elif operator == ">":
+                return float(field_value) > float(compare_value)
+            elif operator == "<":
+                return float(field_value) < float(compare_value)
+            elif operator == ">=":
+                return float(field_value) >= float(compare_value)
+            elif operator == "<=":
+                return float(field_value) <= float(compare_value)
+            elif operator == "contains":
+                return str(compare_value) in str(field_value)
+            elif operator == "not_contains":
+                return str(compare_value) not in str(field_value)
+            elif operator == "in":
+                if isinstance(compare_value, (list, tuple, set)):
+                    return field_value in compare_value
+                return str(field_value) in str(compare_value)
+            elif operator == "not_in":
+                if isinstance(compare_value, (list, tuple, set)):
+                    return field_value not in compare_value
+                return str(field_value) not in str(compare_value)
+            elif operator == "startswith":
+                return str(field_value).startswith(str(compare_value))
+            elif operator == "endswith":
+                return str(field_value).endswith(str(compare_value))
+            elif operator == "is_empty":
+                return not field_value or (isinstance(field_value, (list, dict, str)) and len(field_value) == 0)
+            elif operator == "is_not_empty":
+                return bool(field_value) and (not isinstance(field_value, (list, dict, str)) or len(field_value) > 0)
+            else:
+                logger.warning(f"Unknown operator: {operator}, defaulting to True")
+                return True
+        except Exception as e:
+            logger.warning(f"Error evaluating condition: {e}, defaulting to True")
+            return True
+
+    def _evaluate_structured_conditions(self, conditions: List[Dict[str, Any]], inputs: Dict[str, Any]) -> bool:
+        """Evaluate structured conditions safely"""
+        if not conditions:
+            return True
+
+        result = True
+        current_logical_op = None
+
+        for condition in conditions:
+            field_name = condition.get('field', '')
+            operator = condition.get('operator', '==')
+            compare_value = condition.get('value')
+            logical_op = condition.get('logical_op')
+
+            # Get field value from inputs
+            field_value = inputs.get(field_name)
+
+            # Evaluate this condition
+            condition_result = self._safe_evaluate_operator(field_value, operator, compare_value)
+
+            # Combine with previous result using logical operator
+            if current_logical_op == 'AND':
+                result = result and condition_result
+            elif current_logical_op == 'OR':
+                result = result or condition_result
+            else:
+                # First condition
+                result = condition_result
+
+            # Set logical operator for next iteration
+            current_logical_op = logical_op
+
+        return result
+
+    def _evaluate_condition(self, condition_config: Dict[str, Any], inputs: Dict[str, Any]) -> bool:
+        """Evaluate condition using structured format only"""
+        if not condition_config:
+            return True
+
+        # Only support structured format
+        if isinstance(condition_config, dict):
+            conditions = condition_config.get('structured_conditions', [])
+            return self._evaluate_structured_conditions(conditions, inputs)
+
+        return True
 
 
-class IfElseTemplate(BaseLogicTemplate):
-    """Template for IfElse logic nodes"""
+class RouterTemplate(BaseLogicTemplate):
+    """Template for Router logic nodes with multiple branches"""
 
     def initialize(self, context: Any):
         """Return self to provide call/acall interface"""
         return self
 
     def call(self, **inputs) -> Dict[str, Any]:
-        """Synchronous execution"""
-        condition = self.node_data.get('condition', '')
-        condition_result = self._evaluate_condition(condition, inputs)
+        """Synchronous execution - evaluate branches in order and route to first match"""
+        router_config = self.node_data.get('router_config', {})
+        branches = router_config.get('branches', [])
+
+        matched_branch = None
+        default_branch = None
+
+        # Evaluate each branch in order
+        for branch in branches:
+            if branch.get('is_default', False):
+                default_branch = branch.get('branch_id', 'default')
+                continue
+
+            condition_config = branch.get('condition_config', {})
+            if self._evaluate_condition(condition_config, inputs):
+                matched_branch = branch.get('branch_id')
+                break
+
+        # Use matched branch or fall back to default
+        selected_branch = matched_branch or default_branch or 'default'
 
         return {
-            'condition_result': condition_result,
-            'branch': 'true' if condition_result else 'false',
+            'branch': selected_branch,
+            'matched_branch': matched_branch,
             **inputs
         }
 
     async def acall(self, **inputs) -> Dict[str, Any]:
         """Async execution - logic is sync anyway"""
         return self.call(**inputs)
-    
+
     def generate_code(self, context: CodeGenerationContext) -> Dict[str, Any]:
-        """Generate code for IfElse logic node"""
-        condition = self.node_data.get('condition', '')
-        instance_var = f"if_else_{context.get_node_count('if_else')}"
-        
-        # Generate condition evaluation code
+        """Generate code for Router logic node"""
+        instance_var = f"router_{context.get_node_count('router')}"
+
+        # Get router configuration
+        router_config = self.node_data.get('router_config', {})
+        branches = router_config.get('branches', [])
+
+        # Generate router evaluation code
         forward_lines = [
-            f"        # IfElse logic: {condition}",
-            f"        {instance_var}_condition = {repr(condition)}",
-            f"        {instance_var}_result = self._evaluate_condition({instance_var}_condition, locals())",
-            f"        condition_result = {instance_var}_result",
-            f"        branch = 'true' if {instance_var}_result else 'false'"
+            f"        # Router logic with multiple branches",
+            f"        {instance_var}_branches = {repr(branches)}",
+            f"        {instance_var}_matched = None",
+            f"        {instance_var}_default = None",
+            f"        ",
+            f"        # Evaluate each branch in order",
+            f"        for {instance_var}_branch in {instance_var}_branches:",
+            f"            if {instance_var}_branch.get('is_default', False):",
+            f"                {instance_var}_default = {instance_var}_branch.get('branch_id', 'default')",
+            f"                continue",
+            f"            ",
+            f"            {instance_var}_condition_config = {instance_var}_branch.get('condition_config', {{}})",
+            f"            {instance_var}_conditions = {instance_var}_condition_config.get('structured_conditions', [])",
+            f"            if self._evaluate_structured_conditions({instance_var}_conditions, locals()):",
+            f"                {instance_var}_matched = {instance_var}_branch.get('branch_id')",
+            f"                break",
+            f"        ",
+            f"        # Use matched branch or fall back to default",
+            f"        branch = {instance_var}_matched or {instance_var}_default or 'default'",
+            f"        matched_branch = {instance_var}_matched"
         ]
-        
+
         return {
             'signature': '',
-            'instance': f"        # IfElse logic configured: {condition}",
+            'instance': f"        # Router logic configured with {len(branches)} branches",
             'forward': '\n'.join(forward_lines),
             'dependencies': [],
             'instance_var': instance_var

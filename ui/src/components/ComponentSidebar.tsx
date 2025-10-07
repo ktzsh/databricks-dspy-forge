@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, Brain, GitBranch, Filter, Search } from 'lucide-react';
+import { Database, Brain, GitBranch, Filter, Search, RouteIcon } from 'lucide-react';
 
 interface ComponentSidebarProps {
   onAddNode: (nodeData: { type: string; data: any }) => void;
@@ -151,16 +151,51 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
       category: 'Logic Components',
       items: [
         {
-          id: 'if-else',
-          name: 'If-Else',
-          icon: GitBranch,
-          description: 'Conditional branching',
+          id: 'router',
+          name: 'Router',
+          icon: RouteIcon,
+          description: 'Multi-branch conditional routing',
           type: 'logic',
           enabled: true,
           data: {
-            label: 'If-Else',
-            logicType: 'IfElse',
-            condition: '',
+            label: 'Router',
+            logicType: 'Router',
+            routerConfig: {
+              branches: [
+                {
+                  branchId: 'branch_1',
+                  label: 'Branch 1',
+                  conditionConfig: {
+                    mode: 'structured',
+                    structuredConditions: [
+                      {
+                        field: '',
+                        operator: '==',
+                        value: '',
+                        logicalOp: undefined
+                      }
+                    ]
+                  },
+                  isDefault: false
+                },
+                {
+                  branchId: 'branch_2',
+                  label: 'Branch 2',
+                  conditionConfig: {
+                    mode: 'structured',
+                    structuredConditions: [
+                      {
+                        field: '',
+                        operator: '==',
+                        value: '',
+                        logicalOp: undefined
+                      }
+                    ]
+                  },
+                  isDefault: false
+                }
+              ]
+            },
             parameters: {}
           }
         },

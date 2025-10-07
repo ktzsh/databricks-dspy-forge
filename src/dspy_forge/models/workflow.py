@@ -4,6 +4,66 @@ from enum import Enum
 from datetime import datetime
 
 
+class ComparisonOperator(str, Enum):
+    """Operators for condition comparisons"""
+    EQ = "=="
+    NE = "!="
+    GT = ">"
+    LT = "<"
+    GTE = ">="
+    LTE = "<="
+    CONTAINS = "contains"
+    NOT_CONTAINS = "not_contains"
+    IN = "in"
+    NOT_IN = "not_in"
+    STARTSWITH = "startswith"
+    ENDSWITH = "endswith"
+    IS_EMPTY = "is_empty"
+    IS_NOT_EMPTY = "is_not_empty"
+
+
+class LogicalOperator(str, Enum):
+    """Logical operators for combining conditions"""
+    AND = "AND"
+    OR = "OR"
+
+
+class StructuredCondition(BaseModel):
+    """A single condition in structured format"""
+    model_config = ConfigDict(populate_by_name=True)
+
+    field: str
+    operator: ComparisonOperator
+    value: Optional[Union[str, int, float, bool, List[Any]]] = None
+    logical_op: Optional[LogicalOperator] = Field(default=None, alias="logicalOp")  # For chaining to next condition
+
+
+class ConditionConfig(BaseModel):
+    """Configuration for If-Else conditions"""
+    model_config = ConfigDict(populate_by_name=True)
+
+    mode: Literal["structured", "expression"] = "structured"
+    structured_conditions: List[StructuredCondition] = Field(default_factory=list, alias="structuredConditions")
+    expression: Optional[str] = None  # For advanced expression mode
+
+
+class RouterBranch(BaseModel):
+    """A single branch in a Router with its own condition"""
+    model_config = ConfigDict(populate_by_name=True)
+
+    branch_id: str = Field(alias="branchId")  # Unique identifier for the branch
+    label: str  # Display label for the branch
+    condition_config: ConditionConfig = Field(alias="conditionConfig")  # Condition configuration for this branch
+    is_default: bool = Field(default=False, alias="isDefault")  # Whether this is the default/fallback branch
+
+
+class RouterConfig(BaseModel):
+    """Configuration for Router logic"""
+    model_config = ConfigDict(populate_by_name=True)
+
+    branches: List[RouterBranch] = Field(default_factory=list)
+
+
 class FieldType(str, Enum):
     STRING = "str"
     INTEGER = "int"
@@ -13,6 +73,7 @@ class FieldType(str, Enum):
     LIST_INT = "list[int]"
     DICT = "dict"
     ANY = "Any"
+    ENUM = "enum"
 
 
 class SignatureField(BaseModel):
@@ -20,6 +81,7 @@ class SignatureField(BaseModel):
     type: FieldType
     description: Optional[str] = None
     required: bool = True
+    enum_values: Optional[List[str]] = None  # For enum type fields
 
 
 class NodePosition(BaseModel):
@@ -41,7 +103,7 @@ class RetrieverType(str, Enum):
 
 
 class LogicType(str, Enum):
-    IF_ELSE = "IfElse"
+    ROUTER = "Router"
     MERGE = "Merge"
     FIELD_SELECTOR = "FieldSelector"
 
@@ -84,7 +146,8 @@ class LogicNode(BaseNode):
     type: Literal[NodeType.LOGIC] = NodeType.LOGIC
     data: Dict[str, Any] = Field(default_factory=lambda: {
         "logic_type": None,
-        "condition": None,
+        "condition": None,  # Legacy text condition (backward compatibility)
+        "router_config": None,  # Router configuration with multiple branches
         "parameters": {},
         "selected_fields": [],
         "field_mappings": {},

@@ -4,7 +4,7 @@ import { Plus, X, Edit3, Database, Trash2 } from 'lucide-react';
 import { SignatureFieldNodeData, SignatureField, FieldType } from '../../types/workflow';
 import TraceIndicator from './TraceIndicator';
 
-const fieldTypes: FieldType[] = ['str', 'int', 'bool', 'float', 'list[str]', 'list[int]', 'dict', 'list[dict[str, Any]]', 'Any'];
+const fieldTypes: FieldType[] = ['str', 'int', 'bool', 'float', 'dict', 'list[str]', 'list[int]', 'list[dict[str, Any]]', 'enum'];
 
 const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceData?: any; onTraceClick?: (nodeId: string, traceData: any) => void }>> = ({ data, selected, id }) => {
   const { traceData, onTraceClick, ...nodeData } = data;
@@ -14,6 +14,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   const [isStart, setIsStart] = useState(nodeData.isStart || false);
   const [isEnd, setIsEnd] = useState(nodeData.isEnd || false);
   const [connectionMode, setConnectionMode] = useState<'whole' | 'field-level'>(nodeData.connectionMode || 'whole');
+  const [enumInputs, setEnumInputs] = useState<Record<number, string>>({});
   const { deleteElements, setNodes } = useReactFlow();
 
   // Check if this is the default start node
@@ -22,12 +23,13 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   const addField = () => {
     // Don't allow adding fields to default start node
     if (isDefaultStartNode) return;
-    
+
     const newField: SignatureField = {
       name: `field_${fields.length + 1}`,
       type: 'str',
       description: '',
-      required: true
+      required: true,
+      enumValues: []
     };
     setFields([...fields, newField]);
   };
@@ -293,6 +295,47 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                     ))}
                   </select>
 
+                  {field.type === 'enum' && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-700">Enum Values (comma-separated)</label>
+                      <input
+                        type="text"
+                        value={enumInputs[index] ?? field.enumValues?.join(', ') ?? ''}
+                        onChange={(e) => {
+                          setEnumInputs({ ...enumInputs, [index]: e.target.value });
+                        }}
+                        onBlur={(e) => {
+                          const values = e.target.value.split(',').map(v => v.trim()).filter(v => v);
+                          updateField(index, { enumValues: values });
+                          const newEnumInputs = { ...enumInputs };
+                          delete newEnumInputs[index];
+                          setEnumInputs(newEnumInputs);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const values = e.currentTarget.value.split(',').map(v => v.trim()).filter(v => v);
+                            updateField(index, { enumValues: values });
+                            const newEnumInputs = { ...enumInputs };
+                            delete newEnumInputs[index];
+                            setEnumInputs(newEnumInputs);
+                          }
+                        }}
+                        placeholder="e.g., pending, approved, rejected"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                        disabled={isDefaultStartNode}
+                      />
+                      {field.enumValues && field.enumValues.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {field.enumValues.map((value, vIdx) => (
+                            <span key={vIdx} className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">
+                              {value}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <input
                     type="text"
                     value={field.description || ''}
@@ -343,14 +386,25 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
             {fields.length > 0 ? (
               <div className="space-y-1">
                 {fields.map((field, index) => (
-                  <div key={index} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center space-x-2">
-                      {connectionMode === 'field-level' && (
-                        <div className="w-2 h-2 bg-blue-500 rounded-full" title="Individual connection handle"></div>
-                      )}
-                      <span className="font-medium">{field.name}</span>
+                  <div key={index} className="text-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        {connectionMode === 'field-level' && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full" title="Individual connection handle"></div>
+                        )}
+                        <span className="font-medium">{field.name}</span>
+                      </div>
+                      <span className="text-gray-500">{field.type}</span>
                     </div>
-                    <span className="text-gray-500">{field.type}</span>
+                    {field.type === 'enum' && field.enumValues && field.enumValues.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1 ml-4">
+                        {field.enumValues.map((value, vIdx) => (
+                          <span key={vIdx} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-xs rounded">
+                            {value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

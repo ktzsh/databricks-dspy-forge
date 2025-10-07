@@ -40,17 +40,29 @@ class WorkflowCompilerService:
 
             # Check if workflow contains StructuredRetrieve nodes
             has_structured_retrieve = any(
-                node.type == NodeType.RETRIEVER and 
+                node.type == NodeType.RETRIEVER and
                 node.data.get('retriever_type') == 'StructuredRetrieve'
                 for node in workflow.nodes
             )
-            
+
+            # Check if workflow contains enum type fields
+            has_enum_fields = any(
+                node.type == NodeType.SIGNATURE_FIELD and
+                any(field.get('type') == 'enum' for field in node.data.get('fields', []))
+                for node in workflow.nodes
+            )
+
             code_lines = [
                 "import dspy",
                 "import mlflow",
                 "",
-                "from typing import Any, List, Dict, Optional"
             ]
+
+            # Add typing imports
+            if has_enum_fields:
+                code_lines.append("from typing import Any, List, Dict, Optional, Literal")
+            else:
+                code_lines.append("from typing import Any, List, Dict, Optional")
             
             # Add DatabricksRM import only if needed
             if has_unstructured_retrieve:
@@ -88,7 +100,7 @@ class WorkflowCompilerService:
                 end_fields = ['output']
             
             # Get execution order
-            execution_order = get_execution_order(workflow)
+            execution_order, graph = get_execution_order(workflow)
             
             # Generate code for each node using templates
             signatures = []
@@ -130,12 +142,24 @@ class WorkflowCompilerService:
                     code_lines.append(class_def)
                     code_lines.append("")
 
-            # Add signatures to code
+            # Add signatures to code (avoid duplicates)
+            added_signature_names = set()
             for signature in signatures:
                 if signature.strip():
-                    code_lines.append(signature)
-                    code_lines.append("")
+                    # Extract signature class name (e.g., "PredictSignature_2" from "class PredictSignature_2(dspy.Signature):")
+                    signature_name = signature.split('(')[0].replace('class', '').strip()
+                    if signature_name not in added_signature_names:
+                        code_lines.append(signature)
+                        code_lines.append("")
+                        added_signature_names.add(signature_name)
             
+            # Check if workflow contains Router nodes (need helper methods)
+            has_router = any(
+                node.type == NodeType.LOGIC and
+                node.data.get('logic_type') == 'Router'
+                for node in workflow.nodes
+            )
+
             # Generate CompoundProgram class
             code_lines.append("class CompoundProgram(dspy.Module):")
             code_lines.append("    def __init__(self):")
@@ -149,8 +173,9 @@ class WorkflowCompilerService:
             code_lines.append("")
             
             # Generate forward method
+            code_lines.append("")
             code_lines.append("    def forward(self, " + ", ".join(start_fields) + "):")
-            
+
             # Add forward code blocks
             for forward_block in forward_code_blocks:
                 if forward_block.strip():

@@ -30,18 +30,18 @@ class BaseModuleTemplate(NodeTemplate):
         
         # Add input fields
         for field_name in input_fields:
-            field_type, field_desc = self._get_field_info(field_name, is_input=True)
+            field_type, field_desc, enum_values = self._get_field_info(field_name, is_input=True)
             if field_desc:
                 class_attrs[field_name] = dspy.InputField(desc=field_desc)
             else:
                 class_attrs[field_name] = dspy.InputField()
-        
+
         # Add module-specific fields to class_attrs
         self._add_module_specific_fields_to_dict(class_attrs)
-        
+
         # Add output fields
         for field_name in output_fields:
-            field_type, field_desc = self._get_field_info(field_name, is_input=False)
+            field_type, field_desc, enum_values = self._get_field_info(field_name, is_input=False)
             if field_desc:
                 class_attrs[field_name] = dspy.OutputField(desc=field_desc)
             else:
@@ -70,20 +70,20 @@ class BaseModuleTemplate(NodeTemplate):
         
         # Add input fields
         for field_name in input_fields:
-            field_type, field_desc = self._get_field_info(field_name, is_input=True)
-            python_type = self._convert_ui_type_to_python(field_type)
+            field_type, field_desc, enum_values = self._get_field_info(field_name, is_input=True)
+            python_type = self._convert_ui_type_to_python(field_type, enum_values)
             if field_desc:
                 lines.append(f"    {field_name}: {python_type} = dspy.InputField(desc='{field_desc}')")
             else:
                 lines.append(f"    {field_name}: {python_type} = dspy.InputField()")
-        
+
         # Add module-specific signature fields
         self._add_signature_specific_fields(lines)
-        
+
         # Add output fields
         for field_name in output_fields:
-            field_type, field_desc = self._get_field_info(field_name, is_input=False)
-            python_type = self._convert_ui_type_to_python(field_type)
+            field_type, field_desc, enum_values = self._get_field_info(field_name, is_input=False)
+            python_type = self._convert_ui_type_to_python(field_type, enum_values)
             if field_desc:
                 lines.append(f"    {field_name}: {python_type} = dspy.OutputField(desc='{field_desc}')")
             else:

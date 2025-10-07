@@ -122,8 +122,8 @@ class NodeTemplate(ABC):
 
         return fields
     
-    def _get_field_info(self, field_name: str, is_input: bool = True) -> Tuple[str, str]:
-        """Get field type and description from connected signature field nodes and field selector logic nodes"""
+    def _get_field_info(self, field_name: str, is_input: bool = True) -> Tuple[str, str, Optional[List[str]]]:
+        """Get field type, description, and enum values from connected signature field nodes and field selector logic nodes"""
         if is_input:
             edges = [edge for edge in self.workflow.edges if edge.target == self.node_id]
         else:
@@ -139,7 +139,8 @@ class NodeTemplate(ABC):
                     if field_data.get('name') == field_name:
                         field_type = field_data.get('type', 'str')
                         field_desc = field_data.get('description', '')
-                        return field_type, field_desc
+                        enum_values = field_data.get('enum_values', None)
+                        return field_type, field_desc, enum_values
             elif node and node.type == NodeType.LOGIC:
                 # Handle field selector logic nodes
                 logic_type = node.data.get('logic_type')
@@ -158,8 +159,13 @@ class NodeTemplate(ABC):
             f"Field '{field_name}' not found in connected SignatureField or FieldSelector nodes for node '{self.node_id}'"
         )
 
-    def _trace_field_info_upstream(self, field_selector_node_id: str, original_field_name: str) -> Tuple[str, str]:
-        """Trace upstream from field selector to find original field type and description"""
+    def _get_field_info_legacy(self, field_name: str, is_input: bool = True) -> Tuple[str, str]:
+        """Legacy version that returns 2 values (for backward compatibility)"""
+        field_type, field_desc, enum_values = self._get_field_info(field_name, is_input)
+        return field_type, field_desc
+
+    def _trace_field_info_upstream(self, field_selector_node_id: str, original_field_name: str) -> Tuple[str, str, Optional[List[str]]]:
+        """Trace upstream from field selector to find original field type, description, and enum values"""
         # Find edges coming into the field selector node
         upstream_edges = [edge for edge in self.workflow.edges if edge.target == field_selector_node_id]
 
@@ -172,7 +178,8 @@ class NodeTemplate(ABC):
                     if field_data.get('name') == original_field_name:
                         field_type = field_data.get('type', 'str')
                         field_desc = field_data.get('description', '')
-                        return field_type, field_desc
+                        enum_values = field_data.get('enum_values', None)
+                        return field_type, field_desc, enum_values
             elif upstream_node and upstream_node.type == NodeType.LOGIC:
                 # If upstream is another logic node, trace further
                 upstream_logic_type = upstream_node.data.get('logic_type')
@@ -190,19 +197,25 @@ class NodeTemplate(ABC):
         raise ValueError(
             f"Field '{original_field_name}' not found upstream of FieldSelector node '{field_selector_node_id}'"
         )
-    
-    def _convert_ui_type_to_python(self, ui_type: str) -> str:
+
+    def _convert_ui_type_to_python(self, ui_type: str, enum_values: Optional[List[str]] = None) -> str:
         """Convert UI field type to Python type annotation"""
+        if ui_type == 'enum' and enum_values:
+            # Generate Literal type hint for enums
+            formatted_values = ', '.join([f'"{val}"' for val in enum_values])
+            return f'Literal[{formatted_values}]'
+
         type_mapping = {
             'str': 'str',
-            'int': 'int', 
+            'int': 'int',
             'bool': 'bool',
             'float': 'float',
             'list[str]': 'List[str]',
             'list[int]': 'List[int]',
             'dict': 'Dict',
             'list[dict[str, Any]]': 'List[Dict[str, Any]]',
-            'Any': 'Any'
+            'Any': 'Any',
+            'enum': 'str'  # Fallback if no enum values provided
         }
         return type_mapping.get(ui_type, 'str')
 

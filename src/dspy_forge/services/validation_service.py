@@ -257,18 +257,20 @@ class WorkflowValidationService:
     def _validate_logic_node(self, node: Any) -> List[str]:
         """Validate logic node"""
         errors = []
-        
+
         logic_type = node.data.get('logic_type')
         if not logic_type:
             errors.append("Logic component must specify a logic type")
-        
+
         try:
             logic_type_enum = DSPyLogicType(logic_type)
-            
-            if logic_type_enum == DSPyLogicType.IF_ELSE:
-                condition = node.data.get('condition')
-                if not condition:
-                    errors.append("If-Else logic must specify a condition")
+
+            if logic_type_enum == DSPyLogicType.ROUTER:
+                # Support both snake_case and camelCase for router config
+                router_config = node.data.get('router_config') or node.data.get('routerConfig', {})
+                branches = router_config.get('branches', []) if router_config else []
+                if not branches:
+                    errors.append("Router must have at least one branch configured")
             elif logic_type_enum == DSPyLogicType.FIELD_SELECTOR:
                 selected_fields = node.data.get('selectedFields', [])
                 if not selected_fields:
@@ -276,7 +278,7 @@ class WorkflowValidationService:
                     pass
         except ValueError:
             errors.append(f"Invalid logic type: {logic_type}")
-        
+
         return errors
     
     def _validate_retriever_node(self, node: Any) -> List[str]:

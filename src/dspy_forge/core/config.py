@@ -25,6 +25,10 @@ def configure_databricks_auth(settings):
         os.environ["MLFLOW_ENABLE_DB_SDK"] = "true"
         mlflow.set_tracking_uri("databricks")
         mlflow.set_registry_uri("databricks-uc")
+    else:
+        raise ValueError(
+            "Databricks configuration is missing. Please provide either DATABRICKS_CONFIG_PROFILE or DATABRICKS_HOST and DATABRICKS_TOKEN in .env file."
+        )
 
 class Settings(BaseSettings):
     app_name: str = "DSPy Workflow Builder"

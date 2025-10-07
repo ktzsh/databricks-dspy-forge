@@ -11,7 +11,7 @@ from dspy_forge.models.workflow import NodeType, ModuleType, RetrieverType, Logi
 from .signature_field import SignatureFieldTemplate
 from .module_templates import PredictTemplate, ChainOfThoughtTemplate
 from .retriever_templates import UnstructuredRetrieveTemplate, StructuredRetrieveTemplate
-from .logic_templates import IfElseTemplate, MergeTemplate, FieldSelectorTemplate
+from .logic_templates import RouterTemplate, MergeTemplate, FieldSelectorTemplate
 
 
 def register_all_templates():
@@ -79,8 +79,8 @@ class LogicTemplateDispatcher:
     def __init__(self, node, workflow):
         logic_type = node.data.get('logic_type')
 
-        if logic_type == LogicType.IF_ELSE.value:
-            self._template = IfElseTemplate(node, workflow)
+        if logic_type == LogicType.ROUTER.value:
+            self._template = RouterTemplate(node, workflow)
         elif logic_type == LogicType.MERGE.value:
             self._template = MergeTemplate(node, workflow)
         elif logic_type == LogicType.FIELD_SELECTOR.value:
