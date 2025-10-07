@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
+import React, { useState, useEffect } from 'react';
+import { Handle, Position, NodeProps, useReactFlow, useNodes, useEdges } from 'reactflow';
 import { Plus, X, Edit3, Database, Trash2 } from 'lucide-react';
 import { SignatureFieldNodeData, SignatureField, FieldType } from '../../types/workflow';
 import TraceIndicator from './TraceIndicator';
@@ -16,9 +16,25 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   const [connectionMode, setConnectionMode] = useState<'whole' | 'field-level'>(nodeData.connectionMode || 'whole');
   const [enumInputs, setEnumInputs] = useState<Record<number, string>>({});
   const { deleteElements, setNodes } = useReactFlow();
+  const nodes = useNodes();
+  const edges = useEdges();
 
   // Check if this is the default start node
   const isDefaultStartNode = id === 'default-start-node';
+
+  // Sync local state with node data when it changes (for auto-generated fields)
+  useEffect(() => {
+    setFields(nodeData.fields || []);
+  }, [nodeData.fields]);
+
+  // Check if this signature field is connected to a ChainOfThought module
+  const isConnectedToChainOfThought = () => {
+    const incomingEdges = edges.filter(edge => edge.target === id);
+    return incomingEdges.some(edge => {
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      return sourceNode?.type === 'module' && (sourceNode.data as any)?.moduleType === 'ChainOfThought';
+    });
+  };
 
   const addField = () => {
     // Don't allow adding fields to default start node
@@ -37,6 +53,12 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   const removeField = (index: number) => {
     // Don't allow removing fields from default start node
     if (isDefaultStartNode) return;
+    
+    // Don't allow removing the rationale field if connected to ChainOfThought
+    const field = fields[index];
+    if (field?.name === 'rationale' && isConnectedToChainOfThought()) {
+      return;
+    }
     
     setFields(fields.filter((_, i) => i !== index));
   };
@@ -264,7 +286,16 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
               </div>
 
               {fields.map((field, index) => (
-                <div key={index} className="border border-gray-200 rounded p-2 space-y-2">
+                <div key={index} className={`border rounded p-2 space-y-2 ${
+                  field.name === 'rationale' && isConnectedToChainOfThought() 
+                    ? 'border-blue-300 bg-blue-50' 
+                    : 'border-gray-200'
+                }`}>
+                  {field.name === 'rationale' && isConnectedToChainOfThought() && (
+                    <div className="text-xs text-blue-600 font-medium flex items-center">
+                      Auto-generated for ChainOfThought
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <input
                       type="text"
@@ -272,9 +303,9 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                       onChange={(e) => updateField(index, { name: e.target.value })}
                       placeholder="Field name"
                       className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                      disabled={isDefaultStartNode}
+                      disabled={isDefaultStartNode || (field.name === 'rationale' && isConnectedToChainOfThought())}
                     />
-                    {!isDefaultStartNode && (
+                    {!isDefaultStartNode && !(field.name === 'rationale' && isConnectedToChainOfThought()) && (
                       <button
                         onClick={() => removeField(index)}
                         className="p-1 text-red-500 hover:bg-red-50 rounded"
@@ -288,7 +319,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                     value={field.type}
                     onChange={(e) => updateField(index, { type: e.target.value as FieldType })}
                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                    disabled={isDefaultStartNode}
+                    disabled={isDefaultStartNode || (field.name === 'rationale' && isConnectedToChainOfThought())}
                   >
                     {fieldTypes.map(type => (
                       <option key={type} value={type}>{type}</option>
@@ -386,13 +417,14 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
             {fields.length > 0 ? (
               <div className="space-y-1">
                 {fields.map((field, index) => (
-                  <div key={index} className="text-sm">
+                  <div key={index} className={`text-sm`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         {connectionMode === 'field-level' && (
                           <div className="w-2 h-2 bg-blue-500 rounded-full" title="Individual connection handle"></div>
                         )}
                         <span className="font-medium">{field.name}</span>
+                        {field.name === 'rationale' && isConnectedToChainOfThought()}
                       </div>
                       <span className="text-gray-500">{field.type}</span>
                     </div>

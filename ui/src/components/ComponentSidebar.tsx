@@ -50,7 +50,7 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           icon: Brain,
           description: 'Chain of thought reasoning',
           type: 'module',
-          enabled: false,
+          enabled: true,
           data: {
             label: 'Chain of Thought',
             moduleType: 'ChainOfThought',
@@ -74,21 +74,21 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
             parameters: {}
           }
         },
-        {
-          id: 'best-of-n',
-          name: 'Best of N',
-          icon: Brain,
-          description: 'Best of N selection module',
-          type: 'module',
-          enabled: false,
-          data: {
-            label: 'Best of N',
-            moduleType: 'BestOfN',
-            model: '',
-            instruction: '',
-            parameters: {}
-          }
-        },
+        // {
+        //   id: 'best-of-n',
+        //   name: 'Best of N',
+        //   icon: Brain,
+        //   description: 'Best of N selection module',
+        //   type: 'module',
+        //   enabled: false,
+        //   data: {
+        //     label: 'Best of N',
+        //     moduleType: 'BestOfN',
+        //     model: '',
+        //     instruction: '',
+        //     parameters: {}
+        //   }
+        // },
         // {
         //   id: 'refine',
         //   name: 'Refine',

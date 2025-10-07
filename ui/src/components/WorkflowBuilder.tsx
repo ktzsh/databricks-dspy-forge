@@ -202,6 +202,78 @@ const WorkflowBuilderContent: React.FC = () => {
     // Extract the base changes (removing trace data) and apply to base nodes
     onNodesChange(changes);
   }, [onNodesChange]);
+
+  // Custom handler for edge changes to handle rationale field updates
+  const handleEdgesChange = useCallback((changes: any[]) => {
+    onEdgesChange(changes);
+    
+    // After edge changes, check for rationale field updates
+    // We need to wait for the edge state to update, so we use setTimeout
+    setTimeout(() => {
+      setEdges((currentEdges) => {
+        // Re-implement the rationale field check here
+        setNodes((currentNodes) => {
+          return currentNodes.map(node => {
+            // Only process SignatureField nodes
+            if (node.type !== 'signature_field') return node;
+
+            // Find incoming edges to this signature field
+            const incomingEdges = currentEdges.filter(edge => edge.target === node.id);
+            
+            // Check if any incoming edge comes from a ChainOfThought module
+            const hasChainOfThoughtInput = incomingEdges.some(edge => {
+              const sourceNode = currentNodes.find(n => n.id === edge.source);
+              return sourceNode?.type === 'module' && (sourceNode.data as any)?.moduleType === 'ChainOfThought';
+            });
+
+            if (hasChainOfThoughtInput) {
+              const signatureData = node.data as any;
+              const currentFields = signatureData.fields || [];
+              
+              // Check if rationale field already exists
+              const hasRationaleField = currentFields.some((field: any) => field.name === 'rationale');
+              
+              if (!hasRationaleField) {
+                // Add rationale field
+                const rationaleField = {
+                  name: 'rationale',
+                  type: 'str' as const,
+                  description: 'Step-by-step reasoning process',
+                  required: true
+                };
+                
+                return {
+                  ...node,
+                  data: {
+                    ...signatureData,
+                    fields: [...currentFields, rationaleField]
+                  }
+                };
+              }
+            } else {
+              // Remove rationale field if no ChainOfThought connection
+              const signatureData = node.data as any;
+              const currentFields = signatureData.fields || [];
+              const fieldsWithoutRationale = currentFields.filter((field: any) => field.name !== 'rationale');
+              
+              if (fieldsWithoutRationale.length !== currentFields.length) {
+                return {
+                  ...node,
+                  data: {
+                    ...signatureData,
+                    fields: fieldsWithoutRationale
+                  }
+                };
+              }
+            }
+
+            return node;
+          });
+        });
+        return currentEdges;
+      });
+    }, 0);
+  }, [onEdgesChange, setNodes, setEdges]);
   const [workflowName, setWorkflowName] = useState('Untitled Workflow');
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [isPlaygroundOpen, setIsPlaygroundOpen] = useState(true);
@@ -304,8 +376,71 @@ const WorkflowBuilderContent: React.FC = () => {
   }, []);
 
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
+    (params: Connection) => {
+      const newEdges = addEdge(params, edges);
+      setEdges(newEdges);
+      
+      // Check and add rationale field after connection
+      setNodes((currentNodes) => {
+        return currentNodes.map(node => {
+          // Only process SignatureField nodes
+          if (node.type !== 'signature_field') return node;
+
+          // Find incoming edges to this signature field
+          const incomingEdges = newEdges.filter(edge => edge.target === node.id);
+          
+          // Check if any incoming edge comes from a ChainOfThought module
+          const hasChainOfThoughtInput = incomingEdges.some(edge => {
+            const sourceNode = currentNodes.find(n => n.id === edge.source);
+            return sourceNode?.type === 'module' && (sourceNode.data as any)?.moduleType === 'ChainOfThought';
+          });
+
+          if (hasChainOfThoughtInput) {
+            const signatureData = node.data as any;
+            const currentFields = signatureData.fields || [];
+            
+            // Check if rationale field already exists
+            const hasRationaleField = currentFields.some((field: any) => field.name === 'rationale');
+            
+            if (!hasRationaleField) {
+              // Add rationale field
+              const rationaleField = {
+                name: 'rationale',
+                type: 'str' as const,
+                description: 'Step-by-step reasoning process',
+                required: true
+              };
+              
+              return {
+                ...node,
+                data: {
+                  ...signatureData,
+                  fields: [...currentFields, rationaleField]
+                }
+              };
+            }
+          } else {
+            // Remove rationale field if no ChainOfThought connection
+            const signatureData = node.data as any;
+            const currentFields = signatureData.fields || [];
+            const fieldsWithoutRationale = currentFields.filter((field: any) => field.name !== 'rationale');
+            
+            if (fieldsWithoutRationale.length !== currentFields.length) {
+              return {
+                ...node,
+                data: {
+                  ...signatureData,
+                  fields: fieldsWithoutRationale
+                }
+              };
+            }
+          }
+
+          return node;
+        });
+      });
+    },
+    [setEdges, edges, setNodes]
   );
 
   // Handle selection changes (both nodes and edges)
@@ -956,7 +1091,7 @@ const WorkflowBuilderContent: React.FC = () => {
             nodes={nodesWithTraceData}
             edges={edges}
             onNodesChange={handleNodesChange}
-            onEdgesChange={onEdgesChange}
+            onEdgesChange={handleEdgesChange}
             onConnect={onConnect}
             onSelectionChange={onSelectionChange}
             nodeTypes={nodeTypes}
