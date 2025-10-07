@@ -127,7 +127,7 @@ class BaseModuleTemplate(NodeTemplate):
         
         forward_lines = []
         if model_name and model_name != 'default':
-            forward_lines.append(f"        with dspy.context(lm=dspy.LM('databricks/{model_name}')):")
+            forward_lines.append(f"        with dspy.context(lm=dspy.LM('{model_name}')):")
             forward_lines.append(f"            {result_var} = self.{instance_var}({input_args})")
         else:
             forward_lines.append(f"        {result_var} = self.{instance_var}({input_args})")

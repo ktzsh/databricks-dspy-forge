@@ -62,7 +62,7 @@ class CompoundProgram(dspy.Module):
             try:
                 if isinstance(self.components[node_id], dspy.primitives.module.Module):
                     model_name = node.data.get('model')
-                    with dspy.context(lm=dspy.LM(f'databricks/{model_name}')):
+                    with dspy.context(lm=dspy.LM(f'{model_name}')):
                         result = self.components[node_id](**node_inputs)
                 else:
                     result = self.components[node_id].call(**node_inputs)
@@ -90,7 +90,7 @@ class CompoundProgram(dspy.Module):
                 if isinstance(self.components[node_id], dspy.primitives.module.Module):
                     model_name = node.data.get('model', '')
                     # Use model-specific context for DSPy modules
-                    with dspy.context(lm=dspy.LM(f'databricks/{model_name}')):
+                    with dspy.context(lm=dspy.LM(f'{model_name}')):
                         result = await self.components[node_id].acall(**node_inputs)
                 else:
                     # Use default LM or no context

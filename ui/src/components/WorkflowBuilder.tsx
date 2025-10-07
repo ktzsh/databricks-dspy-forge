@@ -64,6 +64,79 @@ const generateEdgeId = (): string => {
   return `edge-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
 };
 
+// Helper function to transform workflow data from backend (snake_case) to frontend (camelCase)
+const transformWorkflowFromBackend = (workflow: any) => {
+  const loadedNodes = workflow.nodes.map((node: any) => {
+    let nodeData = { ...node.data };
+
+    // Convert snake_case back to camelCase for frontend
+    if (node.data.module_type) {
+      nodeData.moduleType = node.data.module_type;
+      delete nodeData.module_type;
+    }
+
+    if (node.data.logic_type) {
+      nodeData.logicType = node.data.logic_type;
+      delete nodeData.logic_type;
+    }
+
+    // Convert logic node specific fields
+    if (node.data.selected_fields) {
+      nodeData.selectedFields = node.data.selected_fields;
+      delete nodeData.selected_fields;
+    }
+
+    if (node.data.field_mappings) {
+      nodeData.fieldMappings = node.data.field_mappings;
+      delete nodeData.field_mappings;
+    }
+
+    if (node.data.retriever_type) {
+      nodeData.retrieverType = node.data.retriever_type;
+      delete nodeData.retriever_type;
+    }
+
+    // Convert other snake_case fields back to camelCase for retrievers
+    const snakeToCamelMappings = {
+      catalog_name: 'catalogName',
+      schema_name: 'schemaName',
+      index_name: 'indexName',
+      content_column: 'contentColumn',
+      id_column: 'idColumn',
+      embedding_model: 'embeddingModel',
+      query_type: 'queryType',
+      num_results: 'numResults',
+      score_threshold: 'scoreThreshold',
+      genie_space_id: 'genieSpaceId'
+    };
+
+    for (const [snakeCase, camelCase] of Object.entries(snakeToCamelMappings)) {
+      if (nodeData[snakeCase] !== undefined) {
+        nodeData[camelCase] = nodeData[snakeCase];
+        delete nodeData[snakeCase];
+      }
+    }
+
+    return {
+      id: node.id,
+      type: node.type || 'signature_field',
+      position: node.position || { x: 100, y: 100 },
+      data: nodeData
+    };
+  });
+
+  const loadedEdges = workflow.edges.map((edge: any) => ({
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    sourceHandle: edge.sourceHandle,
+    targetHandle: edge.targetHandle,
+    type: edge.type || 'default'
+  }));
+
+  return { loadedNodes, loadedEdges };
+};
+
 // Helper function to find a good position for new nodes
 const findAvailablePosition = (existingNodes: Node[], preferredX: number = 100, preferredY: number = 100) => {
   const nodeWidth = 200; // Approximate node width
@@ -167,9 +240,13 @@ const WorkflowBuilderContent: React.FC = () => {
             setWorkflowName(workflow.name);
             setWorkflowId(workflow.id);
 
-            const loadedNodes = ensureDefaultStartNode(workflow.nodes);
-            setNodes(loadedNodes);
-            setEdges(workflow.edges || []);
+            // Transform workflow data from backend format to frontend format
+            const { loadedNodes, loadedEdges } = transformWorkflowFromBackend(workflow);
+
+            // Ensure default start node is present
+            const nodesWithDefaultStart = ensureDefaultStartNode(loadedNodes);
+            setNodes(nodesWithDefaultStart);
+            setEdges(loadedEdges);
 
             showSuccess('Workflow Loaded', `"${workflow.name}" loaded successfully`);
 
@@ -357,74 +434,8 @@ const WorkflowBuilderContent: React.FC = () => {
   }, [deploymentTimeoutId]);
 
   const handleLoadWorkflow = useCallback((workflow: any) => {
-    // Convert backend data to frontend format
-    const loadedNodes = workflow.nodes.map((node: any) => {
-      let nodeData = { ...node.data };
-      
-      // Convert snake_case back to camelCase for frontend
-      if (node.data.module_type) {
-        nodeData.moduleType = node.data.module_type;
-        delete nodeData.module_type;
-      }
-      
-      if (node.data.logic_type) {
-        nodeData.logicType = node.data.logic_type;
-        delete nodeData.logic_type;
-      }
-
-      // Convert logic node specific fields
-      if (node.data.selected_fields) {
-        nodeData.selectedFields = node.data.selected_fields;
-        delete nodeData.selected_fields;
-      }
-
-      if (node.data.field_mappings) {
-        nodeData.fieldMappings = node.data.field_mappings;
-        delete nodeData.field_mappings;
-      }
-      
-      if (node.data.retriever_type) {
-        nodeData.retrieverType = node.data.retriever_type;
-        delete nodeData.retriever_type;
-      }
-      
-      // Convert other snake_case fields back to camelCase for retrievers
-      const snakeToCamelMappings = {
-        catalog_name: 'catalogName',
-        schema_name: 'schemaName',
-        index_name: 'indexName',
-        content_column: 'contentColumn',
-        id_column: 'idColumn',
-        embedding_model: 'embeddingModel',
-        query_type: 'queryType',
-        num_results: 'numResults',
-        score_threshold: 'scoreThreshold',
-        genie_space_id: 'genieSpaceId'
-      };
-      
-      for (const [snakeCase, camelCase] of Object.entries(snakeToCamelMappings)) {
-        if (nodeData[snakeCase] !== undefined) {
-          nodeData[camelCase] = nodeData[snakeCase];
-          delete nodeData[snakeCase];
-        }
-      }
-      
-      return {
-        id: node.id,
-        type: node.type || 'signature_field',
-        position: node.position || { x: 100, y: 100 },
-        data: nodeData
-      };
-    });
-
-    const loadedEdges = workflow.edges.map((edge: any) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-      type: edge.type || 'default'
-    }));
+    // Transform workflow data from backend format to frontend format
+    const { loadedNodes, loadedEdges } = transformWorkflowFromBackend(workflow);
 
     // Ensure default start node is present and is the only start node
     const nodesWithDefaultStart = ensureDefaultStartNode(loadedNodes);
@@ -438,14 +449,14 @@ const WorkflowBuilderContent: React.FC = () => {
     // Clear selections
     setSelectedNodes([]);
     setSelectedEdges([]);
-    
+
     // Auto-fit view after loading with a slight delay to ensure nodes are rendered
     if (fitViewTimeoutRef.current) {
       clearTimeout(fitViewTimeoutRef.current);
     }
     fitViewTimeoutRef.current = setTimeout(() => {
-      reactFlowInstance.fitView({ 
-        padding: 0.1, 
+      reactFlowInstance.fitView({
+        padding: 0.1,
         duration: 800,
         minZoom: 0.3,
         maxZoom: 1.2

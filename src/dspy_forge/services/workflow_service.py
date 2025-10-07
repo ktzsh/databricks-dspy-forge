@@ -31,6 +31,60 @@ class WorkflowService:
         self.logger = get_logger(__name__)
         self.logger.info("Workflow service initialized")
 
+    async def _enrich_workflow_with_optimization_data(self, workflow: Workflow) -> Workflow:
+        """
+        Enrich a workflow with optimization data from program.json if available.
+
+        Args:
+            workflow: The workflow to enrich
+
+        Returns:
+            Workflow with optimization data merged into node data, or original workflow if no optimization data exists
+        """
+        try:
+            storage = await get_storage_backend()
+
+            # Check if program.json exists for this workflow
+            program_json_path = f"workflows/{workflow.id}/program.json"
+            program_content = await storage.get_file(program_json_path)
+
+            if not program_content:
+                return workflow
+
+            # Parse program.json
+            program_data = json.loads(program_content)
+            self.logger.debug(f"Found program.json for workflow {workflow.id}")
+
+            # Merge optimization data into workflow nodes
+            workflow_dict = workflow.model_dump()
+
+            for node in workflow_dict.get('nodes', []):
+                node_id = node.get('id')
+                # Look for component data matching this node ID
+                component_key = f"components['{node_id}']"
+
+                if component_key in program_data:
+                    component_data = program_data[component_key]
+
+                    # Add optimization data to node
+                    node['data']['optimization_data'] = {
+                        'demos': component_data.get('demos', []),
+                        'signature': component_data.get('signature', {}),
+                        'has_optimization': True
+                    }
+
+                    self.logger.debug(f"Merged optimization data for node {node_id}")
+
+            # Create new Workflow object with enriched data
+            return Workflow(**workflow_dict)
+
+        except json.JSONDecodeError as e:
+            self.logger.warning(f"Failed to parse program.json for workflow {workflow.id}: {e}")
+            return workflow
+        except Exception as e:
+            self.logger.warning(f"Failed to merge optimization data for workflow {workflow.id}: {e}")
+            return workflow
+
     async def create_workflow(self, workflow_data: dict) -> Workflow:
         """Create a new workflow"""
         try:
@@ -76,55 +130,26 @@ class WorkflowService:
             if not workflow:
                 return None
 
-            # Check if program.json exists for this workflow
-            program_json_path = f"workflows/{workflow_id}/program.json"
-            program_content = await storage.get_file(program_json_path)
-
-            if program_content:
-                try:
-                    # Parse program.json
-                    program_data = json.loads(program_content)
-                    self.logger.debug(f"Found program.json for workflow {workflow_id}")
-
-                    # Merge optimization data into workflow nodes
-                    workflow_dict = workflow.model_dump()
-
-                    for node in workflow_dict.get('nodes', []):
-                        node_id = node.get('id')
-                        # Look for component data matching this node ID
-                        component_key = f"components['{node_id}']"
-
-                        if component_key in program_data:
-                            component_data = program_data[component_key]
-
-                            # Add optimization data to node
-                            node['data']['optimization_data'] = {
-                                'demos': component_data.get('demos', []),
-                                'signature': component_data.get('signature', {}),
-                                'has_optimization': True
-                            }
-
-                            self.logger.debug(f"Merged optimization data for node {node_id}")
-
-                    # Create new Workflow object with enriched data
-                    workflow = Workflow(**workflow_dict)
-
-                except json.JSONDecodeError as e:
-                    self.logger.warning(f"Failed to parse program.json for workflow {workflow_id}: {e}")
-                except Exception as e:
-                    self.logger.warning(f"Failed to merge optimization data for workflow {workflow_id}: {e}")
-
-            return workflow
+            # Enrich with optimization data if available
+            return await self._enrich_workflow_with_optimization_data(workflow)
 
         except Exception as e:
             self.logger.error(f"Failed to get workflow {workflow_id}: {e}")
             return None
 
     async def list_workflows(self) -> List[Workflow]:
-        """List all workflows"""
+        """List all workflows, enriched with optimization data if available"""
         try:
             storage = await get_storage_backend()
-            return await storage.list_workflows()
+            workflows = await storage.list_workflows()
+
+            # Enrich each workflow with optimization data if available
+            enriched_workflows = []
+            for workflow in workflows:
+                enriched_workflow = await self._enrich_workflow_with_optimization_data(workflow)
+                enriched_workflows.append(enriched_workflow)
+
+            return enriched_workflows
         except Exception as e:
             self.logger.error(f"Failed to list workflows: {e}")
             return []
