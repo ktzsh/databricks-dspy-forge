@@ -121,13 +121,11 @@ class RouterTemplate(BaseLogicTemplate):
 
         # Evaluate each branch in order
         for branch in branches:
-            print(branch)
             if branch.get('is_default', False):
                 default_branch = branch.get('branch_id', 'default')
                 continue
 
             condition_config = branch.get('condition_config', {})
-            print(default_branch, condition_config)
             if self._evaluate_condition(condition_config, inputs):
                 matched_branch = branch.get('branch_id')
                 break

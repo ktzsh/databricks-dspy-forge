@@ -147,8 +147,6 @@ class DeploymentService:
 
             logger.info(f"Saved compiled workflow code for {workflow.id}")
 
-            raise ValueError("Intentional Error")
-
             # Step 4: Copy agent.py
             agent_source = os.path.join(os.path.dirname(__file__), "..", "deployment", "agent.py")
 
