@@ -173,7 +173,7 @@ def get_workflow_outputs(workflow: Workflow) -> Dict[str, List[SignatureFieldDef
     """Get all output signatures for the workflow"""
     outputs = {}
     end_nodes = find_end_nodes(workflow)
-    
+
     for node_id in end_nodes:
         node = next((n for n in workflow.nodes if n.id == node_id), None)
         if node and node.type == NodeType.SIGNATURE_FIELD:
@@ -187,5 +187,192 @@ def get_workflow_outputs(workflow: Workflow) -> Dict[str, List[SignatureFieldDef
                 )
                 fields.append(field)
             outputs[node_id] = fields
-    
+
     return outputs
+
+
+def identify_router_nodes(workflow: Workflow) -> List[str]:
+    """Identify all router nodes in the workflow"""
+    router_nodes = []
+
+    for node in workflow.nodes:
+        if node.type == NodeType.LOGIC:
+            logic_type = node.data.get('logic_type')
+            if logic_type == 'Router':
+                router_nodes.append(node.id)
+
+    return router_nodes
+
+
+def get_nodes_in_branch(workflow: Workflow, router_node_id: str, branch_id: str) -> List[str]:
+    """
+    Get all nodes reachable from a specific branch of a router node.
+
+    Args:
+        workflow: The workflow
+        router_node_id: ID of the router node
+        branch_id: ID of the branch to trace
+
+    Returns:
+        List of node IDs in this branch path (excluding the router itself)
+    """
+    # Find edges from router with this branch_id as sourceHandle
+    branch_edges = [
+        edge for edge in workflow.edges
+        if edge.source == router_node_id and edge.sourceHandle == branch_id
+    ]
+
+    if not branch_edges:
+        return []
+
+    # Build a set of all nodes directly connected to router branches (for merge detection)
+    router_node = next((n for n in workflow.nodes if n.id == router_node_id), None)
+    if router_node:
+        router_config = router_node.data.get('router_config') or router_node.data.get('routerConfig', {})
+        all_branch_ids = {b.get('branchId') or b.get('branch_id') for b in router_config.get('branches', [])}
+    else:
+        all_branch_ids = set()
+
+    # Collect all nodes reachable from this branch using BFS
+    visited = set()
+    queue = [edge.target for edge in branch_edges]
+    branch_nodes = []
+
+    while queue:
+        node_id = queue.pop(0)
+
+        if node_id in visited:
+            continue
+
+        # Check if this node is a merge point before adding it
+        # A merge point receives edges from multiple branches
+        incoming_to_node = [e for e in workflow.edges if e.target == node_id]
+        source_branch_ids = set()
+
+        for inc_edge in incoming_to_node:
+            # Check if edge comes directly from router with a branch handle
+            if inc_edge.source == router_node_id and inc_edge.sourceHandle in all_branch_ids:
+                source_branch_ids.add(inc_edge.sourceHandle)
+
+        # If node receives from multiple branches directly, it's a merge point - stop here
+        if len(source_branch_ids) > 1:
+            continue
+
+        visited.add(node_id)
+        branch_nodes.append(node_id)
+
+        # Find outgoing edges from this node
+        outgoing_edges = [edge for edge in workflow.edges if edge.source == node_id]
+
+        for edge in outgoing_edges:
+            target = edge.target
+
+            if target not in visited and target not in queue:
+                # Before adding to queue, check if it's a potential merge point
+                incoming_to_target = [e for e in workflow.edges if e.target == target]
+                target_source_branches = set()
+
+                for inc_edge in incoming_to_target:
+                    if inc_edge.source == router_node_id and inc_edge.sourceHandle in all_branch_ids:
+                        target_source_branches.add(inc_edge.sourceHandle)
+
+                # If target receives from multiple branches, don't add it
+                if len(target_source_branches) <= 1:
+                    queue.append(target)
+
+    return branch_nodes
+
+
+def get_branch_paths(workflow: Workflow, router_node_id: str) -> Dict[str, List[str]]:
+    """
+    Get all branch paths from a router node.
+
+    Args:
+        workflow: The workflow
+        router_node_id: ID of the router node
+
+    Returns:
+        Dict mapping branch_id to list of node IDs in that branch
+    """
+    router_node = next((n for n in workflow.nodes if n.id == router_node_id), None)
+
+    if not router_node:
+        return {}
+
+    # Get router configuration (support both snake_case and camelCase)
+    router_config = router_node.data.get('router_config') or router_node.data.get('routerConfig', {})
+    branches = router_config.get('branches', [])
+
+    branch_paths = {}
+
+    for branch in branches:
+        branch_id = branch.get('branchId') or branch.get('branch_id')
+        if branch_id:
+            branch_paths[branch_id] = get_nodes_in_branch(workflow, router_node_id, branch_id)
+
+    return branch_paths
+
+
+def find_branch_merge_point(workflow: Workflow, router_node_id: str) -> str:
+    """
+    Find the merge point where branches from a router converge.
+
+    Args:
+        workflow: The workflow
+        router_node_id: ID of the router node
+
+    Returns:
+        Node ID of the merge point, or None if branches don't merge
+    """
+    branch_paths = get_branch_paths(workflow, router_node_id)
+
+    if len(branch_paths) < 2:
+        return None
+
+    # Get all branch node sets
+    branch_node_sets = [set(nodes) for nodes in branch_paths.values()]
+
+    # Find nodes that appear in multiple branch paths
+    # Or find nodes that have incoming edges from multiple branches
+    router_node = next((n for n in workflow.nodes if n.id == router_node_id), None)
+    if not router_node:
+        return None
+
+    router_config = router_node.data.get('router_config') or router_node.data.get('routerConfig', {})
+    all_branch_ids = [b.get('branchId') or b.get('branch_id') for b in router_config.get('branches', [])]
+
+    # Check all nodes to find merge point
+    all_nodes_in_branches = set()
+    for nodes in branch_paths.values():
+        all_nodes_in_branches.update(nodes)
+
+    # Find first node (in topological order) that has incoming edges from multiple branches
+    graph = build_workflow_graph(workflow)
+    try:
+        topo_order = list(nx.topological_sort(graph))
+    except nx.NetworkXError:
+        return None
+
+    for node_id in topo_order:
+        if node_id == router_node_id:
+            continue
+
+        # Check if this node receives edges from multiple branches
+        incoming_edges = [e for e in workflow.edges if e.target == node_id]
+        source_branches = set()
+
+        for edge in incoming_edges:
+            # Direct edge from router
+            if edge.source == router_node_id and edge.sourceHandle in all_branch_ids:
+                source_branches.add(edge.sourceHandle)
+            # Edge from node in a branch
+            else:
+                for branch_id, branch_nodes in branch_paths.items():
+                    if edge.source in branch_nodes:
+                        source_branches.add(branch_id)
+                        break
+
+        if len(source_branches) > 1:
+            return node_id
+
+    return None

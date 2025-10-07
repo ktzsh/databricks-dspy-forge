@@ -144,44 +144,76 @@ class RouterTemplate(BaseLogicTemplate):
         return self.call(**inputs)
 
     def generate_code(self, context: CodeGenerationContext) -> Dict[str, Any]:
-        """Generate code for Router logic node"""
+        """Generate code for Router logic node - returns empty as router is handled specially in compiler"""
         instance_var = f"router_{context.get_node_count('router')}"
 
-        # Get router configuration
-        router_config = self.node_data.get('router_config', {})
-        branches = router_config.get('branches', [])
+        context.node_to_var_mapping[self.node_id] = instance_var
 
-        # Generate router evaluation code
-        forward_lines = [
-            f"        # Router logic with multiple branches",
-            f"        {instance_var}_branches = {repr(branches)}",
-            f"        {instance_var}_matched = None",
-            f"        {instance_var}_default = None",
-            f"        ",
-            f"        # Evaluate each branch in order",
-            f"        for {instance_var}_branch in {instance_var}_branches:",
-            f"            if {instance_var}_branch.get('is_default', False):",
-            f"                {instance_var}_default = {instance_var}_branch.get('branch_id', 'default')",
-            f"                continue",
-            f"            ",
-            f"            {instance_var}_condition_config = {instance_var}_branch.get('condition_config', {{}})",
-            f"            {instance_var}_conditions = {instance_var}_condition_config.get('structured_conditions', [])",
-            f"            if self._evaluate_structured_conditions({instance_var}_conditions, locals()):",
-            f"                {instance_var}_matched = {instance_var}_branch.get('branch_id')",
-            f"                break",
-            f"        ",
-            f"        # Use matched branch or fall back to default",
-            f"        branch = {instance_var}_matched or {instance_var}_default or 'default'",
-            f"        matched_branch = {instance_var}_matched"
-        ]
-
+        # Router nodes are handled specially in compiler_service.py
+        # They generate if-elif-else blocks wrapping branch node code
         return {
             'signature': '',
-            'instance': f"        # Router logic configured with {len(branches)} branches",
-            'forward': '\n'.join(forward_lines),
+            'instance': '',
+            'forward': '',
             'dependencies': [],
             'instance_var': instance_var
         }
+
+    def _generate_condition_expression(self, conditions: List[Dict[str, Any]]) -> str:
+        """Generate Python boolean expression from structured conditions"""
+        if not conditions:
+            return "True"
+
+        expr_parts = []
+        for i, condition in enumerate(conditions):
+            field = condition.get('field', '')
+            operator = condition.get('operator', '==')
+            value = condition.get('value')
+            logical_op = condition.get('logical_op')
+
+            # Generate comparison expression
+            if operator == "==":
+                comp_expr = f"{field} == {repr(value)}"
+            elif operator == "!=":
+                comp_expr = f"{field} != {repr(value)}"
+            elif operator == ">":
+                comp_expr = f"{field} > {value}"
+            elif operator == "<":
+                comp_expr = f"{field} < {value}"
+            elif operator == ">=":
+                comp_expr = f"{field} >= {value}"
+            elif operator == "<=":
+                comp_expr = f"{field} <= {value}"
+            elif operator == "contains":
+                comp_expr = f"{repr(value)} in str({field})"
+            elif operator == "not_contains":
+                comp_expr = f"{repr(value)} not in str({field})"
+            elif operator == "in":
+                comp_expr = f"{field} in {repr(value)}"
+            elif operator == "not_in":
+                comp_expr = f"{field} not in {repr(value)}"
+            elif operator == "startswith":
+                comp_expr = f"str({field}).startswith({repr(value)})"
+            elif operator == "endswith":
+                comp_expr = f"str({field}).endswith({repr(value)})"
+            elif operator == "is_empty":
+                comp_expr = f"not {field}"
+            elif operator == "is_not_empty":
+                comp_expr = f"bool({field})"
+            else:
+                comp_expr = "True"
+
+            # Add to expression with logical operator
+            if i == 0:
+                expr_parts.append(comp_expr)
+            else:
+                prev_logical_op = conditions[i-1].get('logical_op', 'AND')
+                if prev_logical_op == 'OR':
+                    expr_parts.append(f" or {comp_expr}")
+                else:  # AND
+                    expr_parts.append(f" and {comp_expr}")
+
+        return ''.join(expr_parts)
 
 
 class MergeTemplate(BaseLogicTemplate):

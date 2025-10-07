@@ -4,7 +4,12 @@ from datetime import datetime
 from dspy_forge.models.workflow import Workflow, NodeType
 from dspy_forge.storage.factory import get_storage_backend
 from dspy_forge.core.logging import get_logger
-from dspy_forge.utils.workflow_utils import get_execution_order
+from dspy_forge.utils.workflow_utils import (
+    get_execution_order,
+    identify_router_nodes,
+    get_branch_paths,
+    find_branch_merge_point
+)
 from dspy_forge.core.templates import TemplateFactory, CodeGenerationContext
 from dspy_forge.components import registry  # This will auto-register all templates
 
@@ -101,40 +106,79 @@ class WorkflowCompilerService:
             
             # Get execution order
             execution_order, graph = get_execution_order(workflow)
-            
+
+            # Identify router nodes
+            router_node_ids = identify_router_nodes(workflow)
+
+            # Build a mapping of router_id -> branch_paths
+            router_branch_map = {}
+            for router_id in router_node_ids:
+                router_branch_map[router_id] = get_branch_paths(workflow, router_id)
+
             # Generate code for each node using templates
             signatures = []
             instances = []
             forward_code_blocks = []
             instance_vars = []
             class_definitions = []
-            
+            processed_nodes = set()  # Track nodes already handled (in branches)
+
+            # First pass: collect all non-branch node code
+            node_code_map = {}  # Map node_id -> generated code
+
             for node_id in execution_order:
                 node = next((n for n in workflow.nodes if n.id == node_id), None)
                 if not node:
                     continue
-                
+
                 # Create template for this node
                 template = TemplateFactory.create_template(node, workflow)
-                
+
                 # Generate code for this node
                 node_code = template.generate_code(context)
-                
-                # Collect code components
+                node_code_map[node_id] = node_code
+
+                # Collect code components (except forward - handled separately)
                 if node_code.get('class_definition'):
                     class_definitions.append(node_code['class_definition'])
 
                 if node_code.get('signature'):
                     signatures.append(node_code['signature'])
-                
+
                 if node_code.get('instance'):
                     instances.append(node_code['instance'])
-                
-                if node_code.get('forward'):
-                    forward_code_blocks.append(node_code['forward'])
-                
+
                 if node_code.get('instance_var'):
                     instance_vars.append(node_code['instance_var'])
+
+            # Second pass: generate forward method with router branching
+            for node_id in execution_order:
+                if node_id in processed_nodes:
+                    continue
+
+                node = next((n for n in workflow.nodes if n.id == node_id), None)
+                if not node:
+                    continue
+
+                # Check if this is a router node
+                if node_id in router_node_ids:
+                    # Generate if-elif-else block for router
+                    router_code = self._generate_router_code(
+                        workflow, node, router_branch_map[node_id],
+                        node_code_map, context
+                    )
+                    forward_code_blocks.append(router_code)
+
+                    # Mark all branch nodes as processed
+                    for branch_nodes in router_branch_map[node_id].values():
+                        processed_nodes.update(branch_nodes)
+                    processed_nodes.add(node_id)
+                else:
+                    # Regular node - add its forward code
+                    node_code = node_code_map.get(node_id, {})
+                    if node_code.get('forward'):
+                        forward_code_blocks.append(node_code['forward'])
+                    processed_nodes.add(node_id)
             
             # Generate class definitions
             for class_def in class_definitions:
@@ -270,6 +314,107 @@ class WorkflowCompilerService:
         input_str = ", ".join([f"{k}='{v}'" for k, v in example_input.items()])
         code_lines.append(f"    result = program({input_str})")
         code_lines.append("    print('Result:', result)")
+
+    def _generate_router_code(
+        self,
+        workflow: Workflow,
+        router_node: Any,
+        branch_paths: Dict[str, List[str]],
+        node_code_map: Dict[str, Dict[str, Any]],
+        context: CodeGenerationContext
+    ) -> str:
+        """
+        Generate if-elif-else code for router node with branches.
+
+        Args:
+            workflow: The workflow
+            router_node: The router node
+            branch_paths: Dict mapping branch_id to list of node IDs in that branch
+            node_code_map: Map of node_id to generated code dict
+            context: Code generation context
+
+        Returns:
+            Generated if-elif-else code block as string
+        """
+        from dspy_forge.components.logic_templates import RouterTemplate
+
+        # Get router configuration
+        router_config = router_node.data.get('router_config') or router_node.data.get('routerConfig', {})
+        branches = router_config.get('branches', [])
+
+        if not branches:
+            return "        # Router with no branches configured\n"
+
+        # Create template to use helper methods
+        template = RouterTemplate(router_node, workflow)
+
+        code_lines = []
+        code_lines.append("        # Router branching logic")
+        code_lines.append("")
+
+        default_branch = None
+        non_default_branches = []
+
+        for branch in branches:
+            if branch.get('isDefault') or branch.get('is_default'):
+                default_branch = branch
+            else:
+                non_default_branches.append(branch)
+
+        # Generate if-elif-else structure
+        for i, branch in enumerate(non_default_branches):
+            branch_id = branch.get('branchId') or branch.get('branch_id')
+            condition_config = branch.get('conditionConfig') or branch.get('condition_config', {})
+            structured_conditions = condition_config.get('structuredConditions') or condition_config.get('structured_conditions', [])
+
+            # Generate condition expression
+            condition_expr = template._generate_condition_expression(structured_conditions)
+
+            # Determine if/elif
+            if i == 0:
+                code_lines.append(f"        if {condition_expr}:")
+            else:
+                code_lines.append(f"        elif {condition_expr}:")
+
+            # Add code for nodes in this branch
+            branch_node_ids = branch_paths.get(branch_id, [])
+            if branch_node_ids:
+                for node_id in branch_node_ids:
+                    node_code = node_code_map.get(node_id, {})
+                    forward_code = node_code.get('forward', '')
+                    if forward_code:
+                        # Indent the forward code (add 4 more spaces)
+                        indented_code = '\n'.join(
+                            '    ' + line if line.strip() else line
+                            for line in forward_code.split('\n')
+                        )
+                        code_lines.append(indented_code)
+            else:
+                code_lines.append("            pass  # No nodes in this branch")
+
+        # Handle default branch
+        if default_branch:
+            code_lines.append("        else:")
+            branch_id = default_branch.get('branchId') or default_branch.get('branch_id')
+            branch_node_ids = branch_paths.get(branch_id, [])
+
+            if branch_node_ids:
+                for node_id in branch_node_ids:
+                    node_code = node_code_map.get(node_id, {})
+                    forward_code = node_code.get('forward', '')
+                    if forward_code:
+                        # Indent the forward code (add 4 more spaces)
+                        indented_code = '\n'.join(
+                            '    ' + line if line.strip() else line
+                            for line in forward_code.split('\n')
+                        )
+                        code_lines.append(indented_code)
+            else:
+                code_lines.append("            pass  # No nodes in default branch")
+
+        code_lines.append("")
+
+        return '\n'.join(code_lines)
     
 
 
