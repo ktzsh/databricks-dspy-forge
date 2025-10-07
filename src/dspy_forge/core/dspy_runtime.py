@@ -10,6 +10,8 @@ from dspy_forge.utils.workflow_utils import (
     find_start_nodes,
     find_end_nodes,
     get_node_dependencies,
+    identify_router_nodes,
+    get_branch_paths,
 )
 from dspy_forge.core.templates import TemplateFactory
 from dspy_forge.models.workflow import Workflow, WorkflowExecution
@@ -26,6 +28,12 @@ class CompoundProgram(dspy.Module):
         self.context = context
         self.components = {}
         self.execution_order, _ = get_execution_order(workflow)
+
+        # Identify router nodes and their branch paths
+        self.router_node_ids = identify_router_nodes(workflow)
+        self.router_branch_map = {}
+        for router_id in self.router_node_ids:
+            self.router_branch_map[router_id] = get_branch_paths(workflow, router_id)
 
         # Initialize all components
         self._initialize_components()
@@ -51,25 +59,77 @@ class CompoundProgram(dspy.Module):
         Synchronous execution for DSPy optimizers.
         Uses component.call() methods directly.
         """
-        for node_id in self.execution_order:
+        # Build execution path considering routers
+        execution_path = self._build_execution_path()
+        processed_nodes = set()
+
+        i = 0
+        while i < len(execution_path):
+            node_id = execution_path[i]
+
+            if node_id in processed_nodes:
+                i += 1
+                continue
+
             start_time = datetime.now()
             node = next((n for n in self.workflow.nodes if n.id == node_id), None)
             if not node:
+                i += 1
                 continue
 
             node_inputs = self._get_node_inputs(node_id, inputs)
 
             try:
-                if isinstance(self.components[node_id], dspy.primitives.module.Module):
-                    model_name = node.data.get('model')
-                    with dspy.context(lm=dspy.LM(f'{model_name}')):
-                        result = self.components[node_id](**node_inputs)
-                else:
-                    result = self.components[node_id].call(**node_inputs)
+                # Check if this is a router node
+                if node_id in self.router_node_ids:
+                    # Execute router to determine branch
+                    if isinstance(self.components[node_id], dspy.primitives.module.Module):
+                        model_name = node.data.get('model', '')
+                        with dspy.context(lm=dspy.LM(f'{model_name}')):
+                            result = self.components[node_id](**node_inputs)
+                    else:
+                        result = self.components[node_id].call(**node_inputs)
 
-                self._process_node_result(node_id, node, node_inputs, start_time, result)
+                    self._process_node_result(node_id, node, node_inputs, start_time, result)
+                    processed_nodes.add(node_id)
+
+                    # Get selected branch
+                    selected_branch = result.get('branch') if isinstance(result, dict) else getattr(result, 'branch', None)
+
+                    if selected_branch:
+                        # Get nodes in selected branch
+                        branch_nodes = self.router_branch_map[node_id].get(selected_branch, [])
+
+                        # Insert branch nodes into execution path after router
+                        for j, branch_node_id in enumerate(branch_nodes):
+                            execution_path.insert(i + 1 + j, branch_node_id)
+
+                        # Mark all other branch nodes as processed (skip them)
+                        # But don't mark nodes that also appear in the selected branch (merge points)
+                        selected_branch_nodes = set(branch_nodes)
+                        for branch_id, nodes in self.router_branch_map[node_id].items():
+                            if branch_id != selected_branch:
+                                for node_to_skip in nodes:
+                                    # Only mark as processed if NOT in selected branch
+                                    if node_to_skip not in selected_branch_nodes:
+                                        processed_nodes.add(node_to_skip)
+                else:
+                    # Regular node execution
+                    if isinstance(self.components[node_id], dspy.primitives.module.Module):
+                        model_name = node.data.get('model')
+                        with dspy.context(lm=dspy.LM(f'{model_name}')):
+                            result = self.components[node_id](**node_inputs)
+                    else:
+                        result = self.components[node_id].call(**node_inputs)
+
+                    self._process_node_result(node_id, node, node_inputs, start_time, result)
+                    processed_nodes.add(node_id)
+
             except Exception as e:
                 self._handle_node_error(node_id, node, node_inputs, start_time, e)
+                processed_nodes.add(node_id)
+
+            i += 1
 
         return self._get_final_outputs()
 
@@ -78,29 +138,100 @@ class CompoundProgram(dspy.Module):
         Asynchronous execution for playground/real-time usage.
         Uses component.acall() methods.
         """
-        for node_id in self.execution_order:
+        # Build execution path considering routers
+        execution_path = self._build_execution_path()
+        processed_nodes = set()
+
+        i = 0
+        while i < len(execution_path):
+            node_id = execution_path[i]
+
+            if node_id in processed_nodes:
+                i += 1
+                continue
+
             start_time = datetime.now()
             node = next((n for n in self.workflow.nodes if n.id == node_id), None)
             if not node:
+                i += 1
                 continue
 
             node_inputs = self._get_node_inputs(node_id, inputs)
 
             try:
-                if isinstance(self.components[node_id], dspy.primitives.module.Module):
-                    model_name = node.data.get('model', '')
-                    # Use model-specific context for DSPy modules
-                    with dspy.context(lm=dspy.LM(f'{model_name}')):
+                # Check if this is a router node
+                if node_id in self.router_node_ids:
+                    # Execute router to determine branch
+                    if isinstance(self.components[node_id], dspy.primitives.module.Module):
+                        model_name = node.data.get('model', '')
+                        with dspy.context(lm=dspy.LM(f'{model_name}')):
+                            result = await self.components[node_id].acall(**node_inputs)
+                    else:
                         result = await self.components[node_id].acall(**node_inputs)
-                else:
-                    # Use default LM or no context
-                    result = await self.components[node_id].acall(**node_inputs)
 
-                self._process_node_result(node_id, node, node_inputs, start_time, result)
+                    self._process_node_result(node_id, node, node_inputs, start_time, result)
+                    processed_nodes.add(node_id)
+
+                    # Get selected branch
+                    selected_branch = result.get('branch') if isinstance(result, dict) else getattr(result, 'branch', None)
+
+                    if selected_branch:
+                        # Get nodes in selected branch
+                        branch_nodes = self.router_branch_map[node_id].get(selected_branch, [])
+
+                        # Insert branch nodes into execution path after router
+                        for j, branch_node_id in enumerate(branch_nodes):
+                            execution_path.insert(i + 1 + j, branch_node_id)
+
+                        # Mark all other branch nodes as processed (skip them)
+                        # But don't mark nodes that also appear in the selected branch (merge points)
+                        selected_branch_nodes = set(branch_nodes)
+                        for branch_id, nodes in self.router_branch_map[node_id].items():
+                            if branch_id != selected_branch:
+                                for node_to_skip in nodes:
+                                    # Only mark as processed if NOT in selected branch
+                                    if node_to_skip not in selected_branch_nodes:
+                                        processed_nodes.add(node_to_skip)
+                else:
+                    # Regular node execution
+                    if isinstance(self.components[node_id], dspy.primitives.module.Module):
+                        model_name = node.data.get('model', '')
+                        # Use model-specific context for DSPy modules
+                        with dspy.context(lm=dspy.LM(f'{model_name}')):
+                            result = await self.components[node_id].acall(**node_inputs)
+                    else:
+                        # Use default LM or no context
+                        result = await self.components[node_id].acall(**node_inputs)
+
+                    self._process_node_result(node_id, node, node_inputs, start_time, result)
+                    processed_nodes.add(node_id)
+
             except Exception as e:
                 self._handle_node_error(node_id, node, node_inputs, start_time, e)
+                processed_nodes.add(node_id)
+
+            i += 1
 
         return self._get_final_outputs()
+
+    def _build_execution_path(self) -> List[str]:
+        """
+        Build initial execution path, excluding nodes that are inside router branches.
+        Branch nodes will be added dynamically when routers are executed.
+        """
+        # Get all nodes that are in any branch
+        all_branch_nodes = set()
+        for router_id in self.router_node_ids:
+            for branch_id, branch_nodes in self.router_branch_map[router_id].items():
+                all_branch_nodes.update(branch_nodes)
+
+        # Build execution path excluding branch nodes
+        execution_path = []
+        for node_id in self.execution_order:
+            if node_id not in all_branch_nodes:
+                execution_path.append(node_id)
+
+        return execution_path
 
     def _get_node_inputs(self, node_id: str, initial_inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Get inputs for a node from its dependencies"""

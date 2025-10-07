@@ -139,7 +139,7 @@ class NodeTemplate(ABC):
                     if field_data.get('name') == field_name:
                         field_type = field_data.get('type', 'str')
                         field_desc = field_data.get('description', '')
-                        enum_values = field_data.get('enum_values', None)
+                        enum_values = field_data.get('enum_values', None) or field_data.get('enumValues', None)
                         return field_type, field_desc, enum_values
             elif node and node.type == NodeType.LOGIC:
                 # Handle field selector logic nodes
@@ -178,7 +178,7 @@ class NodeTemplate(ABC):
                     if field_data.get('name') == original_field_name:
                         field_type = field_data.get('type', 'str')
                         field_desc = field_data.get('description', '')
-                        enum_values = field_data.get('enum_values', None)
+                        enum_values = field_data.get('enum_values', None) or field_data.get('enumValues', None)
                         return field_type, field_desc, enum_values
             elif upstream_node and upstream_node.type == NodeType.LOGIC:
                 # If upstream is another logic node, trace further

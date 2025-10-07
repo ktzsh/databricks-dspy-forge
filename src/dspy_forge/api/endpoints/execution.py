@@ -44,6 +44,16 @@ def _normalize_workflow_data(workflow_ir: Dict[str, Any]) -> Dict[str, Any]:
                 if "module_type" not in node_data:  # Don't duplicate if both exist
                     del normalized_node["data"]["moduleType"]
         
+        elif node.get("type") == "signature_field":
+            for field in normalized_node["data"]["fields"]:
+                if field.get("type") == "enum":
+                    # Convert enumValues to enum_values
+                    if "enumValues" in field:
+                        field["enum_values"] = field["enumValues"]
+                        if "enum_values" not in field:  # Don't duplicate if both exist
+                            del field["enumValues"]
+            
+
         elif node.get("type") == "logic":
             # Convert logicType to logic_type
             if "logicType" in node_data:
@@ -56,6 +66,7 @@ def _normalize_workflow_data(workflow_ir: Dict[str, Any]) -> Dict[str, Any]:
                 "selectedFields": "selected_fields",
                 "fieldMappings": "field_mappings",
                 "conditionConfig": "condition_config",
+                "routerConfig": "router_config"
             }
             
             for camel_case, snake_case in camel_to_snake_mappings.items():
@@ -63,6 +74,25 @@ def _normalize_workflow_data(workflow_ir: Dict[str, Any]) -> Dict[str, Any]:
                     normalized_node["data"][snake_case] = node_data[camel_case]
                     if snake_case not in node_data:  # Don't duplicate if both exist
                         del normalized_node["data"][camel_case]
+                
+                if snake_case == "router_config":
+                    router_config = normalized_node["data"][snake_case]
+                    if isinstance(router_config, dict):
+                        branches = router_config.get("branches", [])
+                        for branch in branches:
+                            if "isDefault" in branch:
+                                branch["is_default"] = branch["isDefault"]
+                                if "is_default" not in branch:
+                                    del branch["isDefault"]
+                            if "branchId" in branch:
+                                branch["branch_id"] = branch["branchId"]
+                                if "branch_id" not in branch:
+                                    del branch["branchId"]
+                            if "conditionConfig" in branch:
+                                branch["condition_config"] = branch["conditionConfig"]
+                                branch["condition_config"]["structuredConditions"] = branch["condition_config"]["structuredConditions"]
+                                if "condition_config" not in branch:
+                                    del branch["conditionConfig"]
         
         elif node.get("type") == "retriever":
             # Convert retrieverType to retriever_type

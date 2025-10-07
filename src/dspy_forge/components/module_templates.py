@@ -25,12 +25,15 @@ class BaseModuleTemplate(NodeTemplate):
         class_attrs = {}
         
         # Add docstring
+        class_attrs['__annotations__'] = {}
         if instruction:
             class_attrs['__doc__'] = instruction
         
         # Add input fields
         for field_name in input_fields:
             field_type, field_desc, enum_values = self._get_field_info(field_name, is_input=True)
+            python_type = self._convert_ui_type_to_python(field_type, enum_values)
+            class_attrs['__annotations__'][field_name] = python_type
             if field_desc:
                 class_attrs[field_name] = dspy.InputField(desc=field_desc)
             else:
@@ -42,6 +45,8 @@ class BaseModuleTemplate(NodeTemplate):
         # Add output fields
         for field_name in output_fields:
             field_type, field_desc, enum_values = self._get_field_info(field_name, is_input=False)
+            python_type = self._convert_ui_type_to_python(field_type, enum_values)
+            class_attrs['__annotations__'][field_name] = python_type
             if field_desc:
                 class_attrs[field_name] = dspy.OutputField(desc=field_desc)
             else:
