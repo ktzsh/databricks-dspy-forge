@@ -90,7 +90,7 @@ def _normalize_workflow_data(workflow_ir: Dict[str, Any]) -> Dict[str, Any]:
                                     del branch["branchId"]
                             if "conditionConfig" in branch:
                                 branch["condition_config"] = branch["conditionConfig"]
-                                branch["condition_config"]["structuredConditions"] = branch["condition_config"]["structuredConditions"]
+                                branch["condition_config"]["structured_conditions"] = branch["condition_config"]["structuredConditions"]
                                 if "condition_config" not in branch:
                                     del branch["conditionConfig"]
         
