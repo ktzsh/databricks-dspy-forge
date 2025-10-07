@@ -231,12 +231,12 @@ const WorkflowBuilderContent: React.FC = () => {
               const currentFields = signatureData.fields || [];
               
               // Check if rationale field already exists
-              const hasRationaleField = currentFields.some((field: any) => field.name === 'rationale');
+              const hasRationaleField = currentFields.some((field: any) => field.name === 'reasoning');
               
               if (!hasRationaleField) {
                 // Add rationale field
                 const rationaleField = {
-                  name: 'rationale',
+                  name: 'reasoning',
                   type: 'str' as const,
                   description: 'Step-by-step reasoning process',
                   required: true
@@ -254,7 +254,7 @@ const WorkflowBuilderContent: React.FC = () => {
               // Remove rationale field if no ChainOfThought connection
               const signatureData = node.data as any;
               const currentFields = signatureData.fields || [];
-              const fieldsWithoutRationale = currentFields.filter((field: any) => field.name !== 'rationale');
+              const fieldsWithoutRationale = currentFields.filter((field: any) => field.name !== 'reasoning');
               
               if (fieldsWithoutRationale.length !== currentFields.length) {
                 return {
@@ -400,12 +400,12 @@ const WorkflowBuilderContent: React.FC = () => {
             const currentFields = signatureData.fields || [];
             
             // Check if rationale field already exists
-            const hasRationaleField = currentFields.some((field: any) => field.name === 'rationale');
+            const hasRationaleField = currentFields.some((field: any) => field.name === 'reasoning');
             
             if (!hasRationaleField) {
               // Add rationale field
               const rationaleField = {
-                name: 'rationale',
+                name: 'reasoning',
                 type: 'str' as const,
                 description: 'Step-by-step reasoning process',
                 required: true
@@ -423,7 +423,7 @@ const WorkflowBuilderContent: React.FC = () => {
             // Remove rationale field if no ChainOfThought connection
             const signatureData = node.data as any;
             const currentFields = signatureData.fields || [];
-            const fieldsWithoutRationale = currentFields.filter((field: any) => field.name !== 'rationale');
+            const fieldsWithoutRationale = currentFields.filter((field: any) => field.name !== 'reasoning');
             
             if (fieldsWithoutRationale.length !== currentFields.length) {
               return {

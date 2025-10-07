@@ -6,7 +6,7 @@ must implement to support both execution and code generation.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Literal
 from dspy_forge.models.workflow import NodeType
 
 
@@ -218,6 +218,26 @@ class NodeTemplate(ABC):
             'enum': 'str'  # Fallback if no enum values provided
         }
         return type_mapping.get(ui_type, 'str')
+    
+    def _convert_ui_type_to_python_actual(self, ui_type: str, enum_values=None):
+        """Convert UI field type to actual Python type object (not string)"""
+        if ui_type == 'enum' and enum_values:
+            # Generate Literal type for enums
+            return Literal[tuple(enum_values)]
+        
+        type_mapping = {
+            'str': str,
+            'int': int,
+            'bool': bool,
+            'float': float,
+            'list[str]': List[str],
+            'list[int]': List[int],
+            'dict': Dict,
+            'list[dict[str, Any]]': List[Dict[str, Any]],
+            'Any': Any,
+            'enum': str  # Fallback if no enum values provided
+        }
+        return type_mapping.get(ui_type, str)
 
 
 class TemplateFactory:

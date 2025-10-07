@@ -5,7 +5,7 @@ Handles Predict, ChainOfThought, and other DSPy module types.
 """
 import dspy
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Literal, get_type_hints
 from dspy_forge.core.templates import NodeTemplate, CodeGenerationContext
 from dspy_forge.core.dspy_types import DSPyModuleType
 from dspy_forge.core.logging import get_logger
@@ -32,7 +32,7 @@ class BaseModuleTemplate(NodeTemplate):
         # Add input fields
         for field_name in input_fields:
             field_type, field_desc, enum_values = self._get_field_info(field_name, is_input=True)
-            python_type = self._convert_ui_type_to_python(field_type, enum_values)
+            python_type = self._convert_ui_type_to_python_actual(field_type, enum_values)
             class_attrs['__annotations__'][field_name] = python_type
             if field_desc:
                 class_attrs[field_name] = dspy.InputField(desc=field_desc)
@@ -44,8 +44,11 @@ class BaseModuleTemplate(NodeTemplate):
 
         # Add output fields
         for field_name in output_fields:
+            if isinstance(self, ChainOfThoughtTemplate) and field_name == 'reasoning':
+                # Let reasoning be autoadded by dspy we only show it in UI
+                continue
             field_type, field_desc, enum_values = self._get_field_info(field_name, is_input=False)
-            python_type = self._convert_ui_type_to_python(field_type, enum_values)
+            python_type = self._convert_ui_type_to_python_actual(field_type, enum_values)
             class_attrs['__annotations__'][field_name] = python_type
             if field_desc:
                 class_attrs[field_name] = dspy.OutputField(desc=field_desc)
@@ -87,6 +90,9 @@ class BaseModuleTemplate(NodeTemplate):
 
         # Add output fields
         for field_name in output_fields:
+            if isinstance(self, ChainOfThoughtTemplate) and field_name == 'reasoning':
+                # Let reasoning be autoadded by dspy we only show it in UI
+                continue
             field_type, field_desc, enum_values = self._get_field_info(field_name, is_input=False)
             python_type = self._convert_ui_type_to_python(field_type, enum_values)
             if field_desc:
@@ -187,18 +193,6 @@ class ChainOfThoughtTemplate(BaseModuleTemplate):
         instruction = self.node_data.get('instruction', '')
         signature_class = self._create_dynamic_signature(instruction)
         return dspy.ChainOfThought(signature_class)
-    
-    def _add_module_specific_fields(self, signature_class):
-        """Add rationale field for chain of thought"""
-        setattr(signature_class, 'rationale', dspy.OutputField(desc="Step-by-step reasoning"))
-    
-    def _add_module_specific_fields_to_dict(self, class_attrs: dict):
-        """Add rationale field to class attributes dict"""
-        class_attrs['rationale'] = dspy.OutputField(desc="Step-by-step reasoning")
-    
-    def _add_signature_specific_fields(self, lines: List[str]):
-        """Add rationale field to signature code"""
-        lines.append("    rationale = dspy.OutputField(desc='Step-by-step reasoning')")
     
     def _generate_instance_code(self, instance_var: str, signature_name: str) -> str:
         """Generate ChainOfThought instance creation code"""

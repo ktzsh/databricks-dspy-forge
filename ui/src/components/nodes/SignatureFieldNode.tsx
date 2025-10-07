@@ -56,7 +56,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
     
     // Don't allow removing the rationale field if connected to ChainOfThought
     const field = fields[index];
-    if (field?.name === 'rationale' && isConnectedToChainOfThought()) {
+    if (field?.name === 'reasoning' && isConnectedToChainOfThought()) {
       return;
     }
     
@@ -287,11 +287,11 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
 
               {fields.map((field, index) => (
                 <div key={index} className={`border rounded p-2 space-y-2 ${
-                  field.name === 'rationale' && isConnectedToChainOfThought() 
+                  field.name === 'reasoning' && isConnectedToChainOfThought() 
                     ? 'border-blue-300 bg-blue-50' 
                     : 'border-gray-200'
                 }`}>
-                  {field.name === 'rationale' && isConnectedToChainOfThought() && (
+                  {field.name === 'reasoning' && isConnectedToChainOfThought() && (
                     <div className="text-xs text-blue-600 font-medium flex items-center">
                       Auto-generated for ChainOfThought
                     </div>
@@ -303,9 +303,9 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                       onChange={(e) => updateField(index, { name: e.target.value })}
                       placeholder="Field name"
                       className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                      disabled={isDefaultStartNode || (field.name === 'rationale' && isConnectedToChainOfThought())}
+                      disabled={isDefaultStartNode || (field.name === 'reasoning' && isConnectedToChainOfThought())}
                     />
-                    {!isDefaultStartNode && !(field.name === 'rationale' && isConnectedToChainOfThought()) && (
+                    {!isDefaultStartNode && !(field.name === 'reasoning' && isConnectedToChainOfThought()) && (
                       <button
                         onClick={() => removeField(index)}
                         className="p-1 text-red-500 hover:bg-red-50 rounded"
@@ -319,7 +319,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                     value={field.type}
                     onChange={(e) => updateField(index, { type: e.target.value as FieldType })}
                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                    disabled={isDefaultStartNode || (field.name === 'rationale' && isConnectedToChainOfThought())}
+                    disabled={isDefaultStartNode || (field.name === 'reasoning' && isConnectedToChainOfThought())}
                   >
                     {fieldTypes.map(type => (
                       <option key={type} value={type}>{type}</option>
@@ -424,7 +424,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                           <div className="w-2 h-2 bg-blue-500 rounded-full" title="Individual connection handle"></div>
                         )}
                         <span className="font-medium">{field.name}</span>
-                        {field.name === 'rationale' && isConnectedToChainOfThought()}
+                        {field.name === 'reasoning' && isConnectedToChainOfThought()}
                       </div>
                       <span className="text-gray-500">{field.type}</span>
                     </div>
