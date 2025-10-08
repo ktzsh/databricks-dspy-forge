@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { X, Copy, Check, Download } from 'lucide-react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface CodeModalProps {
   isOpen: boolean;
@@ -54,10 +56,20 @@ const CodeModal: React.FC<CodeModalProps> = ({ isOpen, onClose, code, workflowNa
 
         {/* Code Content */}
         <div className="flex-1 overflow-auto p-6">
-          <div className="bg-slate-900 rounded-lg p-6 overflow-x-auto">
-            <pre className="text-sm text-slate-100 font-mono leading-relaxed">
-              <code>{code}</code>
-            </pre>
+          <div className="rounded-lg overflow-hidden">
+            <SyntaxHighlighter
+              language="python"
+              style={vscDarkPlus}
+              customStyle={{
+                margin: 0,
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem',
+                lineHeight: '1.5',
+              }}
+              showLineNumbers
+            >
+              {code}
+            </SyntaxHighlighter>
           </div>
         </div>
 
