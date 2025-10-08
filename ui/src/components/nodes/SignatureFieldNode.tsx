@@ -11,7 +11,9 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   const [isEditing, setIsEditing] = useState(false);
   const [nodeLabel, setNodeLabel] = useState(nodeData.label || 'Signature Field');
   const [fields, setFields] = useState<SignatureField[]>(nodeData.fields || []);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isStart, setIsStart] = useState(nodeData.isStart || false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isEnd, setIsEnd] = useState(nodeData.isEnd || false);
   const [connectionMode, setConnectionMode] = useState<'whole' | 'field-level'>(nodeData.connectionMode || 'whole');
   const [enumInputs, setEnumInputs] = useState<Record<number, string>>({});
