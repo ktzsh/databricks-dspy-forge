@@ -19,8 +19,10 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   const nodes = useNodes();
   const edges = useEdges();
 
-  // Check if this is the default start node
+  // Check if this is a default node (start or end)
   const isDefaultStartNode = id === 'default-start-node';
+  const isDefaultEndNode = id === 'default-end-node';
+  const isDefaultNode = isDefaultStartNode || isDefaultEndNode;
 
   // Sync local state with node data when it changes (for auto-generated fields)
   useEffect(() => {
@@ -37,8 +39,8 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   };
 
   const addField = () => {
-    // Don't allow adding fields to default start node
-    if (isDefaultStartNode) return;
+    // Don't allow adding fields to default nodes
+    if (isDefaultNode) return;
 
     const newField: SignatureField = {
       name: `field_${fields.length + 1}`,
@@ -51,8 +53,8 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   };
 
   const removeField = (index: number) => {
-    // Don't allow removing fields from default start node
-    if (isDefaultStartNode) return;
+    // Don't allow removing fields from default nodes
+    if (isDefaultNode) return;
     
     // Don't allow removing the rationale field if connected to ChainOfThought
     const field = fields[index];
@@ -64,16 +66,17 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   };
 
   const updateField = (index: number, updatedField: Partial<SignatureField>) => {
-    // For default start node, only allow updating descriptions
-    if (isDefaultStartNode) {
+    // For default nodes, only allow updating descriptions
+    if (isDefaultNode) {
       const field = fields[index];
-      if (field && (field.name === 'question' || field.name === 'history')) {
+      // For default start node fields or default end node answer field
+      if (field && (field.name === 'question' || field.name === 'history' || field.name === 'answer')) {
         // Only allow description changes
         const allowedUpdates: Partial<SignatureField> = {};
         if (updatedField.description !== undefined) {
           allowedUpdates.description = updatedField.description;
         }
-        const updatedFields = fields.map((field, i) => 
+        const updatedFields = fields.map((field, i) =>
           i === index ? { ...field, ...allowedUpdates } : field
         );
         setFields(updatedFields);
@@ -99,7 +102,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                 label: nodeLabel,
                 fields: fields,
                 connectionMode: connectionMode,
-                ...(isDefaultStartNode ? {} : { isStart, isEnd }),
+                // Don't allow modifying isStart/isEnd for any field nodes
               }
             }
           : node
@@ -109,8 +112,8 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
   };
 
   const handleDelete = () => {
-    // Don't allow deleting the default start node
-    if (isDefaultStartNode) return;
+    // Don't allow deleting the default nodes
+    if (isDefaultNode) return;
     
     deleteElements({ nodes: [{ id }] });
   };
@@ -189,7 +192,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
           >
             <Edit3 size={14} className="text-sky-700" />
           </button>
-          {!isDefaultStartNode && (
+          {!isDefaultNode && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -217,37 +220,15 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                 onChange={(e) => setNodeLabel(e.target.value)}
                 placeholder="Enter node name"
                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                disabled={isDefaultStartNode}
+                disabled={isDefaultNode}
               />
             </div>
             
-            {/* Node Type Settings */}
-            {!isDefaultStartNode && (
-              <div className="flex space-x-4">
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={isStart}
-                    onChange={(e) => setIsStart(e.target.checked)}
-                    className="rounded"
-                  />
-                  <span className="text-sm">Start</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={isEnd}
-                    onChange={(e) => setIsEnd(e.target.checked)}
-                    className="rounded"
-                  />
-                  <span className="text-sm">End</span>
-                </label>
-              </div>
-            )}
+            {/* Node Type Settings - Hidden for all field nodes */}
             
-            {isDefaultStartNode && (
+            {isDefaultNode && (
               <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                ℹ️ This is the default input field and cannot be modified except for descriptions.
+                This is a default {isDefaultStartNode ? 'input' : 'output'} field and cannot be modified except for descriptions.
               </div>
             )}
 
@@ -274,7 +255,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Fields</label>
-                {!isDefaultStartNode && (
+                {!isDefaultNode && (
                   <button
                     onClick={addField}
                     className="flex items-center space-x-1 px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
@@ -303,9 +284,9 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                       onChange={(e) => updateField(index, { name: e.target.value })}
                       placeholder="Field name"
                       className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                      disabled={isDefaultStartNode || (field.name === 'reasoning' && isConnectedToChainOfThought())}
+                      disabled={isDefaultNode || (field.name === 'reasoning' && isConnectedToChainOfThought())}
                     />
-                    {!isDefaultStartNode && !(field.name === 'reasoning' && isConnectedToChainOfThought()) && (
+                    {!isDefaultNode && !(field.name === 'reasoning' && isConnectedToChainOfThought()) && (
                       <button
                         onClick={() => removeField(index)}
                         className="p-1 text-red-500 hover:bg-red-50 rounded"
@@ -319,7 +300,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                     value={field.type}
                     onChange={(e) => updateField(index, { type: e.target.value as FieldType })}
                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                    disabled={isDefaultStartNode || (field.name === 'reasoning' && isConnectedToChainOfThought())}
+                    disabled={isDefaultNode || (field.name === 'reasoning' && isConnectedToChainOfThought())}
                   >
                     {fieldTypes.map(type => (
                       <option key={type} value={type}>{type}</option>
@@ -353,7 +334,7 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
                         }}
                         placeholder="e.g., pending, approved, rejected"
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                        disabled={isDefaultStartNode}
+                        disabled={isDefaultNode}
                       />
                       {field.enumValues && field.enumValues.length > 0 && (
                         <div className="flex flex-wrap gap-1">

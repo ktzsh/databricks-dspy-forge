@@ -52,7 +52,27 @@ const createDefaultStartNode = (): Node => ({
   }
 });
 
-const initialNodes: Node[] = [createDefaultStartNode()];
+// Create the default end node (reusable function)
+const createDefaultEndNode = (): Node => ({
+  id: 'default-end-node',
+  type: 'signature_field',
+  position: { x: 100, y: 400 },
+  data: {
+    label: 'Output',
+    fields: [
+      {
+        name: 'answer',
+        type: 'str',
+        description: 'The response or answer',
+        required: true
+      }
+    ],
+    isEnd: true,
+    connectionMode: 'whole'
+  }
+});
+
+const initialNodes: Node[] = [createDefaultStartNode(), createDefaultEndNode()];
 const initialEdges: Edge[] = [];
 
 // Helper function to generate consistent node IDs
@@ -318,9 +338,9 @@ const WorkflowBuilderContent: React.FC = () => {
             // Transform workflow data from backend format to frontend format
             const { loadedNodes, loadedEdges } = transformWorkflowFromBackend(workflow);
 
-            // Ensure default start node is present
-            const nodesWithDefaultStart = ensureDefaultStartNode(loadedNodes);
-            setNodes(nodesWithDefaultStart);
+            // Ensure default start and end nodes are present
+            const nodesWithDefaults = ensureDefaultNodes(loadedNodes);
+            setNodes(nodesWithDefaults);
             setEdges(loadedEdges);
 
             showSuccess('Workflow Loaded', `"${workflow.name}" loaded successfully`);
@@ -360,22 +380,31 @@ const WorkflowBuilderContent: React.FC = () => {
     }
   }, [shouldFitView, nodes, reactFlowInstance]);
 
-  // Function to ensure default start node exists and is the only start node
-  const ensureDefaultStartNode = useCallback((nodes: Node[]) => {
-    // Find the existing default-start-node to preserve its position
+  // Function to ensure default start and end nodes exist
+  const ensureDefaultNodes = useCallback((nodes: Node[]) => {
+    // Find the existing default nodes to preserve their positions
     const existingDefaultStart = nodes.find((node: Node) => node.id === 'default-start-node');
-    
-    // Remove all start nodes (including existing default-start-node)
-    const nonStartNodes = nodes.filter((node: Node) => 
-      !(node.data as any).isStart && !(node.data as any).is_start
+    const existingDefaultEnd = nodes.find((node: Node) => node.id === 'default-end-node');
+
+    // Remove all start and end nodes (including existing default nodes)
+    const nonStartEndNodes = nodes.filter((node: Node) =>
+      !(node.data as any).isStart &&
+      !(node.data as any).is_start &&
+      !(node.data as any).isEnd &&
+      !(node.data as any).is_end
     );
-    
+
     // Create default start node, preserving position if it existed
-    const defaultStart = existingDefaultStart 
+    const defaultStart = existingDefaultStart
       ? { ...createDefaultStartNode(), position: existingDefaultStart.position }
       : createDefaultStartNode();
-      
-    return [defaultStart, ...nonStartNodes];
+
+    // Create default end node, preserving position if it existed
+    const defaultEnd = existingDefaultEnd
+      ? { ...createDefaultEndNode(), position: existingDefaultEnd.position }
+      : createDefaultEndNode();
+
+    return [defaultStart, defaultEnd, ...nonStartEndNodes];
   }, []);
 
   const onConnect = useCallback(
@@ -523,8 +552,8 @@ const WorkflowBuilderContent: React.FC = () => {
           if (selectedNodes.length > 0) {
             const selectedNodeIds = selectedNodes.map(node => node.id);
             
-            // Filter out the default start node from deletion
-            const deletableNodeIds = selectedNodeIds.filter(id => id !== 'default-start-node');
+            // Filter out the default start and end nodes from deletion
+            const deletableNodeIds = selectedNodeIds.filter(id => id !== 'default-start-node' && id !== 'default-end-node');
             
             if (deletableNodeIds.length > 0) {
               // Remove selected nodes (except default start node)
@@ -575,11 +604,11 @@ const WorkflowBuilderContent: React.FC = () => {
     // Transform workflow data from backend format to frontend format
     const { loadedNodes, loadedEdges } = transformWorkflowFromBackend(workflow);
 
-    // Ensure default start node is present and is the only start node
-    const nodesWithDefaultStart = ensureDefaultStartNode(loadedNodes);
+    // Ensure default start and end nodes are present
+    const nodesWithDefaults = ensureDefaultNodes(loadedNodes);
 
     // Update state
-    setNodes(nodesWithDefaultStart);
+    setNodes(nodesWithDefaults);
     setEdges(loadedEdges);
     setWorkflowName(workflow.name);
     setWorkflowId(workflow.id);
@@ -600,17 +629,18 @@ const WorkflowBuilderContent: React.FC = () => {
         maxZoom: 1.2
       });
     }, 100);
-  }, [setNodes, setEdges, ensureDefaultStartNode, reactFlowInstance]);
+  }, [setNodes, setEdges, ensureDefaultNodes, reactFlowInstance]);
 
   const handleNewWorkflow = useCallback(() => {
     const defaultStart = createDefaultStartNode();
-    setNodes([defaultStart]);
+    const defaultEnd = createDefaultEndNode();
+    setNodes([defaultStart, defaultEnd]);
     setEdges([]);
     setWorkflowName('Untitled Workflow');
     setWorkflowId(null);
     setSelectedNodes([]);
     setSelectedEdges([]);
-    showSuccess('New Workflow', 'Started a new workflow with default input field');
+    showSuccess('New Workflow', 'Started a new workflow with default input and output fields');
   }, [setNodes, setEdges, showSuccess]);
 
   const handleSaveWorkflow = async () => {
