@@ -14,13 +14,14 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
-import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash, Zap, Home } from 'lucide-react';
+import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash, Zap, Home, Code } from 'lucide-react';
 
 import ComponentSidebar from './ComponentSidebar';
 import PlaygroundSidebar from './PlaygroundSidebar';
 import ToastContainer from './ToastContainer';
 import WorkflowList from './WorkflowList';
 import OptimizeModal from './OptimizeModal';
+import CodeModal from './CodeModal';
 import { nodeTypes } from './nodes';
 import { WorkflowNode, WorkflowEdge } from '../types/workflow';
 import { useToast } from '../hooks/useToast';
@@ -295,6 +296,8 @@ const WorkflowBuilderContent: React.FC = () => {
   const [deploymentStatus, setDeploymentStatus] = useState<any>(null);
   const [deploymentTimeoutId, setDeploymentTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [activeOptimizationId, setActiveOptimizationId] = useState<string | null>(null);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState('');
   const { toasts, removeToast, showSuccess, showError } = useToast();
   const fitViewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadedWorkflowRef = useRef<string | null>(null);
@@ -934,6 +937,35 @@ const WorkflowBuilderContent: React.FC = () => {
     pollOptimizationStatus(optimizationId);
   };
 
+  const handleGetCode = async () => {
+    if (!workflowId) {
+      showError('Save Required', 'Please save your workflow before generating code.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/v1/workflows/${workflowId}/compile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to compile workflow');
+      }
+
+      const data = await response.json();
+      setGeneratedCode(data.code);
+      setShowCodeModal(true);
+      showSuccess('Code Generated', 'DSPy code has been generated successfully!');
+    } catch (error: any) {
+      console.error('Failed to compile workflow:', error);
+      showError('Compilation Failed', error.message || 'Failed to compile workflow');
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -984,6 +1016,13 @@ const WorkflowBuilderContent: React.FC = () => {
           >
             <Save size={16} />
             <span>{workflowId ? 'Update' : 'Save'}</span>
+          </button>
+          <button
+            onClick={handleGetCode}
+            className="flex items-center space-x-2 px-4 py-2 bg-slate-700/80 text-slate-100 rounded-lg hover:bg-slate-700 transition-all duration-200 font-medium border border-slate-600/50"
+          >
+            <Code size={16} />
+            <span>Get Code</span>
           </button>
           <button
             onClick={() => {
@@ -1216,6 +1255,14 @@ const WorkflowBuilderContent: React.FC = () => {
           isOptimizationActive={!!activeOptimizationId}
         />
       )}
+
+      {/* Code Modal */}
+      <CodeModal
+        isOpen={showCodeModal}
+        onClose={() => setShowCodeModal(false)}
+        code={generatedCode}
+        workflowName={workflowName}
+      />
 
       {/* Node Execution Details Modal */}
       {showNodeExecutionModal && selectedNodeExecution && (
