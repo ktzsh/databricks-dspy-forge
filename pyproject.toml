@@ -15,7 +15,10 @@ dependencies = [
     "databricks-sdk>=0.65.0",
     "databricks-sql-connector>=3.0.0",
     "databricks-ai-bridge>=0.8.0",
-    "databricks-agents>=1.6.0"
+    "databricks-agents>=1.6.0",
+    "aiofiles>=24.1.0",
+    "networkx>=3.5",
+    "dspy>=3.0.3",
 ]
 
 [build-system]

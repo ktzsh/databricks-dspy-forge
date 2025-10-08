@@ -449,6 +449,41 @@ async def get_optimization_status(optimization_id: str):
         )
 
 
+@router.post("/{workflow_id}/compile")
+async def compile_workflow(workflow_id: str):
+    """Compile workflow to DSPy code"""
+    try:
+        logger.info(f"Compiling workflow {workflow_id}")
+
+        # Get workflow
+        workflow = await workflow_service.get_workflow(workflow_id)
+        if not workflow:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow not found"
+            )
+
+        # Compile workflow to code
+        from dspy_forge.services.compiler_service import compiler_service
+        compiled_code, node_mapping = compiler_service.compile_workflow_to_code(workflow)
+
+        logger.info(f"Successfully compiled workflow {workflow_id}")
+        return {
+            "workflow_id": workflow_id,
+            "code": compiled_code,
+            "node_mapping": node_mapping
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to compile workflow {workflow_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to compile workflow: {str(e)}"
+        )
+
+
 @router.get("/_health")
 async def storage_health():
     """Get storage backend health status"""
