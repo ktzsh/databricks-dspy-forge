@@ -289,7 +289,7 @@ class DeploymentService:
             if node.type == NodeType.MODULE:
                 model_name = node_data.get('model')
                 if model_name:
-                    models_used.add(model_name)
+                    models_used.add(model_name.split("/")[-1])
             
             # Extract retriever information
             if node.type == NodeType.RETRIEVER:
