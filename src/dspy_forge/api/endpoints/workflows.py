@@ -2,16 +2,20 @@ from fastapi import APIRouter, HTTPException, status, BackgroundTasks
 from typing import List, Dict, Optional, Literal, Any
 from pydantic import BaseModel, Field, field_validator
 
+from dspy_forge.core.logging import get_logger
+from dspy_forge.storage.factory import get_storage_backend
 from dspy_forge.models.workflow import (
     Workflow, WorkflowCreateRequest, WorkflowUpdateRequest, DeploymentRequest
 )
-from dspy_forge.services.workflow_service import workflow_service
 from dspy_forge.services.validation_service import (
     WorkflowValidationError,
     validation_service,
     optimization_validation_service
 )
-from dspy_forge.core.logging import get_logger
+from dspy_forge.services.workflow_service import workflow_service
+from dspy_forge.services.compiler_service import compiler_service
+from dspy_forge.services.deployment_service import deployment_service
+from dspy_forge.services.optimization_service import optimization_service
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -131,7 +135,6 @@ async def get_workflow_history(workflow_id: str):
             )
 
         # Get storage backend
-        from dspy_forge.storage.factory import get_storage_backend
         storage = await get_storage_backend()
 
         # Get optimization and deployment history
@@ -232,7 +235,6 @@ async def validate_workflow_endpoint(workflow_id: str):
         )
     
     try:
-        from dspy_forge.services.validation_service import validation_service
         errors = validation_service.validate_workflow(workflow)
         return {
             "valid": len(errors) == 0,
@@ -260,7 +262,6 @@ async def deploy_workflow(workflow_id: str, deployment_request: DeploymentReques
             )
         
         # Start background deployment task
-        from dspy_forge.services.deployment_service import deployment_service
         deployment_id = f"deploy_{workflow_id}_{deployment_request.model_name}"
         
         background_tasks.add_task(
@@ -295,7 +296,6 @@ async def get_deployment_status(deployment_id: str):
     """Get deployment status"""
     try:
         logger.info(f"Getting deployment status for {deployment_id}")
-        from dspy_forge.services.deployment_service import deployment_service
         status_info = await deployment_service.get_deployment_status(deployment_id)
         
         if not status_info:
@@ -376,8 +376,6 @@ async def optimize_workflow(request: OptimizationRequest, background_tasks: Back
             )
 
         # Step 4: Start background optimization task
-        from dspy_forge.services.optimization_service import optimization_service
-
         optimization_id = f"opt_{request.workflow_id}"
 
         # Add optimization task to background
@@ -426,7 +424,6 @@ async def get_optimization_status(optimization_id: str):
     """Get optimization status"""
     try:
         logger.info(f"Getting optimization status for {optimization_id}")
-        from dspy_forge.services.optimization_service import optimization_service
         status_info = await optimization_service.get_optimization_status(optimization_id)
 
         if not status_info:
@@ -464,7 +461,6 @@ async def compile_workflow(workflow_id: str):
             )
 
         # Compile workflow to code
-        from dspy_forge.services.compiler_service import compiler_service
         compiled_code, node_mapping = compiler_service.compile_workflow_to_code(workflow)
 
         logger.info(f"Successfully compiled workflow {workflow_id}")
