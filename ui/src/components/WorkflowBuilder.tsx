@@ -14,7 +14,7 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
-import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash, Zap, Home, Code } from 'lucide-react';
+import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash, Zap, Home, Code, Cpu } from 'lucide-react';
 
 import ComponentSidebar from './ComponentSidebar';
 import PlaygroundSidebar from './PlaygroundSidebar';
@@ -22,6 +22,7 @@ import ToastContainer from './ToastContainer';
 import WorkflowList from './WorkflowList';
 import OptimizeModal from './OptimizeModal';
 import CodeModal from './CodeModal';
+import LMConfigModal from './LMConfigModal';
 import { nodeTypes } from './nodes';
 import { WorkflowNode, WorkflowEdge } from '../types/workflow';
 import { useToast } from '../hooks/useToast';
@@ -318,6 +319,7 @@ const WorkflowBuilderContent: React.FC = () => {
   const [activeOptimizationId, setActiveOptimizationId] = useState<string | null>(null);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('');
+  const [showLMConfigModal, setShowLMConfigModal] = useState(false);
   const { toasts, removeToast, showSuccess, showError } = useToast();
   const fitViewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadedWorkflowRef = useRef<string | null>(null);
@@ -1048,6 +1050,14 @@ const WorkflowBuilderContent: React.FC = () => {
             <span>{workflowId ? 'Update' : 'Save'}</span>
           </button>
           <button
+            onClick={() => setShowLMConfigModal(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-slate-700/80 text-slate-100 rounded-lg hover:bg-slate-700 transition-all duration-200 font-medium border border-slate-600/50"
+            title="Configure global LM settings"
+          >
+            <Cpu size={16} />
+            <span>LM Config</span>
+          </button>
+          <button
             onClick={handleGetCode}
             className="flex items-center space-x-2 px-4 py-2 bg-slate-700/80 text-slate-100 rounded-lg hover:bg-slate-700 transition-all duration-200 font-medium border border-slate-600/50"
           >
@@ -1292,6 +1302,12 @@ const WorkflowBuilderContent: React.FC = () => {
         onClose={() => setShowCodeModal(false)}
         code={generatedCode}
         workflowName={workflowName}
+      />
+
+      {/* LM Config Modal */}
+      <LMConfigModal
+        isOpen={showLMConfigModal}
+        onClose={() => setShowLMConfigModal(false)}
       />
 
       {/* Node Execution Details Modal */}

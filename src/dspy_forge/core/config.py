@@ -39,25 +39,32 @@ class Settings(BaseSettings):
     app_name: str = "DSPy Workflow Builder"
     debug: bool = False
     api_prefix: str = "/api/v1"
-    
+
     # Logging settings
     log_level: str = "INFO"
     log_file: Optional[str] = None # "./logs/app.log"
-        
+
     # Storage settings
     storage_backend: Literal["local", "databricks"] = "local"
     artifacts_path: str = "./artifacts/"
     # artifacts_path: str = "/Volumes/users/kshitiz_sharma/dspy_forge_artifacts"
-    
+
     # Databricks settings
     databricks_config_profile: Optional[str] = None
     databricks_host: Optional[str] = None
     databricks_token: Optional[str] = None
     databricks_warehouse_id: Optional[str] = None
-    
+
+    # LM Provider settings (for non-Databricks models)
+    openai_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    custom_lm_api_base: Optional[str] = None
+    custom_lm_api_key: Optional[str] = None
+
     # CORS settings
     allowed_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
-    
+
     class Config:
         env_file = ".env"
 

@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Literal, get_type_hints
 from dspy_forge.core.templates import NodeTemplate, CodeGenerationContext
 from dspy_forge.core.dspy_types import DSPyModuleType
 from dspy_forge.core.logging import get_logger
+from dspy_forge.core.lm_config import parse_model_name
 
 logger = get_logger(__name__)
 
@@ -135,19 +136,21 @@ class BaseModuleTemplate(NodeTemplate):
         # Generate forward method code
         input_args = ", ".join([f"{field}={field}" for field in input_fields])
         result_var = f"result_{context.get_result_count()}"
-        
+
         forward_lines = []
         if model_name and model_name != 'default':
-            forward_lines.append(f"        with dspy.context(lm=dspy.LM('{model_name}')):")
+            # Import create_lm helper at the top of generated code
+            context.add_import("from dspy_forge.core.lm_config import create_lm")
+            forward_lines.append(f"        with dspy.context(lm=create_lm('{model_name}')):")
             forward_lines.append(f"            {result_var} = self.{instance_var}({input_args})")
         else:
             forward_lines.append(f"        {result_var} = self.{instance_var}({input_args})")
-        
+
         # Extract output fields
         for field in output_fields:
             forward_lines.append(f"        {field} = {result_var}.{field}")
         forward_lines[-1] += "\n"
-        
+
         forward_code = '\n'.join(forward_lines)
         
         return {
