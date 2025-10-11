@@ -1,11 +1,12 @@
 import React from 'react';
-import { Database, Brain, GitBranch, Filter, Search, RouteIcon } from 'lucide-react';
+import { Database, Brain, GitBranch, Filter, Search, RouteIcon, AlertCircle } from 'lucide-react';
 
 interface ComponentSidebarProps {
   onAddNode: (nodeData: { type: string; data: any }) => void;
+  isDatabricksAvailable?: boolean;
 }
 
-const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
+const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode, isDatabricksAvailable = true }) => {
   const components = [
     {
       category: 'Signature Fields',
@@ -115,7 +116,8 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           icon: Search,
           description: 'Databricks Vector Search',
           type: 'retriever',
-          enabled: true,
+          enabled: isDatabricksAvailable,
+          requiresDatabricks: true,
           data: {
             label: 'Unstructured Retrieve',
             retrieverType: 'UnstructuredRetrieve',
@@ -137,7 +139,8 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
           icon: Database,
           description: 'Databricks Genie Space',
           type: 'retriever',
-          enabled: true,
+          enabled: isDatabricksAvailable,
+          requiresDatabricks: true,
           data: {
             label: 'Structured Retrieve',
             retrieverType: 'StructuredRetrieve',
@@ -247,47 +250,61 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode }) => {
             </h3>
 
             <div className="space-y-2">
-              {category.items.map((component) => {
+              {category.items.map((component: any) => {
                 const IconComponent = component.icon;
                 const isEnabled = component.enabled !== false;
+                const requiresDatabricks = component.requiresDatabricks === true;
+                const showDatabricksWarning = requiresDatabricks && !isDatabricksAvailable;
+
                 return (
-                  <div
-                    key={component.id}
-                    className={`group p-3.5 bg-white border border-slate-200 rounded-xl transition-all duration-200 ${
-                      isEnabled
-                        ? 'cursor-pointer hover:bg-slate-50 hover:border-brand-300 hover:shadow-soft hover:scale-[1.02] active:scale-[0.98]'
-                        : 'cursor-not-allowed opacity-40 grayscale'
-                    }`}
-                    onClick={() => {
-                      if (isEnabled) {
-                        onAddNode({
-                          type: component.type,
-                          data: component.data
-                        });
-                      }
-                    }}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-2 rounded-lg transition-colors ${
+                  <div key={component.id}>
+                    <div
+                      className={`group p-3.5 bg-white border border-slate-200 rounded-xl transition-all duration-200 ${
                         isEnabled
-                          ? 'bg-slate-100 text-slate-700 group-hover:bg-brand-100 group-hover:text-brand-600'
-                          : 'bg-slate-50 text-slate-400'
-                      }`}>
-                        <IconComponent size={18} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-sm font-semibold truncate ${
-                          isEnabled ? "text-slate-900" : "text-slate-400"
+                          ? 'cursor-pointer hover:bg-slate-50 hover:border-brand-300 hover:shadow-soft hover:scale-[1.02] active:scale-[0.98]'
+                          : 'cursor-not-allowed opacity-40 grayscale'
+                      }`}
+                      onClick={() => {
+                        if (isEnabled) {
+                          onAddNode({
+                            type: component.type,
+                            data: component.data
+                          });
+                        }
+                      }}
+                      title={showDatabricksWarning ? 'Requires Databricks configuration' : ''}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className={`p-2 rounded-lg transition-colors ${
+                          isEnabled
+                            ? 'bg-slate-100 text-slate-700 group-hover:bg-brand-100 group-hover:text-brand-600'
+                            : 'bg-slate-50 text-slate-400'
                         }`}>
-                          {component.name}
+                          <IconComponent size={18} />
                         </div>
-                        <div className={`text-xs truncate ${
-                          isEnabled ? "text-slate-500" : "text-slate-300"
-                        }`}>
-                          {component.description}
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-semibold truncate ${
+                            isEnabled ? "text-slate-900" : "text-slate-400"
+                          }`}>
+                            {component.name}
+                          </div>
+                          <div className={`text-xs truncate ${
+                            isEnabled ? "text-slate-500" : "text-slate-300"
+                          }`}>
+                            {component.description}
+                          </div>
                         </div>
+                        {showDatabricksWarning && (
+                          <AlertCircle size={14} className="text-yellow-500 flex-shrink-0" />
+                        )}
                       </div>
                     </div>
+                    {showDatabricksWarning && (
+                      <div className="mt-1 px-2 py-1 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700 flex items-start space-x-1">
+                        <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
+                        <span>Requires Databricks configuration</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}

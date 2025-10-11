@@ -14,7 +14,7 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
-import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash, Zap, Home, Code, Cpu } from 'lucide-react';
+import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash, Zap, Home, Code, Cpu, AlertCircle } from 'lucide-react';
 
 import ComponentSidebar from './ComponentSidebar';
 import PlaygroundSidebar from './PlaygroundSidebar';
@@ -26,6 +26,7 @@ import LMConfigModal from './LMConfigModal';
 import { nodeTypes } from './nodes';
 import { WorkflowNode, WorkflowEdge } from '../types/workflow';
 import { useToast } from '../hooks/useToast';
+import { useLMConfig } from '../contexts/LMConfigContext';
 
 // Create the default start node (reusable function)
 const createDefaultStartNode = (): Node => ({
@@ -321,9 +322,13 @@ const WorkflowBuilderContent: React.FC = () => {
   const [generatedCode, setGeneratedCode] = useState('');
   const [showLMConfigModal, setShowLMConfigModal] = useState(false);
   const { toasts, removeToast, showSuccess, showError } = useToast();
+  const { availableProviders } = useLMConfig();
   const fitViewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadedWorkflowRef = useRef<string | null>(null);
   const [shouldFitView, setShouldFitView] = useState(false);
+
+  // Check if Databricks is available for optimization and retrievers
+  const isDatabricksAvailable = availableProviders['databricks'] === true;
 
   // Load workflow from URL params on mount
   useEffect(() => {
@@ -1066,6 +1071,10 @@ const WorkflowBuilderContent: React.FC = () => {
           </button>
           <button
             onClick={() => {
+              if (!isDatabricksAvailable) {
+                showError('Databricks Required', 'Optimization requires Databricks to be configured.');
+                return;
+              }
               if (!workflowId) {
                 showError('Save Required', 'Please save your workflow before optimizing.');
                 return;
@@ -1076,12 +1085,13 @@ const WorkflowBuilderContent: React.FC = () => {
               }
               setShowOptimizeModal(true);
             }}
-            disabled={!!activeOptimizationId}
+            disabled={!!activeOptimizationId || !isDatabricksAvailable}
             className={`flex items-center space-x-2 px-4 py-2 ${
-              activeOptimizationId
+              activeOptimizationId || !isDatabricksAvailable
                 ? 'bg-slate-400 cursor-not-allowed'
                 : 'bg-brand-500 hover:bg-brand-600'
             } text-white rounded-lg transition-all duration-200 shadow-soft font-medium`}
+            title={!isDatabricksAvailable ? 'Databricks configuration required for optimization' : activeOptimizationId ? 'Optimization in progress' : 'Optimize workflow'}
           >
             <Zap size={16} className={activeOptimizationId ? 'animate-pulse' : ''} />
             <span>{activeOptimizationId ? 'Optimizing...' : 'Optimize'}</span>
@@ -1100,7 +1110,9 @@ const WorkflowBuilderContent: React.FC = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Components */}
         <div className="w-80 border-r border-slate-200 bg-gradient-to-b from-slate-50 to-white flex-shrink-0 overflow-y-auto">
-          <ComponentSidebar onAddNode={(nodeData) => {
+          <ComponentSidebar
+            isDatabricksAvailable={isDatabricksAvailable}
+            onAddNode={(nodeData) => {
           const newNodeId = generateNodeId();
           
           // Find an available position for the new node
