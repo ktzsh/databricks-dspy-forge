@@ -5,7 +5,9 @@ from pydantic_settings import BaseSettings
 from typing import Optional, Literal
 
 from databricks.sdk import WorkspaceClient
+from dspy_forge.core.logging import get_logger
 
+logger = get_logger(__name__)
 
 def configure_databricks_auth(settings):
     # Set Databricks SDK environment variables from settings
@@ -26,9 +28,12 @@ def configure_databricks_auth(settings):
         mlflow.set_tracking_uri("databricks")
         mlflow.set_registry_uri("databricks-uc")
     else:
-        raise ValueError(
-            "Databricks configuration is missing. Please provide either DATABRICKS_CONFIG_PROFILE or DATABRICKS_HOST and DATABRICKS_TOKEN in .env file."
+        logger.info(
+            "Databricks integration is not configured."
         )
+        # raise ValueError(
+        #     "Databricks configuration is missing. Please provide either DATABRICKS_CONFIG_PROFILE or DATABRICKS_HOST and DATABRICKS_TOKEN in .env file."
+        # )
 
 class Settings(BaseSettings):
     app_name: str = "DSPy Workflow Builder"

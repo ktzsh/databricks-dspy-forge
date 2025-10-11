@@ -161,7 +161,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
                 type="text"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g., gpt-3.5-turbo, claude-3"
+                placeholder="e.g., databricks/databricks-claude-sonnet-4-5"
                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
               />
             </div>
