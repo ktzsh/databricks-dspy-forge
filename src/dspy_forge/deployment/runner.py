@@ -15,9 +15,6 @@ from dspy_forge.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-w = WorkspaceClient()
-current_user = w.current_user.me().user_name
-
 def deploy_agent(
         workflow_id: str,
         agent_file_path: str,
@@ -28,6 +25,9 @@ def deploy_agent(
         auth_policy: tuple[list[Any], list[Any]],
         program_json_path: Optional[str] = None
     ):
+    w = WorkspaceClient()
+    current_user = w.current_user.me().user_name
+
     mlflow.set_experiment(
         f"/Users/{current_user}/DSPy-Forge-Experiment-{workflow_id}"
     )

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
-import { Edit3, Brain, Settings, Trash2 } from 'lucide-react';
+import { Edit3, Brain, Settings, Trash2, Sparkles } from 'lucide-react';
 import { ModuleNodeData, ModuleType } from '../../types/workflow';
 import TraceIndicator from './TraceIndicator';
 import OptimizationFooter from './OptimizationFooter';
+import { useLMConfig } from '../../contexts/LMConfigContext';
 
 const moduleTypes: ModuleType[] = [
   'Predict',
@@ -30,6 +31,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
   const [instruction, setInstruction] = useState(nodeData.instruction || '');
   const [parameters, setParameters] = useState(nodeData.parameters || {});
   const { deleteElements, setNodes } = useReactFlow();
+  const { globalLMConfig } = useLMConfig();
 
   const handleSave = () => {
     // Update the node data immutably using setNodes to ensure React Flow detects the change
@@ -70,6 +72,12 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
   const addParameter = () => {
     const key = `param_${Object.keys(parameters).length + 1}`;
     updateParameter(key, '');
+  };
+
+  const useGlobalConfig = () => {
+    if (globalLMConfig) {
+      setModel(globalLMConfig.modelName);
+    }
   };
 
   return (
@@ -156,14 +164,34 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
 
             {/* Model Selection */}
             <div>
-              <label className="block text-sm font-medium mb-1">Model</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium">Model</label>
+                {globalLMConfig && (
+                  <button
+                    onClick={useGlobalConfig}
+                    className="flex items-center space-x-1 px-2 py-0.5 text-xs bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 transition-colors"
+                    type="button"
+                  >
+                    <Sparkles size={12} />
+                    <span>Use Global</span>
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g., gpt-3.5-turbo, claude-3"
+                placeholder="e.g., databricks/databricks-claude-sonnet-4-5"
                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
               />
+              <div className="text-xs text-gray-500 mt-1">
+                Format: provider/model-name (openai/gpt-4, databricks/claude-sonnet)
+              </div>
+              {globalLMConfig && (
+                <div className="text-xs text-emerald-600 mt-1">
+                  Global: {globalLMConfig.modelName}
+                </div>
+              )}
             </div>
 
             {/* Instruction */}

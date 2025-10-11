@@ -1,12 +1,12 @@
 # DSPy Forge
 
-A visual platform for building, prototyping, and deploying multi-step agentic programs on Databricks using DSPy's programming and signature based primitives.
+A visual platform for building, prototyping, and deploying multi-step agentic programs using DSPy's programming and signature based primitives.
 
 ## Overview
 
 DSPy Forge provides a drag-and-drop interface for creating sophisticated AI workflows that combine retrieval, reasoning, and action components. Program workflows are executed in an integrated playground and deployed to Databricks serving using Agent Framework.
 
-NOTE: The DSPy Forge is designed to only work with Models & Retrievers available on Databricks.
+**LM Provider Support:** DSPy Forge now supports multiple LM providers including Databricks, OpenAI, Anthropic, Google Gemini, and custom providers!
 
 ![DSPy Forge Dashboard](artifacts/home.png)
 ![Canvas](artifacts/canvas.png)
@@ -138,9 +138,81 @@ DATABRICKS_TOKEN=dapi...
 # Or use profile-based auth
 DATABRICKS_CONFIG_PROFILE=DEFAULT
 
+# LM Provider API Keys (optional - for non-Databricks models)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...
+CUSTOM_LM_API_BASE=https://api.example.com/v1
+CUSTOM_LM_API_KEY=...
+
 # Logging
 LOG_LEVEL=INFO
 ```
+
+## 🤖 LM Provider Configuration
+
+DSPy Forge supports multiple Language Model providers beyond Databricks. Configure API keys server-side for security.
+
+### Supported Providers
+
+1. **Databricks** (Default)
+   - No additional API key needed if Databricks auth is configured
+   - Model format: `databricks/model-name`
+   - Example: `databricks/databricks-claude-sonnet-4-5`
+
+2. **OpenAI**
+   - Requires: `OPENAI_API_KEY` in `.env`
+   - Model format: `openai/model-name`
+   - Example: `openai/gpt-4`, `openai/gpt-3.5-turbo`
+
+3. **Anthropic**
+   - Requires: `ANTHROPIC_API_KEY` in `.env`
+   - Model format: `anthropic/model-name`
+   - Example: `anthropic/claude-3-sonnet`, `anthropic/claude-3-opus`
+
+4. **Google Gemini**
+   - Requires: `GEMINI_API_KEY` in `.env`
+   - Model format: `gemini/model-name`
+   - Example: `gemini/gemini-pro`, `gemini/gemini-1.5-pro`
+
+5. **Custom Provider**
+   - Requires: `CUSTOM_LM_API_BASE` and `CUSTOM_LM_API_KEY` in `.env`
+   - Model format: `custom/model-name` or `your-provider/model-name`
+   - Example: `custom/llama-3-70b`
+
+### Using LM Providers
+
+#### Global Configuration (UI)
+
+1. Click **"LM Config"** button in the workflow builder toolbar
+2. Select your provider (Databricks, OpenAI, Anthropic, Gemini, or Custom)
+3. Enter the model name (without provider prefix)
+4. Save - this becomes the default for new module nodes
+
+#### Per-Node Configuration
+
+- When creating a DSPy module node (Predict, ChainOfThought, etc.), you can:
+  - Click **"Use Global"** to auto-fill from global config
+  - Or manually enter: `provider/model-name`
+- Each node can use a different model/provider if needed
+
+#### Model Name Format
+
+Always use the format: `provider/model-name`
+
+Examples:
+- `databricks/databricks-claude-sonnet-4-5`
+- `openai/gpt-4`
+- `anthropic/claude-3-sonnet`
+- `gemini/gemini-pro`
+- `custom/my-model`
+
+### Security Notes
+
+- **API keys are stored server-side only** in the `.env` file
+- The UI never has access to actual API keys
+- Only provider availability status is sent to the frontend
+- All API calls are made from the backend
 
 ## Usage
 
