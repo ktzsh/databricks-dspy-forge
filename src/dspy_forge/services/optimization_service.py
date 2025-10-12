@@ -13,6 +13,7 @@ from dspy import GEPA, BootstrapFewShotWithRandomSearch, MIPROv2
 
 from dspy_forge.core.config import settings
 from dspy_forge.core.logging import get_logger
+from dspy_forge.core.lm_config import create_lm
 from dspy_forge.models.workflow import Workflow
 from dspy_forge.core.dspy_runtime import CompoundProgram
 from dspy_forge.services.execution_service import ExecutionContext
@@ -241,8 +242,8 @@ class OptimizationService:
             # Parse config parameters with defaults
             auto = optimizer_config.get('auto')
             reflection_lm_model = optimizer_config.get('reflection_lm')
-            reflection_lm = dspy.LM(
-                model=f"{reflection_lm_model}",
+            reflection_lm = create_lm(
+                model_name=reflection_lm_model,
                 temperature=1.0,
                 max_tokens=8192
             )
@@ -256,13 +257,13 @@ class OptimizationService:
         elif optimizer_name == 'MIPROv2':
             # Parse config parameters with defaults
             auto = optimizer_config.get('auto')
-            prompt_model = dspy.LM(
-                model=f"{optimizer_config.get('prompt_model')}",
+            prompt_model = create_lm(
+                model_name=optimizer_config.get('prompt_model'),
                 temperature=1.0,
                 max_tokens=8192
             )
-            task_model = dspy.LM(
-                model=f"{optimizer_config.get('task_model')}",
+            task_model = create_lm(
+                model_name=optimizer_config.get('task_model'),
                 temperature=1.0,
                 max_tokens=8192
             )
