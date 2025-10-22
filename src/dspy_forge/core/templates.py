@@ -19,7 +19,8 @@ class CodeGenerationContext:
         self.result_count = 0
         self.signature_names = {}
         self.node_to_var_mapping = {}  # Maps node_id -> instance_var for optimization loading
-    
+        self.imports = set()  # Track additional imports needed
+
     def get_signature_name(self, signature_key: tuple) -> str:
         """Get or create unique signature name"""
         if signature_key not in self.signature_names:
@@ -28,18 +29,22 @@ class CodeGenerationContext:
             signature_name = f"{module_type_str}Signature_{existing_count + 1}"
             self.signature_names[signature_key] = signature_name
             self.signatures_created.add(signature_key)
-        
+
         return self.signature_names[signature_key]
-    
+
     def get_node_count(self, node_type: str) -> int:
         """Get and increment node count"""
         self.node_counts[node_type] = self.node_counts.get(node_type, 0) + 1
         return self.node_counts[node_type]
-    
+
     def get_result_count(self) -> int:
         """Get and increment result count"""
         self.result_count += 1
         return self.result_count
+
+    def add_import(self, import_statement: str):
+        """Add import statement to context"""
+        self.imports.add(import_statement)
 
 
 class NodeTemplate(ABC):

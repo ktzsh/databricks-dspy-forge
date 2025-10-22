@@ -12,7 +12,8 @@ DSPy Forge provides a drag-and-drop interface for creating sophisticated AI work
 ![Canvas](artifacts/canvas.png)
 
 **Key Features:**
-- Visual drag-and-drop workflow builder with DSPy modules (Predict, ChainOfThought, React, ReAct, ProgramOfThought, Refine, BestOfN)
+- Visual drag-and-drop workflow builder with DSPy modules (Predict, ChainOfThought, ReAct, ProgramOfThought, Refine, BestOfN)
+- **ReAct with Tool Integration:** MCP (Model Context Protocol) tools and Unity Catalog Functions
 - Native Databricks integration: Vector Search, Genie Spaces, Unity Catalog, MLflow, Agent Framework
 - DSPy optimization: GEPA, MIPROv2 with custom scoring functions
 - Integrated playground for testing with execution traces
@@ -38,7 +39,8 @@ dspy-forge/
 │   │   └── deployment_service.py  # Databricks deployment
 │   ├── components/                # DSPy component templates
 │   │   ├── registry.py            # Template factory & dispatchers
-│   │   ├── module_templates.py    # Predict, ChainOfThought
+│   │   ├── module_templates.py    # Predict, ChainOfThought, ReAct
+│   │   ├── tool_templates.py      # MCP tools, UC Functions
 │   │   ├── retriever_templates.py # Vector search retrievers
 │   │   ├── logic_templates.py     # Control flow components
 │   │   └── signature_field.py     # Dynamic signature handling
@@ -65,6 +67,7 @@ dspy-forge/
 │   │   │   ├── WorkflowList.tsx         # Workflow management
 │   │   │   └── nodes/                   # Custom ReactFlow node types
 │   │   │       ├── ModuleNode.tsx       # DSPy module nodes
+│   │   │       ├── ToolNode.tsx         # Tool nodes (MCP, UC Functions)
 │   │   │       ├── RetrieverNode.tsx    # Retriever nodes
 │   │   │       ├── LogicNode.tsx        # Logic component nodes
 │   │   │       ├── SignatureFieldNode.tsx # Signature field nodes
@@ -222,6 +225,8 @@ Simple:       Input → Predict → Output
 RAG:          Input → UnstructuredRetrieve → Predict → Output
 RAG:          Input → StructuredRetrieve → Predict → Output
 Multi-Step:   Input → ChainOfThought → FieldSelector → Predict → Output
+ReAct+Tools:  Input → ReAct (+ MCP Tool) → Output
+              Input → ReAct (+ UC Function) → Output
 ```
 
 **Workflow:** Dashboard → Create → Drag components → Configure → Connect → Test (Playground) → Optimize → Deploy
@@ -248,6 +253,10 @@ Multi-Step:   Input → ChainOfThought → FieldSelector → Predict → Output
 - **If-Else** - Conditional branching
 - **Field Selector** - Extract/rename fields
 - **Merge** - Combine parallel outputs
+
+**Tools:** (Connect to ReAct modules only)
+- **MCP Tool** - Model Context Protocol tool integration with custom headers and secrets
+- **UC Function** - Unity Catalog Function calling (catalog.schema.function_name)
 
 ## 🎯 Optimization
 

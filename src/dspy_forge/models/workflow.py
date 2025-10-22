@@ -108,11 +108,17 @@ class LogicType(str, Enum):
     FIELD_SELECTOR = "FieldSelector"
 
 
+class ToolType(str, Enum):
+    MCP_TOOL = "MCP_TOOL"
+    UC_FUNCTION = "UC_FUNCTION"
+
+
 class NodeType(str, Enum):
     SIGNATURE_FIELD = "signature_field"
     MODULE = "module"
     LOGIC = "logic"
     RETRIEVER = "retriever"
+    TOOL = "tool"
 
 
 class BaseNode(BaseModel):
@@ -161,7 +167,7 @@ class RetrieverNode(BaseNode):
         "retriever_type": None,
         # UnstructuredRetrieve fields
         "catalog_name": None,
-        "schema_name": None, 
+        "schema_name": None,
         "index_name": None,
         "embedding_model": None,
         "query_type": "HYBRID",
@@ -169,6 +175,53 @@ class RetrieverNode(BaseNode):
         "score_threshold": 0.0,
         # StructuredRetrieve fields
         "genie_space_id": None,
+        "parameters": {}
+    })
+
+
+class MCPHeader(BaseModel):
+    """MCP Tool header configuration"""
+    model_config = ConfigDict(populate_by_name=True)
+
+    key: str
+    value: str
+    is_secret: bool = Field(default=False, alias="isSecret")
+    env_var_name: Optional[str] = Field(default=None, alias="envVarName")
+
+
+class ToolNodeData(BaseModel):
+    """Tool node data with proper field aliases for camelCase/snake_case conversion"""
+    model_config = ConfigDict(populate_by_name=True, extra='allow')
+
+    tool_type: Optional[str] = Field(default=None, alias="toolType")
+    tool_name: Optional[str] = Field(default=None, alias="toolName")
+    description: Optional[str] = None
+    # MCP Tool fields
+    mcp_url: Optional[str] = Field(default=None, alias="mcpUrl")
+    mcp_headers: List[Union[MCPHeader, Dict[str, Any]]] = Field(default_factory=list, alias="mcpHeaders")
+    # UC Function fields
+    catalog: Optional[str] = None
+    schema: Optional[str] = None
+    function_name: Optional[str] = Field(default=None, alias="functionName")
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    # Base fields
+    label: Optional[str] = None
+    optimization_data: Optional[Dict[str, Any]] = None
+
+
+class ToolNode(BaseNode):
+    type: Literal[NodeType.TOOL] = NodeType.TOOL
+    data: Dict[str, Any] = Field(default_factory=lambda: {
+        "tool_type": None,
+        "tool_name": None,
+        "description": None,
+        # MCP Tool fields
+        "mcp_url": None,
+        "mcp_headers": [],  # List of {"key": str, "value": str, "is_secret": bool, "env_var_name": str}
+        # UC Function fields
+        "catalog": None,
+        "schema": None,
+        "function_name": None,
         "parameters": {}
     })
 
@@ -188,7 +241,7 @@ class Workflow(BaseModel):
     id: str
     name: str
     description: Optional[str] = None
-    nodes: List[Union[SignatureFieldNode, ModuleNode, LogicNode, RetrieverNode]]
+    nodes: List[Union[SignatureFieldNode, ModuleNode, LogicNode, RetrieverNode, ToolNode]]
     edges: List[Edge]
     created_at: datetime = Field(default_factory=datetime.now, serialization_alias="createdAt")
     updated_at: datetime = Field(default_factory=datetime.now, serialization_alias="updatedAt")

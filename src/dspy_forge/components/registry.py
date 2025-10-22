@@ -9,25 +9,29 @@ from dspy_forge.models.workflow import NodeType, ModuleType, RetrieverType, Logi
 
 # Import all component templates
 from .signature_field import SignatureFieldTemplate
-from .module_templates import PredictTemplate, ChainOfThoughtTemplate
+from .module_templates import PredictTemplate, ChainOfThoughtTemplate, ReActTemplate
 from .retriever_templates import UnstructuredRetrieveTemplate, StructuredRetrieveTemplate
 from .logic_templates import RouterTemplate, MergeTemplate, FieldSelectorTemplate
+from .tool_templates import MCPToolTemplate, UCFunctionTemplate
 
 
 def register_all_templates():
     """Register all component templates with the TemplateFactory"""
-    
+
     # Register signature field template
     TemplateFactory.register_template(NodeType.SIGNATURE_FIELD, SignatureFieldTemplate)
-    
+
     # Register module templates - we'll need a dispatcher for different module types
     TemplateFactory.register_template(NodeType.MODULE, ModuleTemplateDispatcher)
-    
+
     # Register retriever templates - we'll need a dispatcher for different retriever types
     TemplateFactory.register_template(NodeType.RETRIEVER, RetrieverTemplateDispatcher)
-    
+
     # Register logic templates - we'll need a dispatcher for different logic types
     TemplateFactory.register_template(NodeType.LOGIC, LogicTemplateDispatcher)
+
+    # Register tool templates - we'll need a dispatcher for different tool types
+    TemplateFactory.register_template(NodeType.TOOL, ToolTemplateDispatcher)
 
 
 class ModuleTemplateDispatcher:
@@ -40,6 +44,8 @@ class ModuleTemplateDispatcher:
             self._template = PredictTemplate(node, workflow)
         elif module_type == ModuleType.CHAIN_OF_THOUGHT.value:
             self._template = ChainOfThoughtTemplate(node, workflow)
+        elif module_type == ModuleType.REACT.value:
+            self._template = ReActTemplate(node, workflow)
         else:
             # Default to PredictTemplate for unknown types
             self._template = PredictTemplate(node, workflow)
@@ -91,6 +97,31 @@ class LogicTemplateDispatcher:
 
     def initialize(self, context):
         """Initialize returns self (template) with call/acall"""
+        return self._template.initialize(context)
+
+    def generate_code(self, context):
+        return self._template.generate_code(context)
+
+
+class ToolTemplateDispatcher:
+    """Dispatcher for different tool template types"""
+
+    def __init__(self, node, workflow):
+        from dspy_forge.models.workflow import ToolType
+
+        # Support both snake_case (backend) and camelCase (frontend)
+        tool_type = node.data.get('tool_type') or node.data.get('toolType')
+
+        if tool_type == ToolType.MCP_TOOL.value:
+            self._template = MCPToolTemplate(node, workflow)
+        elif tool_type == ToolType.UC_FUNCTION.value:
+            self._template = UCFunctionTemplate(node, workflow)
+        else:
+            # Default to MCPToolTemplate for unknown types
+            self._template = MCPToolTemplate(node, workflow)
+
+    def initialize(self, context):
+        """Tools don't have direct initialization"""
         return self._template.initialize(context)
 
     def generate_code(self, context):

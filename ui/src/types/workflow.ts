@@ -34,7 +34,9 @@ export type RetrieverType = 'UnstructuredRetrieve' | 'StructuredRetrieve';
 
 export type LogicType = 'Router' | 'Merge' | 'FieldSelector';
 
-export type NodeType = 'signature_field' | 'module' | 'logic' | 'retriever';
+export type ToolType = 'MCP_TOOL' | 'UC_FUNCTION';
+
+export type NodeType = 'signature_field' | 'module' | 'logic' | 'retriever' | 'tool';
 
 export type ComparisonOperator =
   | '=='
@@ -137,11 +139,32 @@ export interface RetrieverNodeData extends BaseNodeData {
   parameters: Record<string, any>;
 }
 
+export interface MCPHeader {
+  key: string;
+  value: string;
+  isSecret: boolean;
+  envVarName?: string;
+}
+
+export interface ToolNodeData extends BaseNodeData {
+  toolType: ToolType;
+  toolName: string;
+  description?: string;
+  // MCP Tool specific fields
+  mcpUrl?: string;
+  mcpHeaders?: MCPHeader[];
+  // UC Function specific fields
+  catalog?: string;
+  schema?: string;
+  functionName?: string;
+  parameters: Record<string, any>;
+}
+
 export interface WorkflowNode {
   id: string;
   type: NodeType;
   position: NodePosition;
-  data: SignatureFieldNodeData | ModuleNodeData | LogicNodeData | RetrieverNodeData;
+  data: SignatureFieldNodeData | ModuleNodeData | LogicNodeData | RetrieverNodeData | ToolNodeData;
 }
 
 export interface WorkflowEdge {

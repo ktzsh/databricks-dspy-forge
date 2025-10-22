@@ -140,16 +140,17 @@ class WorkflowValidationService:
     def _validate_connectivity(self, workflow: Workflow) -> List[str]:
         """Validate workflow connectivity and graph properties"""
         errors = []
-        
+
         try:
-            # Build graph for connectivity check
-            graph = self._build_workflow_graph(workflow)
-            
-            # Check if workflow is connected
+            # Build graph for connectivity check (excluding tool nodes/edges)
+            graph = self._build_workflow_graph(workflow, exclude_tool_edges=True)
+
+            # Check if workflow is connected (excluding tool nodes)
             if not nx.is_weakly_connected(graph):
                 errors.append("Workflow must be connected (no isolated nodes)")
-            
+
             # Check for cycles (DSPy workflows should be DAGs)
+            # We check the main graph without tool edges since tools don't participate in execution flow
             if not nx.is_directed_acyclic_graph(graph):
                 errors.append("Workflow cannot contain cycles")
             
@@ -209,9 +210,11 @@ class WorkflowValidationService:
             errors.extend(self._validate_logic_node(node))
         elif node.type == NodeType.RETRIEVER:
             errors.extend(self._validate_retriever_node(node))
+        elif node.type == NodeType.TOOL:
+            errors.extend(self._validate_tool_node(node, workflow))
         else:
             errors.append(f"Unknown node type: {node.type}")
-        
+
         return errors
     
     def _validate_signature_field_node(self, node: Any) -> List[str]:
@@ -284,7 +287,7 @@ class WorkflowValidationService:
     def _validate_retriever_node(self, node: Any) -> List[str]:
         """Validate retriever node"""
         errors = []
-        
+
         retriever_type = node.data.get('retriever_type')
         if not retriever_type:
             errors.append("Retriever must specify a retriever type")
@@ -301,7 +304,129 @@ class WorkflowValidationService:
                     errors.append("StructuredRetrieve requires genie_space_id")
             else:
                 errors.append(f"Unknown retriever type: {retriever_type}")
-        
+
+        return errors
+
+    def _validate_tool_node(self, node: Any, workflow: Workflow) -> List[str]:
+        """Validate tool node and its connections"""
+        errors = []
+
+        # Support both snake_case (backend) and camelCase (frontend)
+        tool_type = node.data.get('tool_type') or node.data.get('toolType')
+        if not tool_type:
+            errors.append("Tool must specify a tool type")
+            return errors
+
+        # Validate tool name (support both naming conventions)
+        tool_name = node.data.get('tool_name') or node.data.get('toolName')
+        if not tool_name:
+            errors.append("Tool must have a name")
+
+        # Validate based on tool type
+        if tool_type == 'MCP_TOOL':
+            errors.extend(self._validate_mcp_tool(node))
+        elif tool_type == 'UC_FUNCTION':
+            errors.extend(self._validate_uc_function_tool(node))
+        else:
+            errors.append(f"Unknown tool type: {tool_type}")
+
+        # Validate tool connections
+        errors.extend(self._validate_tool_connections(node, workflow))
+
+        return errors
+
+    def _validate_mcp_tool(self, node: Any) -> List[str]:
+        """Validate MCP tool configuration"""
+        errors = []
+
+        # Support both naming conventions
+        mcp_url = node.data.get('mcp_url') or node.data.get('mcpUrl')
+        if not mcp_url:
+            errors.append("MCP tool must specify a server URL")
+
+        # Support both naming conventions
+        mcp_headers = node.data.get('mcp_headers') or node.data.get('mcpHeaders', [])
+        for i, header in enumerate(mcp_headers):
+            if not header.get('key'):
+                errors.append(f"MCP header {i+1} must have a key")
+
+            # Support both naming conventions
+            is_secret = header.get('is_secret') or header.get('isSecret', False)
+            if is_secret:
+                env_var_name = header.get('env_var_name') or header.get('envVarName')
+                if not env_var_name:
+                    errors.append(f"MCP header {i+1} marked as secret but no environment variable specified")
+            else:
+                if not header.get('value'):
+                    errors.append(f"MCP header {i+1} must have a value (or mark as secret)")
+
+        return errors
+
+    def _validate_uc_function_tool(self, node: Any) -> List[str]:
+        """Validate Unity Catalog function tool configuration"""
+        errors = []
+
+        catalog = node.data.get('catalog')
+        if not catalog:
+            errors.append("UC Function tool must specify a catalog")
+
+        schema = node.data.get('schema')
+        if not schema:
+            errors.append("UC Function tool must specify a schema")
+
+        # Support both naming conventions
+        function_name = node.data.get('function_name') or node.data.get('functionName')
+        if not function_name:
+            errors.append("UC Function tool must specify a function name")
+
+        return errors
+
+    def _validate_tool_connections(self, node: Any, workflow: Workflow) -> List[str]:
+        """Validate that tool nodes are only connected to ReAct modules via tool handles"""
+        errors = []
+
+        # Find all outgoing edges from this tool node
+        outgoing_edges = [e for e in workflow.edges if e.source == node.id]
+
+        if not outgoing_edges:
+            # Warning: tool is not connected to anything
+            errors.append("Tool is not connected to any ReAct module")
+            return errors
+
+        for edge in outgoing_edges:
+            # Tool nodes should only connect via sourceHandle='tool-output'
+            if edge.sourceHandle != 'tool-output':
+                errors.append(f"Tool must connect via 'tool-output' handle, not '{edge.sourceHandle}'")
+
+            # Tool nodes should only connect to targetHandle='tools'
+            if edge.targetHandle != 'tools':
+                errors.append(
+                    f"Tool must connect to a ReAct module's 'tools' handle, "
+                    f"not '{edge.targetHandle}'. Tools cannot connect to regular signature fields."
+                )
+
+            # Check that target is a ReAct module
+            target_node = next((n for n in workflow.nodes if n.id == edge.target), None)
+            if target_node:
+                if target_node.type != NodeType.MODULE:
+                    errors.append(
+                        f"Tool can only connect to Module nodes, not {target_node.type}. "
+                        f"Currently connected to node {target_node.id}."
+                    )
+                else:
+                    # Check if it's specifically a ReAct module
+                    module_type = target_node.data.get('module_type')
+                    if module_type != 'ReAct':
+                        errors.append(
+                            f"Tool can only connect to ReAct modules, not {module_type}. "
+                            f"Currently connected to node {target_node.id}."
+                        )
+
+        # Tool nodes should not have incoming edges
+        incoming_edges = [e for e in workflow.edges if e.target == node.id]
+        if incoming_edges:
+            errors.append("Tool nodes cannot have incoming connections")
+
         return errors
     
     def _validate_execution_flow(self, workflow: Workflow) -> List[str]:
@@ -314,22 +439,23 @@ class WorkflowValidationService:
             
             try:
                 execution_order = list(nx.topological_sort(graph))
-                
+
                 # Validate that all nodes can be reached from start nodes
                 start_nodes = [
-                    node.id for node in workflow.nodes 
+                    node.id for node in workflow.nodes
                     if node.type == NodeType.SIGNATURE_FIELD and (node.data.get('is_start', False) or node.data.get('isStart', False))
                 ]
-                
+
                 reachable_nodes = set()
                 for start_node in start_nodes:
                     descendants = nx.descendants(graph, start_node)
                     reachable_nodes.update(descendants)
                     reachable_nodes.add(start_node)
-                
-                all_nodes = set(node.id for node in workflow.nodes)
+
+                # Only check reachability for non-tool nodes (tools are not part of main execution flow)
+                all_nodes = set(node.id for node in workflow.nodes if node.type != NodeType.TOOL)
                 unreachable_nodes = all_nodes - reachable_nodes
-                
+
                 if unreachable_nodes:
                     errors.append(f"Unreachable nodes: {', '.join(unreachable_nodes)}")
                 
@@ -360,18 +486,29 @@ class WorkflowValidationService:
         
         return errors
     
-    def _build_workflow_graph(self, workflow: Workflow) -> nx.DiGraph:
-        """Build NetworkX graph from workflow"""
+    def _build_workflow_graph(self, workflow: Workflow, exclude_tool_edges: bool = True) -> nx.DiGraph:
+        """
+        Build NetworkX graph from workflow
+
+        Args:
+            workflow: The workflow to build graph from
+            exclude_tool_edges: If True, exclude tool connections (targetHandle='tools') from the graph.
+                               Tool nodes are not part of the main execution flow.
+        """
         graph = nx.DiGraph()
-        
-        # Add nodes
+
+        # Add nodes (exclude tool nodes if excluding tool edges)
         for node in workflow.nodes:
+            if exclude_tool_edges and node.type == NodeType.TOOL:
+                continue
             graph.add_node(node.id, data=node.data, type=node.type)
-        
-        # Add edges
+
+        # Add edges (exclude tool connections if specified)
         for edge in workflow.edges:
+            if exclude_tool_edges and edge.targetHandle == 'tools':
+                continue
             graph.add_edge(edge.source, edge.target)
-        
+
         return graph
 
 

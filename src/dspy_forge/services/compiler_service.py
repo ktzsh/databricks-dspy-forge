@@ -121,6 +121,8 @@ class WorkflowCompilerService:
             forward_code_blocks = []
             instance_vars = []
             class_definitions = []
+            tool_methods = []  # Tool loading methods
+            tool_init_calls = []  # Tool initialization calls in __init__
             processed_nodes = set()  # Track nodes already handled (in branches)
 
             # First pass: collect all non-branch node code
@@ -150,6 +152,13 @@ class WorkflowCompilerService:
 
                 if node_code.get('instance_var'):
                     instance_vars.append(node_code['instance_var'])
+
+                # Collect tool-specific code (for ReAct nodes)
+                if node_code.get('tool_methods'):
+                    tool_methods.extend(node_code['tool_methods'])
+
+                if node_code.get('tool_init_calls'):
+                    tool_init_calls.extend(node_code['tool_init_calls'])
 
             # Second pass: generate forward method with router branching
             for node_id in execution_order:
@@ -208,16 +217,31 @@ class WorkflowCompilerService:
             code_lines.append("class CompoundProgram(dspy.Module):")
             code_lines.append("    def __init__(self):")
             code_lines.append("        super().__init__()")
+            code_lines.append("")
+
+            # Add tool initialization calls first (before creating module instances)
+            if tool_init_calls:
+                code_lines.append("        # Load tools")
+                for tool_init_call in tool_init_calls:
+                    if tool_init_call.strip():
+                        code_lines.append(tool_init_call)
+                code_lines.append("")
 
             # Add instance creation code
             for instance in instances:
                 if instance.strip():
                     code_lines.append(instance)
-            
+
             code_lines.append("")
-            
+
+            # Add tool loading methods to the class (after __init__)
+            if tool_methods:
+                for tool_method in tool_methods:
+                    if tool_method.strip():
+                        code_lines.append(tool_method)
+                        code_lines.append("")
+
             # Generate forward method
-            code_lines.append("")
             code_lines.append("    def forward(self, " + ", ".join(start_fields) + "):")
 
             # Add forward code blocks

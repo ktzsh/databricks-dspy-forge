@@ -10,6 +10,8 @@ from dspy_forge.core.logging import get_logger
 from dspy_forge.utils.workflow_utils import find_end_nodes
 from dspy_forge.models.workflow import Workflow, WorkflowExecution
 from dspy_forge.core.dspy_runtime import CompoundProgram
+from dspy_forge.models.workflow import NodeType
+from dspy_forge.components.tool_templates import MCPToolTemplate
 from dspy_forge.components import registry  # This will auto-register all templates
 
 logger = get_logger(__name__)
@@ -23,14 +25,23 @@ class ExecutionContext:
         self.execution_trace: List[Dict[str, Any]] = []
         self.models: Dict[str, Any] = {}
         self.node_counts: Dict[str, int] = {}  # Track count of each module type
-        
+        self.loaded_tools: Dict[str, List[Any]] = {}  # Store pre-loaded tools by node_id
+
     def set_node_output(self, node_id: str, output: Dict[str, Any]):
         """Set output for a node"""
         self.node_outputs[node_id] = output
-        
+
     def get_node_output(self, node_id: str) -> Dict[str, Any]:
         """Get output from a node"""
         return self.node_outputs.get(node_id, {})
+
+    def set_loaded_tools(self, node_id: str, tools: List[Any]):
+        """Store pre-loaded tools for a tool node"""
+        self.loaded_tools[node_id] = tools
+
+    def get_loaded_tools(self, node_id: str) -> List[Any]:
+        """Get pre-loaded tools for a tool node"""
+        return self.loaded_tools.get(node_id, [])
         
     def add_trace_entry(self, node_id: str, node_type: str, inputs: Dict[str, Any], outputs: Dict[str, Any], execution_time: float):
         """Add entry to execution trace"""
@@ -73,6 +84,9 @@ class WorkflowExecutionEngine:
 
             # Create execution context
             context = ExecutionContext(workflow, input_data)
+
+            # Pre-load MCP tools asynchronously before creating the program
+            await self._preload_mcp_tools(workflow, context)
 
             # Create and execute CompoundProgram
             program = CompoundProgram(workflow, context)
@@ -120,9 +134,25 @@ class WorkflowExecutionEngine:
         execution = self.active_executions.get(execution_id)
         if not execution:
             return []
-        
+
         # For now, return empty trace - would be populated during execution
         return []
+
+    async def _preload_mcp_tools(self, workflow: Workflow, context: ExecutionContext):
+        """Pre-load MCP tools asynchronously before workflow execution"""
+        # Find all MCP tool nodes
+        mcp_tool_nodes = [
+            node for node in workflow.nodes
+            if node.type == NodeType.TOOL and
+            (node.data.get('tool_type') == 'MCP_TOOL' or node.data.get('toolType') == 'MCP_TOOL')
+        ]
+
+        # Load tools for each MCP node asynchronously
+        for node in mcp_tool_nodes:
+            template = MCPToolTemplate(node, workflow)
+            tools = await template.list_mcp_tools()
+            context.set_loaded_tools(node.id, tools)
+            logger.info(f"Pre-loaded {len(tools)} MCP tools for node {node.id}")
 
 
 # Global execution engine instance

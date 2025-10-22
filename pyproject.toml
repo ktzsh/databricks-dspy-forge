@@ -19,6 +19,8 @@ dependencies = [
     "aiofiles>=24.1.0",
     "networkx>=3.5",
     "dspy>=3.0.3",
+    "mcp>=1.0.0",
+    "unitycatalog-ai[databricks]>=0.2.0",
 ]
 
 [build-system]

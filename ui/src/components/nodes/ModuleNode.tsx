@@ -80,6 +80,9 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
     }
   };
 
+  // Check if this is a ReAct module to show tool handle
+  const isReActModule = moduleType === 'ReAct';
+
   return (
     <div className={`min-w-[280px] relative bg-white rounded-xl border-2 transition-all duration-200 shadow-soft-lg ${
       selected ? 'border-emerald-400 shadow-xl ring-2 ring-emerald-200' : 'border-emerald-200 hover:border-emerald-300'
@@ -90,6 +93,18 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
         position={Position.Top}
         className="w-3 h-3 bg-emerald-500 border-2 border-white shadow-soft"
       />
+
+      {/* Special handle for tools (left side) - only for ReAct */}
+      {isReActModule && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="tools"
+          className="w-3 h-3 bg-purple-500 border-2 border-white shadow-soft"
+          style={{ top: '50%' }}
+        />
+      )}
+
       <Handle
         type="source"
         position={Position.Bottom}

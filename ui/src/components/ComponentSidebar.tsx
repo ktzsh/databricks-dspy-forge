@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, Brain, GitBranch, Filter, Search, RouteIcon, AlertCircle } from 'lucide-react';
+import { Database, Brain, GitBranch, Filter, Search, RouteIcon, AlertCircle, Wrench } from 'lucide-react';
 
 interface ComponentSidebarProps {
   onAddNode: (nodeData: { type: string; data: any }) => void;
@@ -64,9 +64,9 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode, isDatabr
           id: 'react',
           name: 'ReAct',
           icon: Brain,
-          description: 'Reasoning and acting module',
+          description: 'Reasoning and acting with tools',
           type: 'module',
-          enabled: false,
+          enabled: true,
           data: {
             label: 'ReAct',
             moduleType: 'ReAct',
@@ -227,6 +227,47 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode, isDatabr
             logicType: 'FieldSelector',
             selectedFields: [],
             fieldMappings: {},
+            parameters: {}
+          }
+        }
+      ]
+    },
+    {
+      category: 'Tools',
+      items: [
+        {
+          id: 'mcp-tool',
+          name: 'MCP Tool',
+          icon: Wrench,
+          description: 'Model Context Protocol tool',
+          type: 'tool',
+          enabled: true,
+          data: {
+            label: 'MCP Tool',
+            toolType: 'MCP_TOOL',
+            toolName: '',
+            description: '',
+            mcpUrl: '',
+            mcpHeaders: [],
+            parameters: {}
+          }
+        },
+        {
+          id: 'uc-function',
+          name: 'UC Function',
+          icon: Database,
+          description: 'Unity Catalog function',
+          type: 'tool',
+          enabled: isDatabricksAvailable,
+          requiresDatabricks: true,
+          data: {
+            label: 'UC Function',
+            toolType: 'UC_FUNCTION',
+            toolName: '',
+            description: '',
+            catalog: '',
+            schema: '',
+            functionName: '',
             parameters: {}
           }
         }

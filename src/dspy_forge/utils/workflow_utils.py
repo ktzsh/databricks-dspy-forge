@@ -18,27 +18,56 @@ def validate_workflow(workflow: Workflow) -> List[str]:
     return validation_service.validate_workflow(workflow)
 
 
-def build_workflow_graph(workflow: Workflow) -> nx.DiGraph:
-    """Build NetworkX graph from workflow"""
+def build_workflow_graph(workflow: Workflow, exclude_tool_edges: bool = False) -> nx.DiGraph:
+    """
+    Build NetworkX graph from workflow
+
+    Args:
+        workflow: The workflow to build graph from
+        exclude_tool_edges: If True, exclude edges where targetHandle='tools'
+                          (these are tool connections to ReAct, not data flow)
+
+    Returns:
+        NetworkX directed graph
+    """
     graph = nx.DiGraph()
-    
+
     # Add nodes
     for node in workflow.nodes:
         graph.add_node(node.id, data=node.data, type=node.type)
-    
+
     # Add edges
     for edge in workflow.edges:
+        # Skip tool connection edges if requested
+        if exclude_tool_edges and edge.targetHandle == 'tools':
+            continue
         graph.add_edge(edge.source, edge.target)
 
     return graph
 
 
 def get_execution_order(workflow: Workflow) -> List[str]:
-    """Get topological order for workflow execution"""
-    graph = build_workflow_graph(workflow)
-    
+    """
+    Get topological order for workflow execution.
+
+    Tool nodes are excluded from the main execution order as they are
+    loaded by ReAct nodes, not executed in the main flow.
+    """
+    # Build graph excluding tool connection edges
+    graph = build_workflow_graph(workflow, exclude_tool_edges=True)
+
     try:
-        return list(nx.topological_sort(graph)), graph
+        # Get topological sort
+        topo_order = list(nx.topological_sort(graph))
+
+        # Filter out tool nodes from execution order
+        # Tool nodes are not executed in the main flow
+        execution_order = [
+            node_id for node_id in topo_order
+            if not any(n.id == node_id and n.type == NodeType.TOOL for n in workflow.nodes)
+        ]
+
+        return execution_order, graph
     except nx.NetworkXError as e:
         raise WorkflowValidationError(f"Cannot determine execution order: {e}")
 

@@ -72,10 +72,13 @@
 │    └─> dspy.Predict()       │   │    └─> template.execute()   │
 │  • ChainOfThoughtTemplate   │   │  • MergeTemplate            │
 │    └─> dspy.ChainOfThought()│   │    └─> template.execute()   │
-│  • UnstructuredRetrieve     │   │  • FieldSelectorTemplate    │
-│    └─> DatabricksRM()       │   │    └─> template.execute()   │
-│  • StructuredRetrieve       │   │  • SignatureField           │
-│    └─> DatabricksGenieRM()  │   │    └─> template.execute()   │
+│  • ReActTemplate            │   │  • FieldSelectorTemplate    │
+│    └─> dspy.ReAct()         │   │    └─> template.execute()   │
+│    └─> + Tools (MCP/UC)     │   │  • SignatureField           │
+│  • UnstructuredRetrieve     │   │    └─> template.execute()   │
+│    └─> DatabricksRM()       │   │                             │
+│  • StructuredRetrieve       │   │                             │
+│    └─> DatabricksGenieRM()  │   │                             │
 └─────────────────────────────┘   └─────────────────────────────┘
 ```
 
@@ -401,6 +404,36 @@ The `program.json` file is central to optimization and deployment, storing learn
     │  ✓ call/acall()         │  │  ✓ acall/call()         │
     │  ✓ generate_code()      │  │  ✓ generate_code()      │
     └─────────────────────────┘  └─────────────────────────┘
+```
+
+### Tool Architecture
+
+DSPy Forge supports the DSPy ReAct (Reason + Act) pattern with integrated tool support:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        ReAct Module                             │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  dspy.ReAct(signature, tools=[...])                       │  │
+│  │  • Alternates between reasoning and tool invocation       │  │
+│  │  • Uses LLM to decide which tool to call                  │  │
+│  │  • Iterates until final answer is reached                 │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             │ Tools loaded via separate handle
+                             │
+          ┌──────────────────┴──────────────────┐
+          │                                     │
+          ▼                                     ▼
+┌─────────────────────────┐       ┌─────────────────────────┐
+│   MCP Tool Nodes        │       │   UC Function Nodes     │
+│                         │       │                         │
+│  • MCP Server URL       │       │  • Catalog Name         │
+│  • Custom Headers       │       │  • Schema Name          │
+│  • Secret Support       │       │  • Function Name        │
+│  • Async Tool Calls     │       │  • UC Client            │
+└─────────────────────────┘       └─────────────────────────┘
 ```
 
 

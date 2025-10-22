@@ -196,7 +196,138 @@ class ChainOfThoughtTemplate(BaseModuleTemplate):
         instruction = self.node_data.get('instruction', '')
         signature_class = self._create_dynamic_signature(instruction)
         return dspy.ChainOfThought(signature_class)
-    
+
     def _generate_instance_code(self, instance_var: str, signature_name: str) -> str:
         """Generate ChainOfThought instance creation code"""
         return f"        self.{instance_var} = dspy.ChainOfThought({signature_name})"
+
+
+class ReActTemplate(BaseModuleTemplate):
+    """Template for ReAct module nodes with tool support"""
+
+    def _get_connected_tools(self):
+        """Get tool nodes connected to this ReAct module via tool handles"""
+        from dspy_forge.models.workflow import NodeType
+        from dspy_forge.components.tool_templates import MCPToolTemplate, UCFunctionTemplate
+
+        tools = []
+        # Find edges coming into this node's 'tools' handle
+        # Tool connections use targetHandle='tools' to distinguish from regular data flow
+        incoming_edges = [
+            edge for edge in self.workflow.edges
+            if edge.target == self.node_id and edge.targetHandle == 'tools'
+        ]
+
+        for edge in incoming_edges:
+            source_node = next((n for n in self.workflow.nodes if n.id == edge.source), None)
+            if source_node and source_node.type == NodeType.TOOL:
+                # Support both snake_case (backend) and camelCase (frontend)
+                tool_type = source_node.data.get('tool_type') or source_node.data.get('toolType')
+                if tool_type == 'MCP_TOOL':
+                    template = MCPToolTemplate(source_node, self.workflow)
+                    tools.append(('mcp', template, source_node.id))
+                elif tool_type == 'UC_FUNCTION':
+                    template = UCFunctionTemplate(source_node, self.workflow)
+                    tools.append(('uc', template, source_node.id))
+
+        return tools
+
+    def initialize(self, context: Any):
+        """
+        Initialize ReAct module as a DSPy component.
+        Returns a DSPy.ReAct instance with tools loaded (from context for MCP, directly for UC).
+        """
+        instruction = self.node_data.get('instruction', '')
+        signature_class = self._create_dynamic_signature(instruction)
+
+        # Load tools from connected tool nodes
+        tools_list = []
+        connected_tools = self._get_connected_tools()
+
+        logger.info(f"ReAct module {self.node_id} has {len(connected_tools)} connected tool nodes")
+
+        # Load each tool using the template's load_tools() method, passing context
+        for tool_type, tool_template, tool_node_id in connected_tools:
+            try:
+                # Call the template's load_tools() method with context
+                # For MCP tools, this retrieves pre-loaded tools from context
+                # For UC Function tools, this loads them synchronously
+                loaded_tools = tool_template.load_tools(context)
+                tools_list.extend(loaded_tools)
+                logger.info(f"Loaded {len(loaded_tools)} tools from {tool_type} tool node {tool_node_id}")
+            except Exception as e:
+                logger.error(f"Failed to load {tool_type} tool from node {tool_node_id}: {e}")
+
+        logger.info(f"ReAct module {self.node_id} loaded {len(tools_list)} total tools")
+
+        # Create ReAct instance with tools
+        react_instance = dspy.ReAct(signature_class, tools=tools_list, max_iters=3)
+
+        return react_instance
+
+    def _add_signature_specific_fields_to_dict(self, class_attrs: dict):
+        """Add tools field to signature for ReAct"""
+        # ReAct modules should have a tools field in their signature
+        # This allows the LLM to see available tools
+        pass
+
+    def _generate_instance_code(self, instance_var: str, signature_name: str) -> str:
+        """Generate ReAct instance creation code with tool loading"""
+        connected_tools = self._get_connected_tools()
+
+        if not connected_tools:
+            # No tools connected, simple ReAct
+            return f"        self.{instance_var} = dspy.ReAct({signature_name}, max_iters=3)"
+
+        # With tools, we need to load them first and then instantiate ReAct
+        # Tool loading happens in __init__, so we generate the instance code
+        # that uses the loaded tools
+        tool_var_names = [f"tools_{instance_var}_{i}" for i in range(len(connected_tools))]
+
+        # Flatten all tool lists into a single list
+        instance_code = f"        # ReAct with {len(connected_tools)} tool source(s)\n"
+        instance_code += f"        all_tools = []\n"
+        for tool_var in tool_var_names:
+            instance_code += f"        all_tools.extend(self.{tool_var})\n"
+        instance_code += f"        self.{instance_var} = dspy.ReAct({signature_name}, tools=all_tools, max_iters=3)"
+
+        return instance_code
+
+    def generate_code(self, context: CodeGenerationContext) -> Dict[str, Any]:
+        """Generate code for ReAct module with tools"""
+        # Get base code generation
+        base_result = super().generate_code(context)
+
+        # Add tool-specific imports and initialization
+        connected_tools = self._get_connected_tools()
+
+        if connected_tools:
+            # Add tool loading methods
+            context.add_import("import os")
+            context.add_import("from dspy_forge.core.logging import get_logger")
+            context.add_import("logger = get_logger(__name__)")
+
+            tool_methods = []
+            tool_init_calls = []  # Calls in __init__ to load tools
+
+            for i, (tool_type, tool_template, tool_node_id) in enumerate(connected_tools):
+                tool_var = f"tools_{base_result['instance_var']}_{i}"
+                tool_config = tool_template.get_tool_config()
+
+                # Generate tool loading method code
+                method_code = tool_template.generate_tool_loading_method(f"{base_result['instance_var']}_{i}")
+                tool_methods.append(method_code)
+
+                if tool_type == 'mcp':
+                    # MCP tools are loaded async, so we need to handle that
+                    tool_init_calls.append(f"        # MCP tools for {tool_config.get('tool_name', 'unknown')} will be loaded async")
+                    tool_init_calls.append(f"        self.{tool_var} = []  # Placeholder, loaded via await _load_{base_result['instance_var']}_{i}_tools()")
+                elif tool_type == 'uc':
+                    # UC tools are sync
+                    tool_init_calls.append(f"        self.{tool_var} = self._load_{base_result['instance_var']}_{i}_tools()")
+
+            # Add tool loading to class definition
+            base_result['tool_methods'] = tool_methods
+            base_result['tool_init_calls'] = tool_init_calls
+
+        return base_result

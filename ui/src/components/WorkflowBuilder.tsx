@@ -119,7 +119,12 @@ const transformWorkflowFromBackend = (workflow: any) => {
       delete nodeData.retriever_type;
     }
 
-    // Convert other snake_case fields back to camelCase for retrievers
+    if (node.data.tool_type) {
+      nodeData.toolType = node.data.tool_type;
+      delete nodeData.tool_type;
+    }
+
+    // Convert other snake_case fields back to camelCase for retrievers and tools
     const snakeToCamelMappings = {
       catalog_name: 'catalogName',
       schema_name: 'schemaName',
@@ -130,7 +135,12 @@ const transformWorkflowFromBackend = (workflow: any) => {
       query_type: 'queryType',
       num_results: 'numResults',
       score_threshold: 'scoreThreshold',
-      genie_space_id: 'genieSpaceId'
+      genie_space_id: 'genieSpaceId',
+      // Tool fields
+      tool_name: 'toolName',
+      mcp_url: 'mcpUrl',
+      mcp_headers: 'mcpHeaders',
+      function_name: 'functionName'
     };
 
     for (const [snakeCase, camelCase] of Object.entries(snakeToCamelMappings)) {
@@ -688,7 +698,7 @@ const WorkflowBuilderContent: React.FC = () => {
             nodeData.retriever_type = nodeData.retrieverType;
             delete nodeData.retrieverType;
           }
-          
+
           // Convert other camelCase fields for retrievers
           const camelToSnakeMappings = {
             catalogName: 'catalog_name',
@@ -702,7 +712,32 @@ const WorkflowBuilderContent: React.FC = () => {
             scoreThreshold: 'score_threshold',
             genieSpaceId: 'genie_space_id'
           };
-          
+
+          for (const [camelCase, snakeCase] of Object.entries(camelToSnakeMappings)) {
+            if (nodeData[camelCase] !== undefined) {
+              nodeData[snakeCase] = nodeData[camelCase];
+              delete nodeData[camelCase];
+            }
+          }
+        }
+
+        if (node.type === 'tool') {
+          // Convert toolType to tool_type
+          if (nodeData.toolType) {
+            nodeData.tool_type = nodeData.toolType;
+            delete nodeData.toolType;
+          }
+
+          // Convert other camelCase fields for tools
+          const camelToSnakeMappings = {
+            toolName: 'tool_name',
+            mcpUrl: 'mcp_url',
+            mcpHeaders: 'mcp_headers',
+            functionName: 'function_name',
+            catalogName: 'catalog',
+            schemaName: 'schema'
+          };
+
           for (const [camelCase, snakeCase] of Object.entries(camelToSnakeMappings)) {
             if (nodeData[camelCase] !== undefined) {
               nodeData[snakeCase] = nodeData[camelCase];

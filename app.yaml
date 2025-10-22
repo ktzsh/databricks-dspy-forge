@@ -2,7 +2,11 @@ command: ["uv", "run", "dspy-forge", "--workers", "4"]
 # databricks apps listen by default on port 8000
 
 env:
+  - name: LOG_LEVEL
+    value: "INFO"
   - name: STORAGE_BACKEND
     value: "databricks"
   - name: ARTIFACTS_PATH
     valueFrom: "artifacts_path"
+  # - name: DATABRICKS_WAREHOUSE_ID
+  #   valueFrom: "databricks_warehouse_id"
