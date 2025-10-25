@@ -197,7 +197,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
             {/* Instruction */}
             <div>
               <label className="block text-sm font-medium mb-1">
-                Instruction <span className="text-red-500">*</span>
+                Instruction
               </label>
               <textarea
                 value={instruction}
@@ -205,7 +205,6 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
                 placeholder="Describe the task this module should perform..."
                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                 rows={3}
-                required
               />
               <div className="text-xs text-gray-500 mt-1">
                 This will be used as the instruction for the DSPy signature

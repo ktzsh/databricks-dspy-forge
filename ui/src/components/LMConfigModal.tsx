@@ -22,8 +22,13 @@ const LMConfigModal: React.FC<LMConfigModalProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (globalLMConfig) {
-      setSelectedProvider(globalLMConfig.provider);
-      setModelName(globalLMConfig.modelName);
+      // Parse the modelName to extract provider and actual model name
+      // Format is "provider/model-name"
+      const modelNameParts = globalLMConfig.modelName.split('/');
+      if (modelNameParts.length >= 2) {
+        setSelectedProvider(modelNameParts[0]);
+        setModelName(modelNameParts.slice(1).join('/')); // Handle model names with / in them
+      }
     } else {
       // Default to databricks if available, otherwise first available provider
       const defaultProvider = availableProviders['databricks']

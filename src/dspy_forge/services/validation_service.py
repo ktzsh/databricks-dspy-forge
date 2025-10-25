@@ -241,14 +241,6 @@ class WorkflowValidationService:
             try:
                 # Validate module_type is a valid enum value
                 DSPyModuleType(module_type)
-                
-                model = node.data.get('model')
-                if not model and module_type != DSPyModuleType.RETRIEVE:
-                    errors.append("Module must specify a model")
-                    
-                instruction = node.data.get('instruction')
-                if not instruction:
-                    errors.append("Module must specify an instruction")
             except ValueError:
                 errors.append(f"Invalid module type: {module_type}")
         
