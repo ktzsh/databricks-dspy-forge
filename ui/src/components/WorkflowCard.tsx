@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Edit3, Copy, Trash2, MoreVertical, Clock, Calendar, Zap, Cloud, Hash } from 'lucide-react';
+import { Edit3, Copy, Info, Trash2, MoreVertical, Clock, Calendar, Zap, Cloud, Hash } from 'lucide-react';
 import { WorkflowCardData } from '../types/dashboard';
 
 interface WorkflowCardProps {
@@ -81,6 +81,12 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onDelete, onDupli
     navigate(`/workflow/${workflow.id}`);
   };
 
+  const handleShowDetails = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onShowDetails(workflow);
+    setShowActions(false);
+  };
+
   const handleDuplicate = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDuplicate(workflow.id, workflow.name);
@@ -96,7 +102,7 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onDelete, onDupli
   return (
     <div
       className="bg-slate-800/50 border border-slate-700 rounded-xl shadow-sm hover:shadow-lg hover:border-slate-600 transition-all duration-200 overflow-hidden cursor-pointer group backdrop-blur-sm"
-      onClick={() => onShowDetails(workflow)}
+      onClick={() => handleOpenWorkflow()}
     >
       {/* Card Content */}
       <div className="p-5">
@@ -141,6 +147,13 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onDelete, onDupli
                   >
                     <Edit3 size={14} className="mr-2" />
                     Open Workflow
+                  </button>
+                  <button
+                    onClick={handleShowDetails}
+                    className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700 flex items-center"
+                  >
+                    <Info size={14} className="mr-2" />
+                    See Details
                   </button>
                   <button
                     onClick={handleDuplicate}

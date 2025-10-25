@@ -6,3 +6,5 @@ env:
     value: "databricks"
   - name: ARTIFACTS_PATH
     valueFrom: "artifacts_path"
+  - name: DATABRICKS_DISABLE_EXPERIMENTAL_FILES_API_CLIENT
+    value: "true"

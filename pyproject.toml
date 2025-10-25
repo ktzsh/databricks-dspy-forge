@@ -18,7 +18,7 @@ dependencies = [
     "databricks-agents>=1.6.0",
     "aiofiles>=24.1.0",
     "networkx>=3.5",
-    "dspy>=3.0.3",
+    "dspy>=3.0.2",
 ]
 
 [build-system]
