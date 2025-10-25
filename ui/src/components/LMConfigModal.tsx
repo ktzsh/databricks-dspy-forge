@@ -28,10 +28,6 @@ const LMConfigModal: React.FC<LMConfigModalProps> = ({ isOpen, onClose }) => {
       if (modelNameParts.length >= 2) {
         setSelectedProvider(modelNameParts[0]);
         setModelName(modelNameParts.slice(1).join('/')); // Handle model names with / in them
-      } else {
-        // Fallback if format is unexpected
-        setSelectedProvider(globalLMConfig.provider);
-        setModelName(globalLMConfig.modelName);
       }
     } else {
       // Default to databricks if available, otherwise first available provider
