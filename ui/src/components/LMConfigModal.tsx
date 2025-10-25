@@ -12,7 +12,7 @@ const PROVIDER_OPTIONS = [
   { value: 'openai', label: 'OpenAI', requiresKey: true },
   { value: 'anthropic', label: 'Anthropic', requiresKey: true },
   { value: 'gemini', label: 'Gemini (Google)', requiresKey: true },
-  { value: 'custom', label: 'Custom Provider', requiresKey: true },
+  { value: 'custom_lm', label: 'Custom Provider', requiresKey: true },
 ];
 
 const LMConfigModal: React.FC<LMConfigModalProps> = ({ isOpen, onClose }) => {
@@ -90,6 +90,16 @@ const LMConfigModal: React.FC<LMConfigModalProps> = ({ isOpen, onClose }) => {
         statusText: 'Available',
         statusColor: 'text-green-600',
         helperText: '',
+      };
+    }
+
+    if (providerConfig.value === 'custom_lm') {
+      return {
+        statusText: isConfigured ? 'API Key & Base URL Configured' : 'API Key and API Base URL Required',
+        statusColor: isConfigured ? 'text-green-600' : 'text-red-600',
+        helperText: isConfigured
+          ? `${providerConfig.label} API key and API base URL are configured on the server`
+          : `${providerConfig.label}'s API key or base URL not found. Configure ${provider.toUpperCase()}_API_KEY and ${provider.toUpperCase()}_API_BASE in .env on the server`,
       };
     }
 
