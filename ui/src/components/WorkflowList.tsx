@@ -32,7 +32,6 @@ const WorkflowList: React.FC<WorkflowListProps> = ({ onLoadWorkflow, onClose }) 
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Fetched Workflows:', data);
         setWorkflows(data);
       } else {
         showError('Failed to Load', 'Could not fetch workflows from server');
