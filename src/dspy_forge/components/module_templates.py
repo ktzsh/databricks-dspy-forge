@@ -141,7 +141,7 @@ class BaseModuleTemplate(NodeTemplate):
         if model_name and model_name != 'default':
             # TODO handle api_key, api_base if need for other providers
             provider, actual_model = parse_model_name(model_name)
-            forward_lines.append(f"        with dspy.context(lm={provider}/{actual_model}):")
+            forward_lines.append(f"        with dspy.context(lm='{provider}/{actual_model}'):")
             forward_lines.append(f"            {result_var} = self.{instance_var}({input_args})")
         else:
             forward_lines.append(f"        {result_var} = self.{instance_var}({input_args})")

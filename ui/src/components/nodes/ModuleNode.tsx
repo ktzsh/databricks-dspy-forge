@@ -185,7 +185,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
               />
               <div className="text-xs text-gray-500 mt-1">
-                Format: provider/model-name (openai/gpt-4, databricks/claude-sonnet)
+                Format: provider/model-name (openai/gpt-4, databricks/databricks-claude-sonnet-4-5)
               </div>
               {globalLMConfig && (
                 <div className="text-xs text-emerald-600 mt-1">

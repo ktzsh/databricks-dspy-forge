@@ -1,6 +1,7 @@
 import json
 import asyncio
 import os
+import io
 from typing import List, Optional, Dict, Any
 
 from databricks.sdk import WorkspaceClient
@@ -78,9 +79,11 @@ class DatabricksVolumeStorage(StorageBackend):
             
             def _save_file():
                 # Upload file content to volume
+                # Wrap bytes in BytesIO to make it a file-like object
+                content_io = io.BytesIO(workflow_json.encode('utf-8'))
                 self.client.files.upload(
                     file_path=file_path,
-                    contents=workflow_json.encode('utf-8'),
+                    content=content_io,
                     overwrite=True
                 )
                 return True
@@ -256,9 +259,11 @@ class DatabricksVolumeStorage(StorageBackend):
             loop = asyncio.get_event_loop()
 
             def _save_file():
+                # Wrap bytes in BytesIO to make it a file-like object
+                content_io = io.BytesIO(status_json.encode('utf-8'))
                 self.client.files.upload(
                     file_path=file_path,
-                    contents=status_json.encode('utf-8'),
+                    content=content_io,
                     overwrite=True
                 )
                 return True
@@ -305,9 +310,11 @@ class DatabricksVolumeStorage(StorageBackend):
             loop = asyncio.get_event_loop()
 
             def _save_file():
+                # Wrap bytes in BytesIO to make it a file-like object
+                content_io = io.BytesIO(code.encode('utf-8'))
                 self.client.files.upload(
                     file_path=file_path,
-                    contents=code.encode('utf-8'),
+                    content=content_io,
                     overwrite=True
                 )
                 return True
@@ -350,9 +357,11 @@ class DatabricksVolumeStorage(StorageBackend):
             loop = asyncio.get_event_loop()
 
             def _save_file():
+                # Wrap bytes in BytesIO to make it a file-like object
+                content_io = io.BytesIO(content.encode('utf-8'))
                 self.client.files.upload(
                     file_path=file_path,
-                    contents=content.encode('utf-8'),
+                    content=content_io,
                     overwrite=True
                 )
                 return True
@@ -435,9 +444,11 @@ class DatabricksVolumeStorage(StorageBackend):
             loop = asyncio.get_event_loop()
 
             def _save_file():
+                # Wrap bytes in BytesIO to make it a file-like object
+                content_io = io.BytesIO(status_json.encode('utf-8'))
                 self.client.files.upload(
                     file_path=file_path,
-                    contents=status_json.encode('utf-8'),
+                    content=content_io,
                     overwrite=True
                 )
                 return True

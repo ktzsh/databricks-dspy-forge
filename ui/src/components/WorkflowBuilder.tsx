@@ -1215,7 +1215,6 @@ const WorkflowBuilderContent: React.FC = () => {
               onClose={() => setIsPlaygroundOpen(false)}
               onExecute={(inputData) => {
                 console.log('Executing with input:', inputData);
-                // TODO: Implement execution
               }}
               onExecutionResults={(results) => {
                 setLastExecutionResults(results);

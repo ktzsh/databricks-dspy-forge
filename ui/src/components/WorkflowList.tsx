@@ -9,8 +9,8 @@ interface SavedWorkflow {
   description: string;
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface WorkflowListProps {
@@ -181,11 +181,11 @@ const WorkflowList: React.FC<WorkflowListProps> = ({ onLoadWorkflow, onClose }) 
                       <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
                         <div className="flex items-center space-x-1">
                           <Calendar size={14} />
-                          <span>Created: {formatDate(workflow.created_at)}</span>
+                          <span>Created: {formatDate(workflow.createdAt)}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Clock size={14} />
-                          <span>Updated: {formatDate(workflow.updated_at)}</span>
+                          <span>Updated: {formatDate(workflow.updatedAt)}</span>
                         </div>
                       </div>
                       
