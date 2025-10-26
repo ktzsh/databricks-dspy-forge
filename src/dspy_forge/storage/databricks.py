@@ -80,7 +80,7 @@ class DatabricksVolumeStorage(StorageBackend):
                 # Upload file content to volume
                 self.client.files.upload(
                     file_path=file_path,
-                    content=workflow_json.encode('utf-8'),
+                    contents=workflow_json.encode('utf-8'),
                     overwrite=True
                 )
                 return True
@@ -258,7 +258,7 @@ class DatabricksVolumeStorage(StorageBackend):
             def _save_file():
                 self.client.files.upload(
                     file_path=file_path,
-                    content=status_json.encode('utf-8'),
+                    contents=status_json.encode('utf-8'),
                     overwrite=True
                 )
                 return True
@@ -307,7 +307,7 @@ class DatabricksVolumeStorage(StorageBackend):
             def _save_file():
                 self.client.files.upload(
                     file_path=file_path,
-                    content=code.encode('utf-8'),
+                    contents=code.encode('utf-8'),
                     overwrite=True
                 )
                 return True
@@ -352,7 +352,7 @@ class DatabricksVolumeStorage(StorageBackend):
             def _save_file():
                 self.client.files.upload(
                     file_path=file_path,
-                    content=content.encode('utf-8'),
+                    contents=content.encode('utf-8'),
                     overwrite=True
                 )
                 return True
@@ -437,7 +437,7 @@ class DatabricksVolumeStorage(StorageBackend):
             def _save_file():
                 self.client.files.upload(
                     file_path=file_path,
-                    content=status_json.encode('utf-8'),
+                    contens=status_json.encode('utf-8'),
                     overwrite=True
                 )
                 return True
