@@ -201,34 +201,6 @@ const ComponentSidebar: React.FC<ComponentSidebarProps> = ({ onAddNode, isDatabr
             },
             parameters: {}
           }
-        },
-        {
-          id: 'merge',
-          name: 'Merge',
-          icon: GitBranch,
-          description: 'Merge multiple paths',
-          type: 'logic',
-          enabled: false,
-          data: {
-            label: 'Merge',
-            logicType: 'Merge',
-            parameters: {}
-          }
-        },
-        {
-          id: 'field-selector',
-          name: 'Field Selector',
-          icon: Filter,
-          description: 'Select specific fields from input',
-          type: 'logic',
-          enabled: true,
-          data: {
-            label: 'Field Selector',
-            logicType: 'FieldSelector',
-            selectedFields: [],
-            fieldMappings: {},
-            parameters: {}
-          }
         }
       ]
     }
