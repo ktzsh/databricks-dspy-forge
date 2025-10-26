@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, Brain, GitBranch, Filter, Search, RouteIcon, AlertCircle } from 'lucide-react';
+import { Database, Brain, Search, RouteIcon, AlertCircle } from 'lucide-react';
 
 interface ComponentSidebarProps {
   onAddNode: (nodeData: { type: string; data: any }) => void;

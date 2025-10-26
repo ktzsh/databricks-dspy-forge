@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Handle, Position, NodeProps, useReactFlow, useNodes, useEdges } from 'reactflow';
-import { Plus, X, Edit3, Database, Trash2 } from 'lucide-react';
+import { X, Edit3, Database, Trash2 } from 'lucide-react';
 import { SignatureFieldNodeData, SignatureField, FieldType } from '../../types/workflow';
 import TraceIndicator from './TraceIndicator';
 
@@ -39,19 +39,6 @@ const SignatureFieldNode: React.FC<NodeProps<SignatureFieldNodeData & { traceDat
     });
   };
 
-  const addField = () => {
-    // Don't allow adding fields to default nodes
-    if (isDefaultNode) return;
-
-    const newField: SignatureField = {
-      name: `field_${fields.length + 1}`,
-      type: 'str',
-      description: '',
-      required: true,
-      enumValues: []
-    };
-    setFields([...fields, newField]);
-  };
 
   const removeField = (index: number) => {
     // Don't allow removing fields from default nodes
