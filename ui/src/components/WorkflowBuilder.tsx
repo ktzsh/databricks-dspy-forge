@@ -22,7 +22,7 @@ import ToastContainer from './ToastContainer';
 import WorkflowList from './WorkflowList';
 import OptimizeModal from './OptimizeModal';
 import CodeModal from './CodeModal';
-import LMConfigModal from './LMConfigModal';
+import GlobalConfigModal from './GlobalConfigModal';
 import { nodeTypes } from './nodes';
 import { WorkflowNode, WorkflowEdge } from '../types/workflow';
 import { useToast } from '../hooks/useToast';
@@ -330,7 +330,7 @@ const WorkflowBuilderContent: React.FC = () => {
   const [activeOptimizationId, setActiveOptimizationId] = useState<string | null>(null);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('');
-  const [showLMConfigModal, setShowLMConfigModal] = useState(false);
+  const [showGlobalConfigModal, setShowGlobalConfigModal] = useState(false);
   const { toasts, removeToast, showSuccess, showError } = useToast();
   const { availableProviders } = useLMConfig();
   const fitViewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1090,12 +1090,12 @@ const WorkflowBuilderContent: React.FC = () => {
             <span>{workflowId ? 'Update' : 'Save'}</span>
           </button>
           <button
-            onClick={() => setShowLMConfigModal(true)}
+            onClick={() => setShowGlobalConfigModal(true)}
             className="flex items-center space-x-2 px-4 py-2 bg-slate-700/80 text-slate-100 rounded-lg hover:bg-slate-700 transition-all duration-200 font-medium border border-slate-600/50"
-            title="Configure global LM settings"
+            title="Configure global settings (LM, MCP Tools, UC Functions)"
           >
-            <Cpu size={16} />
-            <span>LM Config</span>
+            <Settings size={16} />
+            <span>Global Config</span>
           </button>
           <button
             onClick={handleGetCode}
@@ -1249,8 +1249,7 @@ const WorkflowBuilderContent: React.FC = () => {
               workflowName={workflowName}
               onClose={() => setIsPlaygroundOpen(false)}
               onExecute={(inputData) => {
-                console.log('Executing with input:', inputData);
-                // TODO: Implement execution
+                // Execution handled by PlaygroundSidebar
               }}
               onExecutionResults={(results) => {
                 setLastExecutionResults(results);
@@ -1352,9 +1351,9 @@ const WorkflowBuilderContent: React.FC = () => {
       />
 
       {/* LM Config Modal */}
-      <LMConfigModal
-        isOpen={showLMConfigModal}
-        onClose={() => setShowLMConfigModal(false)}
+      <GlobalConfigModal
+        isOpen={showGlobalConfigModal}
+        onClose={() => setShowGlobalConfigModal(false)}
       />
 
       {/* Node Execution Details Modal */}

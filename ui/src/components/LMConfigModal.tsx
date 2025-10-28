@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, AlertCircle } from 'lucide-react';
 import { useLMConfig } from '../contexts/LMConfigContext';
+import { useToast } from '../hooks/useToast';
+import ToastContainer from './ToastContainer';
 
 interface LMConfigModalProps {
   isOpen: boolean;
@@ -17,6 +19,7 @@ const PROVIDER_OPTIONS = [
 
 const LMConfigModal: React.FC<LMConfigModalProps> = ({ isOpen, onClose }) => {
   const { globalLMConfig, setGlobalLMConfig, availableProviders } = useLMConfig();
+  const { toasts, removeToast, showSuccess, showWarning } = useToast();
   const [selectedProvider, setSelectedProvider] = useState<string>('databricks');
   const [modelName, setModelName] = useState<string>('');
 
@@ -38,7 +41,7 @@ const LMConfigModal: React.FC<LMConfigModalProps> = ({ isOpen, onClose }) => {
 
   const handleSave = () => {
     if (!modelName.trim()) {
-      alert('Please enter a model name');
+      showWarning('Model name required', 'Please enter a model name');
       return;
     }
 
@@ -50,6 +53,7 @@ const LMConfigModal: React.FC<LMConfigModalProps> = ({ isOpen, onClose }) => {
       modelName: fullModelName,
     });
 
+    showSuccess('Configuration saved', 'Global LM configuration updated successfully');
     onClose();
   };
 
@@ -102,6 +106,7 @@ const LMConfigModal: React.FC<LMConfigModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">

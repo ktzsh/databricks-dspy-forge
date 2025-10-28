@@ -317,11 +317,6 @@ class WorkflowValidationService:
             errors.append("Tool must specify a tool type")
             return errors
 
-        # Validate tool name (support both naming conventions)
-        tool_name = node.data.get('tool_name') or node.data.get('toolName')
-        if not tool_name:
-            errors.append("Tool must have a name")
-
         # Validate based on tool type
         if tool_type == 'MCP_TOOL':
             errors.extend(self._validate_mcp_tool(node))
@@ -373,11 +368,6 @@ class WorkflowValidationService:
         schema = node.data.get('schema')
         if not schema:
             errors.append("UC Function tool must specify a schema")
-
-        # Support both naming conventions
-        function_name = node.data.get('function_name') or node.data.get('functionName')
-        if not function_name:
-            errors.append("UC Function tool must specify a function name")
 
         return errors
 

@@ -55,12 +55,14 @@ class MCPToolTemplate(BaseToolTemplate):
 
     def get_tool_config(self) -> Dict[str, Any]:
         """Extract MCP tool configuration"""
-        # Support both snake_case (backend) and camelCase (frontend)
+        mcp_url = self.node_data.get('mcp_url') or self.node_data.get('mcpUrl', '')
+        tool_name = self.node_data.get('tool_name') or self.node_data.get('toolName') or f"MCP Server ({mcp_url})"
+        
         return {
             'tool_type': 'mcp',
-            'tool_name': self.node_data.get('tool_name') or self.node_data.get('toolName', 'Unnamed Tool'),
+            'tool_name': tool_name,
             'description': self.node_data.get('description', ''),
-            'mcp_url': self.node_data.get('mcp_url') or self.node_data.get('mcpUrl', ''),
+            'mcp_url': mcp_url,
             'mcp_headers': self.node_data.get('mcp_headers') or self.node_data.get('mcpHeaders', []),
         }
     
@@ -155,7 +157,7 @@ class MCPToolTemplate(BaseToolTemplate):
         return []
 
     def generate_tool_loading_method(self, var_prefix: str) -> str:
-        """Generate code for MCP client initialization"""
+        """Generate code to load all tools from MCP server"""
         tool_config = self.get_tool_config()
         mcp_url = tool_config['mcp_url']
         headers = tool_config['mcp_headers']
@@ -181,13 +183,15 @@ class MCPToolTemplate(BaseToolTemplate):
         header_lines.append("        }")
         headers_code = '\n'.join(header_lines)
 
-        # Generate async MCP client code that returns tools
         code = f'''
     async def _load_{var_prefix}_tools(self):
-        """Load tools from MCP server: {mcp_url}"""
+        """Load all tools from MCP server: {mcp_url}"""
         import os
         from mcp import ClientSession
         from mcp.client.streamable_http import streamablehttp_client
+        from dspy_forge.core.logging import get_logger
+        
+        logger = get_logger(__name__)
 
 {headers_code}
 
@@ -220,112 +224,42 @@ class UCFunctionTemplate(BaseToolTemplate):
     def get_tool_config(self) -> Dict[str, Any]:
         """Extract UC function configuration"""
         # Support both snake_case (backend) and camelCase (frontend)
+        catalog = self.node_data.get('catalog', '')
+        schema = self.node_data.get('schema', '')
+        tool_name = self.node_data.get('tool_name') or self.node_data.get('toolName') or f"UC Schema ({catalog}.{schema})"
+        
         return {
             'tool_type': 'uc_function',
-            'tool_name': self.node_data.get('tool_name') or self.node_data.get('toolName', 'Unnamed Function'),
+            'tool_name': tool_name,
             'description': self.node_data.get('description', ''),
-            'catalog': self.node_data.get('catalog', ''),
-            'schema': self.node_data.get('schema', ''),
-            'function_name': self.node_data.get('function_name') or self.node_data.get('functionName', ''),
+            'catalog': catalog,
+            'schema': schema,
         }
 
     def load_tools(self, context=None) -> list:
-        """Load Unity Catalog function tools synchronously"""
-        from dspy.adapters.types.tool import Tool as DSPyTool
-
+        """Load all Unity Catalog functions from schema"""
+        from dspy_forge.utils.tool_utils import load_uc_functions_from_schema
+        
         # Get configuration
         catalog = self.node_data.get('catalog', '')
         schema = self.node_data.get('schema', '')
-        function_name = self.node_data.get('function_name') or self.node_data.get('functionName', '')
-        description = self.node_data.get('description', '')
-        tool_name = self.node_data.get('tool_name') or self.node_data.get('toolName', '')
-
-        full_func_name = f"{catalog}.{schema}.{function_name}"
-
-        if not all([catalog, schema, function_name]):
-            logger.error(f"UC Function tool missing required fields: catalog={catalog}, schema={schema}, function_name={function_name}")
-            return []
-
-        try:
-            # Initialize UC function client
-            client = DatabricksFunctionClient()
-            set_uc_function_client(client)
-
-            # Get function metadata to create proper tool signature
-            # The client provides function information including parameters
-            
-            # Create DSPy tool from UC function
-            def uc_function_wrapper(**kwargs):
-                """Wrapper to execute UC function"""
-                try:
-                    result = client.execute_function(full_func_name, kwargs)
-                    return result
-                except Exception as e:
-                    logger.error(f"Error executing UC function {full_func_name}: {e}", exc_info=True)
-                    raise
-
-            # Create tool with proper metadata
-            tool = DSPyTool(
-                func=uc_function_wrapper,
-                name=tool_name or function_name,
-                desc=description or f"Unity Catalog function: {full_func_name}",
-                args={},  # Will be populated from function metadata
-                arg_types={},
-                arg_desc={}
-            )
-            tools = [tool]
-            logger.info(f"Loaded UC function: {full_func_name}")
-            return tools
-
-        except Exception as e:
-            logger.error(f"Failed to load UC function {full_func_name}: {e}", exc_info=True)
-            return []
+        
+        return load_uc_functions_from_schema(catalog, schema)
 
     def generate_tool_loading_method(self, var_prefix: str) -> str:
-        """Generate code for UC function client initialization"""
+        """Generate code to load All functions from UC schema"""
         tool_config = self.get_tool_config()
         catalog = tool_config['catalog']
         schema = tool_config['schema']
-        function_name = tool_config['function_name']
         tool_name = tool_config['tool_name']
-        full_func_name = f"{catalog}.{schema}.{function_name}"
-
-        # Generate UC function loading code
+        
+        # Generate UC function loading code using shared utility
         code = f'''
     def _load_{var_prefix}_tools(self):
-        """Load Unity Catalog function: {full_func_name}"""
-        from unitycatalog.ai.core.base import set_uc_function_client
-        from unitycatalog.ai.core.databricks import DatabricksFunctionClient
-        from dspy.adapters.types.tool import Tool
-
-        tools = []
-        try:
-            client = DatabricksFunctionClient()
-            set_uc_function_client(client)
-
-            # Create wrapper function for UC function execution
-            def uc_function_wrapper(**kwargs):
-                try:
-                    result = client.execute_function("{full_func_name}", kwargs)
-                    return result
-                except Exception as e:
-                    logger.error(f"Error executing UC function {full_func_name}: {{e}}")
-                    raise
-
-            # Create DSPy tool from UC function
-            tool = Tool(
-                func=uc_function_wrapper,
-                name="{tool_name or function_name}",
-                desc="{tool_config['description'] or f'Unity Catalog function: {full_func_name}'}",
-                args={{}},
-                arg_types={{}},
-                arg_desc={{}}
-            )
-            tools.append(tool)
-            logger.info(f"Loaded UC function: {full_func_name}")
-        except Exception as e:
-            logger.error(f"Failed to load UC function {full_func_name}: {{e}}")
-
-        return tools
+        """Load All functions from UC schema: {catalog}.{schema}"""
+        from dspy_forge.utils.tool_utils import load_uc_functions_from_schema
+        
+        # Use shared utility (single source of truth, performance optimized)
+        return load_uc_functions_from_schema("{catalog}", "{schema}")
 '''
         return code

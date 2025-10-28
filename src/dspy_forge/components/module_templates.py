@@ -258,6 +258,12 @@ class ReActTemplate(BaseModuleTemplate):
             except Exception as e:
                 logger.error(f"Failed to load {tool_type} tool from node {tool_node_id}: {e}")
 
+        # Load global tools if requested
+        global_tools = context.get_loaded_tools(f"global_{self.node_id}")
+        if global_tools:
+            tools_list.extend(global_tools)
+            logger.info(f"Added {len(global_tools)} global tools to ReAct module {self.node_id}")
+
         logger.info(f"ReAct module {self.node_id} loaded {len(tools_list)} total tools")
 
         # Create ReAct instance with tools

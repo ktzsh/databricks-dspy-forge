@@ -202,7 +202,7 @@ class ToolNodeData(BaseModel):
     # UC Function fields
     catalog: Optional[str] = None
     schema: Optional[str] = None
-    function_name: Optional[str] = Field(default=None, alias="functionName")
+    function_name: Optional[str] = Field(default=None, alias="functionName")  # Deprecated, kept for compatibility
     parameters: Dict[str, Any] = Field(default_factory=dict)
     # Base fields
     label: Optional[str] = None
@@ -281,6 +281,7 @@ class PlaygroundExecutionRequest(BaseModel):
     workflow_ir: Dict[str, Any]  # Workflow IR containing nodes and edges
     question: str
     conversation_history: list = []  # List of previous conversation exchanges
+    global_tools_config: Optional[Dict[str, Any]] = None  # Global MCP/UC tools configuration
 
 
 class DeploymentRequest(BaseModel):
