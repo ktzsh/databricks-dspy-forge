@@ -14,7 +14,7 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
-import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash, Zap, Home, Code, Cpu, AlertCircle } from 'lucide-react';
+import { Save, Settings, FolderOpen, X, Clock, ArrowRight, FileText, Hash, Zap, Home, Code } from 'lucide-react';
 
 import ComponentSidebar from './ComponentSidebar';
 import PlaygroundSidebar from './PlaygroundSidebar';
@@ -26,7 +26,7 @@ import GlobalConfigModal from './GlobalConfigModal';
 import { nodeTypes } from './nodes';
 import { WorkflowNode, WorkflowEdge } from '../types/workflow';
 import { useToast } from '../hooks/useToast';
-import { useLMConfig } from '../contexts/LMConfigContext';
+import { useGlobalConfig } from '../contexts/GlobalConfigContext';
 
 // Create the default start node (reusable function)
 const createDefaultStartNode = (): Node => ({
@@ -332,7 +332,7 @@ const WorkflowBuilderContent: React.FC = () => {
   const [generatedCode, setGeneratedCode] = useState('');
   const [showGlobalConfigModal, setShowGlobalConfigModal] = useState(false);
   const { toasts, removeToast, showSuccess, showError } = useToast();
-  const { availableProviders } = useLMConfig();
+  const { availableProviders } = useGlobalConfig();
   const fitViewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadedWorkflowRef = useRef<string | null>(null);
   const [shouldFitView, setShouldFitView] = useState(false);

@@ -189,9 +189,6 @@ class MCPToolTemplate(BaseToolTemplate):
         import os
         from mcp import ClientSession
         from mcp.client.streamable_http import streamablehttp_client
-        from dspy_forge.core.logging import get_logger
-        
-        logger = get_logger(__name__)
 
 {headers_code}
 
@@ -209,9 +206,8 @@ class MCPToolTemplate(BaseToolTemplate):
                         dspy.Tool.from_mcp_tool(session, tool)
                         for tool in tool_list.tools
                     ]
-                    logger.info(f"Loaded {{len(tools)}} tools from MCP server: {mcp_url}")
         except Exception as e:
-            logger.error(f"Failed to load MCP tools from {mcp_url}: {{e}}")
+            print(f"Failed to load MCP tools from {mcp_url}: {{e}}")
 
         return tools
 '''
@@ -253,13 +249,67 @@ class UCFunctionTemplate(BaseToolTemplate):
         schema = tool_config['schema']
         tool_name = tool_config['tool_name']
         
-        # Generate UC function loading code using shared utility
+        # Generate standalone UC function loading code
         code = f'''
     def _load_{var_prefix}_tools(self):
         """Load All functions from UC schema: {catalog}.{schema}"""
-        from dspy_forge.utils.tool_utils import load_uc_functions_from_schema
+        from databricks.sdk import WorkspaceClient
+        from unitycatalog.ai.core.databricks import DatabricksFunctionClient
+        import dspy
         
-        # Use shared utility (single source of truth, performance optimized)
-        return load_uc_functions_from_schema("{catalog}", "{schema}")
+        catalog = "{catalog}"
+        schema = "{schema}"
+        
+        try:
+            # Initialize clients
+            client = DatabricksFunctionClient()
+            w = WorkspaceClient()
+            
+            # List all functions in the schema
+            functions = list(w.functions.list(catalog_name=catalog, schema_name=schema))
+            
+            tools = []
+            for func in functions:
+                full_name = func.full_name or f"{{catalog}}.{{schema}}.{{func.name}}"
+                
+                # Extract function parameters
+                args = {{}}
+                arg_types = {{}}
+                arg_desc = {{}}
+                
+                if func.input_params and func.input_params.parameters:
+                    for param in func.input_params.parameters:
+                        param_name = param.name
+                        args[param_name] = None
+                        arg_types[param_name] = param.type_name or 'string'
+                        arg_desc[param_name] = param.comment or f"Parameter: {{param_name}}"
+                
+                # Create wrapper function with closure
+                def make_wrapper(func_name):
+                    def uc_function_wrapper(**kwargs):
+                        try:
+                            result = client.execute_function(func_name, kwargs)
+                            return result
+                        except Exception as e:
+                            print(f"Error executing UC function {{func_name}}: {{e}}")
+                            raise
+                    return uc_function_wrapper
+                
+                # Create DSPy tool
+                tool = dspy.Tool(
+                    func=make_wrapper(full_name),
+                    name=func.name or full_name.split('.')[-1],
+                    desc=func.comment or f"Unity Catalog function: {{full_name}}",
+                    args=args,
+                    arg_types=arg_types,
+                    arg_desc=arg_desc
+                )
+                tools.append(tool)
+            
+            return tools
+            
+        except Exception as e:
+            print(f"Failed to load UC functions from {{catalog}}.{{schema}}: {{e}}")
+            return []
 '''
         return code

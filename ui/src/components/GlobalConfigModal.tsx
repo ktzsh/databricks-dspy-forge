@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, AlertCircle, Plus, ChevronDown, ChevronUp, Trash2, Wrench, Database } from 'lucide-react';
-import { useLMConfig } from '../contexts/LMConfigContext';
-import { useGlobalTools, MCPServer, UCSchema, MCPHeader } from '../contexts/GlobalToolsContext';
+import { useGlobalConfig, MCPServer, UCSchema } from '../contexts/GlobalConfigContext';
 import { useToast } from '../hooks/useToast';
+import { useToolCache } from '../hooks/useToolCache';
+import { useExpandableList } from '../hooks/useExpandableList';
 import ToastContainer from './ToastContainer';
 
 interface GlobalConfigModalProps {
@@ -23,8 +24,8 @@ const PROVIDER_OPTIONS = [
 
 const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({ isOpen, onClose, initialTab = 'lm' }) => {
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
-  const { toasts, removeToast, showSuccess, showWarning, showError } = useToast();
-  const { globalToolsConfig } = useGlobalTools();
+  const { toasts, removeToast, showSuccess, showWarning } = useToast();
+  const { globalToolsConfig } = useGlobalConfig();
   
   if (!isOpen) return null;
 
@@ -117,7 +118,7 @@ interface LMConfigTabProps {
 }
 
 const LMConfigTab: React.FC<LMConfigTabProps> = ({ onClose, showSuccess, showWarning }) => {
-  const { globalLMConfig, setGlobalLMConfig, availableProviders } = useLMConfig();
+  const { globalLMConfig, setGlobalLMConfig, availableProviders } = useGlobalConfig();
   const [selectedProvider, setSelectedProvider] = useState<string>('databricks');
   const [modelName, setModelName] = useState<string>('');
 
@@ -279,20 +280,23 @@ interface MCPToolsTabProps {
 }
 
 const MCPToolsTab: React.FC<MCPToolsTabProps> = ({ showSuccess, showWarning }) => {
-  const { globalToolsConfig, updateMCPServers } = useGlobalTools();
+  const { globalToolsConfig, updateMCPServers } = useGlobalConfig();
   const [servers, setServers] = useState<MCPServer[]>(globalToolsConfig.mcpServers);
   const [newServerUrl, setNewServerUrl] = useState('');
-  const [expandedServers, setExpandedServers] = useState<Set<string>>(new Set());
-  const [loadingServers, setLoadingServers] = useState<Set<string>>(new Set());
-  const [serverTools, setServerTools] = useState<Record<string, any[]>>({});
-  const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   
-  // Cache for tool data with TTL (5 minutes)
-  const [functionCache, setFunctionCache] = useState<Record<string, {
-    data: any[];
-    timestamp: number;
-  }>>({});
-  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  // Use custom hooks for state management
+  const { getCached, setCache } = useToolCache();
+  const {
+    expandedItems: expandedServers,
+    toggleItem: toggleServer,
+    setItemLoading,
+    setItemData: setServerTools,
+    setItemError: setServerError,
+    removeItem: removeServerState,
+    isLoading,
+    getData: getServerTools,
+    getError: getServerError
+  } = useExpandableList<any[]>();
 
   useEffect(() => {
     setServers(globalToolsConfig.mcpServers);
@@ -315,7 +319,7 @@ const MCPToolsTab: React.FC<MCPToolsTabProps> = ({ showSuccess, showWarning }) =
     setNewServerUrl('');
 
     // Auto-expand so user can configure headers and load tools
-    setExpandedServers(new Set([...Array.from(expandedServers), newServer.url]));
+    toggleServer(newServer.url);
     showSuccess('Server added', 'MCP server added successfully. Configure headers and load tools below.');
   };
 
@@ -323,22 +327,16 @@ const MCPToolsTab: React.FC<MCPToolsTabProps> = ({ showSuccess, showWarning }) =
     const cacheKey = `mcp:${server.url}`;
     
     // Check cache first (unless force reload)
-    if (!forceReload && functionCache[cacheKey]) {
-      const cached = functionCache[cacheKey];
-      if (Date.now() - cached.timestamp < CACHE_TTL) {
-        setServerTools(prev => ({ ...prev, [server.url]: cached.data }));
+    if (!forceReload) {
+      const cached = getCached(cacheKey);
+      if (cached) {
+        setServerTools(server.url, cached);
         return;
       }
     }
     
-    setLoadingServers(new Set([...Array.from(loadingServers), server.url]));
-    
-    // Clear previous error for this server
-    setServerErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[server.url];
-      return newErrors;
-    });
+    setItemLoading(server.url, true);
+    setServerError(server.url, null); // Clear previous error
 
     try {
       // Call backend API to list tools from MCP server
@@ -359,53 +357,32 @@ const MCPToolsTab: React.FC<MCPToolsTabProps> = ({ showSuccess, showWarning }) =
       }
 
       const data = await response.json();
-      setServerTools({
-        ...serverTools,
-        [server.url]: data.tools || [],
-      });
+      const tools = data.tools || [];
+      
+      setServerTools(server.url, tools);
+      setCache(cacheKey, tools); // Update cache
     } catch (error) {
       console.error('Failed to load tools:', error);
-      // Store error in state instead of showing alert
-      setServerErrors(prev => ({
-        ...prev,
-        [server.url]: error instanceof Error ? error.message : 'Unknown error occurred'
-      }));
+      setServerError(server.url, error instanceof Error ? error.message : 'Unknown error occurred');
     } finally {
-      setLoadingServers(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(server.url);
-        return newSet;
-      });
+      setItemLoading(server.url, false);
     }
   };
 
-  const toggleServer = (url: string) => {
-    const newExpanded = new Set(expandedServers);
-    if (newExpanded.has(url)) {
-      newExpanded.delete(url);
-    } else {
-      newExpanded.add(url);
-      // Load tools if not loaded yet
+  const handleToggleServer = (url: string) => {
+    toggleServer(url);
+    // Load tools if expanding and not loaded yet
+    if (!expandedServers.has(url)) {
       const server = servers.find(s => s.url === url);
-      if (server && !serverTools[url]) {
+      if (server && !getServerTools(url)) {
         loadToolsFromServer(server);
       }
     }
-    setExpandedServers(newExpanded);
   };
 
   const handleRemoveServer = (url: string) => {
     setServers(servers.filter(s => s.url !== url));
-    setExpandedServers(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(url);
-      return newSet;
-    });
-    setServerTools(prev => {
-      const newTools = { ...prev };
-      delete newTools[url];
-      return newTools;
-    });
+    removeServerState(url); // Remove from all tracking states
   };
 
   const handleToggleTool = (serverUrl: string, toolName: string) => {
@@ -421,10 +398,10 @@ const MCPToolsTab: React.FC<MCPToolsTabProps> = ({ showSuccess, showWarning }) =
   };
 
   const handleSelectAll = (serverUrl: string) => {
-    const tools = serverTools[serverUrl] || [];
+    const tools = getServerTools(serverUrl) || [];
     setServers(servers.map(server => {
       if (server.url === serverUrl) {
-        return { ...server, selectedTools: tools.map(t => t.name) };
+        return { ...server, selectedTools: tools.map((t: any) => t.name) };
       }
       return server;
     }));
@@ -497,7 +474,7 @@ const MCPToolsTab: React.FC<MCPToolsTabProps> = ({ showSuccess, showWarning }) =
             <div className="bg-gray-50 p-4 flex items-center justify-between">
               <div className="flex items-center gap-3 flex-1">
                 <button
-                  onClick={() => toggleServer(server.url)}
+                  onClick={() => handleToggleServer(server.url)}
                   className="p-1 hover:bg-gray-200 rounded transition-colors"
                 >
                   {expandedServers.has(server.url) ? (
@@ -509,8 +486,8 @@ const MCPToolsTab: React.FC<MCPToolsTabProps> = ({ showSuccess, showWarning }) =
                 <div>
                   <p className="font-mono text-sm font-medium text-gray-900">{server.url}</p>
                   <p className="text-xs text-gray-500">
-                    {serverTools[server.url] ? (
-                      `Tools (${server.selectedTools.length}/${serverTools[server.url].length} selected)`
+                    {getServerTools(server.url) ? (
+                      `Tools (${server.selectedTools.length}/${getServerTools(server.url)?.length || 0} selected)`
                     ) : server.selectedTools.length > 0 ? (
                       `${server.selectedTools.length} tool${server.selectedTools.length !== 1 ? 's' : ''} selected`
                     ) : (
@@ -656,21 +633,21 @@ const MCPToolsTab: React.FC<MCPToolsTabProps> = ({ showSuccess, showWarning }) =
                   )}
                   
                   <button
-                    onClick={() => loadToolsFromServer(server, serverTools[server.url] !== undefined)}
+                    onClick={() => loadToolsFromServer(server, getServerTools(server.url) !== undefined)}
                     className="mt-2 w-full px-3 py-1.5 bg-purple-100 text-purple-700 rounded text-sm hover:bg-purple-200 transition-colors"
                   >
-                    {serverTools[server.url] ? 'Reload Tools' : 'Load Tools'}
+                    {getServerTools(server.url) ? 'Reload Tools' : 'Load Tools'}
                   </button>
                 </div>
 
                 {/* Tools Section */}
-                {serverErrors[server.url] ? (
+                {getServerError(server.url) ? (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <div className="flex items-start space-x-2">
                       <AlertCircle size={18} className="text-red-600 mt-0.5 flex-shrink-0" />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-red-800">Failed to load tools</p>
-                        <p className="text-xs text-red-600 mt-1">{serverErrors[server.url]}</p>
+                        <p className="text-xs text-red-600 mt-1">{getServerError(server.url)}</p>
                         <button
                           onClick={() => loadToolsFromServer(server, true)}
                           className="mt-2 text-xs text-red-700 hover:text-red-800 font-medium underline"
@@ -680,16 +657,16 @@ const MCPToolsTab: React.FC<MCPToolsTabProps> = ({ showSuccess, showWarning }) =
                       </div>
                     </div>
                   </div>
-                ) : loadingServers.has(server.url) ? (
+                ) : isLoading(server.url) ? (
                   <div className="text-center py-8 text-gray-500">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
                     Loading tools...
                   </div>
-                ) : serverTools[server.url] ? (
+                ) : getServerTools(server.url) ? (
                   <>
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-sm font-medium text-gray-700">
-                        Tools ({server.selectedTools.length}/{serverTools[server.url]?.length || 0} selected)
+                        Tools ({server.selectedTools.length}/{getServerTools(server.url)?.length || 0} selected)
                       </p>
                       <div className="flex gap-2">
                         <button
@@ -709,7 +686,7 @@ const MCPToolsTab: React.FC<MCPToolsTabProps> = ({ showSuccess, showWarning }) =
                     </div>
 
                     <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {(serverTools[server.url] || []).map((tool) => (
+                      {(getServerTools(server.url) || []).map((tool: any) => (
                         <label
                           key={tool.name}
                           className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
@@ -773,21 +750,24 @@ interface UCFunctionsTabProps {
 }
 
 const UCFunctionsTab: React.FC<UCFunctionsTabProps> = ({ showSuccess, showWarning }) => {
-  const { globalToolsConfig, updateUCSchemas } = useGlobalTools();
+  const { globalToolsConfig, updateUCSchemas } = useGlobalConfig();
   const [schemas, setSchemas] = useState<UCSchema[]>(globalToolsConfig.ucSchemas);
   const [newCatalog, setNewCatalog] = useState('');
   const [newSchema, setNewSchema] = useState('');
-  const [expandedSchemas, setExpandedSchemas] = useState<Set<string>>(new Set());
-  const [loadingSchemas, setLoadingSchemas] = useState<Set<string>>(new Set());
-  const [schemaFunctions, setSchemaFunctions] = useState<Record<string, any[]>>({});
-  const [schemaErrors, setSchemaErrors] = useState<Record<string, string>>({});
   
-  // Cache for function data with TTL (5 minutes)
-  const [functionCache, setFunctionCache] = useState<Record<string, {
-    data: any[];
-    timestamp: number;
-  }>>({});
-  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  // Use custom hooks for state management
+  const { getCached, setCache } = useToolCache();
+  const {
+    expandedItems: expandedSchemas,
+    toggleItem: toggleSchema,
+    setItemLoading,
+    setItemData: setSchemaFunctions,
+    setItemError: setSchemaError,
+    removeItem: removeSchemaState,
+    isLoading,
+    getData: getSchemaFunctions,
+    getError: getSchemaError
+  } = useExpandableList<any[]>();
 
   useEffect(() => {
     setSchemas(globalToolsConfig.ucSchemas);
@@ -819,7 +799,7 @@ const UCFunctionsTab: React.FC<UCFunctionsTabProps> = ({ showSuccess, showWarnin
     setNewSchema('');
 
     // Auto-expand and load functions
-    setExpandedSchemas(new Set([...Array.from(expandedSchemas), schemaKey]));
+    toggleSchema(schemaKey);
     await loadFunctionsFromSchema(newSchemaConfig);
     showSuccess('Schema added', 'Unity Catalog schema added successfully. Loading functions...');
   };
@@ -829,22 +809,16 @@ const UCFunctionsTab: React.FC<UCFunctionsTabProps> = ({ showSuccess, showWarnin
     const cacheKey = `uc:${schemaKey}`;
     
     // Check cache first (unless force reload)
-    if (!forceReload && functionCache[cacheKey]) {
-      const cached = functionCache[cacheKey];
-      if (Date.now() - cached.timestamp < CACHE_TTL) {
-        setSchemaFunctions(prev => ({ ...prev, [schemaKey]: cached.data }));
+    if (!forceReload) {
+      const cached = getCached(cacheKey);
+      if (cached) {
+        setSchemaFunctions(schemaKey, cached);
         return;
       }
     }
     
-    setLoadingSchemas(new Set([...Array.from(loadingSchemas), schemaKey]));
-    
-    // Clear previous error for this schema
-    setSchemaErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[schemaKey];
-      return newErrors;
-    });
+    setItemLoading(schemaKey, true);
+    setSchemaError(schemaKey, null); // Clear previous error
 
     try {
       // Call backend API to list functions from UC schema
@@ -868,56 +842,25 @@ const UCFunctionsTab: React.FC<UCFunctionsTabProps> = ({ showSuccess, showWarnin
       const data = await response.json();
       const functions = data.functions || [];
       
-      setSchemaFunctions({
-        ...schemaFunctions,
-        [schemaKey]: functions,
-      });
-      
-      // Update cache
-      setFunctionCache(prev => ({
-        ...prev,
-        [cacheKey]: { data: functions, timestamp: Date.now() }
-      }));
+      setSchemaFunctions(schemaKey, functions);
+      setCache(cacheKey, functions); // Update cache
     } catch (error) {
       console.error('Failed to load functions:', error);
-      // Store error in state instead of showing alert
-      setSchemaErrors(prev => ({
-        ...prev,
-        [schemaKey]: error instanceof Error ? error.message : 'Unknown error occurred'
-      }));
+      setSchemaError(schemaKey, error instanceof Error ? error.message : 'Unknown error occurred');
     } finally {
-      setLoadingSchemas(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(schemaKey);
-        return newSet;
-      });
+      setItemLoading(schemaKey, false);
     }
   };
 
-  const toggleSchema = (schemaKey: string) => {
-    const newExpanded = new Set(expandedSchemas);
-    if (newExpanded.has(schemaKey)) {
-      newExpanded.delete(schemaKey);
-    } else {
-      newExpanded.add(schemaKey);
-      // Don't auto-load - let user click "Load Functions" button
-      // This gives more control and clarity
-    }
-    setExpandedSchemas(newExpanded);
+  const handleToggleSchema = (schemaKey: string) => {
+    toggleSchema(schemaKey);
+    // Don't auto-load - let user click "Load Functions" button
+    // This gives more control and clarity
   };
 
   const handleRemoveSchema = (schemaKey: string) => {
     setSchemas(schemas.filter(s => `${s.catalog}.${s.schema}` !== schemaKey));
-    setExpandedSchemas(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(schemaKey);
-      return newSet;
-    });
-    setSchemaFunctions(prev => {
-      const newFuncs = { ...prev };
-      delete newFuncs[schemaKey];
-      return newFuncs;
-    });
+    removeSchemaState(schemaKey); // Remove from all tracking states
   };
 
   const handleToggleFunction = (schemaKey: string, functionName: string) => {
@@ -933,10 +876,10 @@ const UCFunctionsTab: React.FC<UCFunctionsTabProps> = ({ showSuccess, showWarnin
   };
 
   const handleSelectAll = (schemaKey: string) => {
-    const functions = schemaFunctions[schemaKey] || [];
+    const functions = getSchemaFunctions(schemaKey) || [];
     setSchemas(schemas.map(schema => {
       if (`${schema.catalog}.${schema.schema}` === schemaKey) {
-        return { ...schema, selectedFunctions: functions.map(f => f.name) };
+        return { ...schema, selectedFunctions: functions.map((f: any) => f.name) };
       }
       return schema;
     }));
@@ -1018,7 +961,7 @@ const UCFunctionsTab: React.FC<UCFunctionsTabProps> = ({ showSuccess, showWarnin
               <div className="bg-gray-50 p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3 flex-1">
                   <button
-                    onClick={() => toggleSchema(schemaKey)}
+                    onClick={() => handleToggleSchema(schemaKey)}
                     className="p-1 hover:bg-gray-200 rounded transition-colors"
                   >
                     {expandedSchemas.has(schemaKey) ? (
@@ -1031,8 +974,8 @@ const UCFunctionsTab: React.FC<UCFunctionsTabProps> = ({ showSuccess, showWarnin
                     <p className="font-mono text-sm font-medium text-gray-900">{schemaKey}</p>
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-gray-500">
-                      {schemaFunctions[schemaKey] ? (
-                        `Functions (${schema.selectedFunctions.length}/${schemaFunctions[schemaKey].length} selected)`
+                      {getSchemaFunctions(schemaKey) ? (
+                        `Functions (${schema.selectedFunctions.length}/${getSchemaFunctions(schemaKey)?.length || 0} selected)`
                       ) : schema.selectedFunctions.length > 0 ? (
                         `${schema.selectedFunctions.length} function${schema.selectedFunctions.length !== 1 ? 's' : ''} selected`
                       ) : (
@@ -1056,24 +999,24 @@ const UCFunctionsTab: React.FC<UCFunctionsTabProps> = ({ showSuccess, showWarnin
                 <div className="p-4 border-t border-gray-200">
                   {/* Load/Reload Functions Button */}
                   <button
-                    onClick={() => loadFunctionsFromSchema(schema, schemaFunctions[schemaKey] !== undefined)}
+                    onClick={() => loadFunctionsFromSchema(schema, getSchemaFunctions(schemaKey) !== undefined)}
                     className="w-full px-3 py-1.5 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200 transition-colors mb-3"
-                    disabled={loadingSchemas.has(schemaKey)}
+                    disabled={isLoading(schemaKey)}
                   >
-                    {loadingSchemas.has(schemaKey) 
+                    {isLoading(schemaKey) 
                       ? 'Loading...' 
-                      : schemaFunctions[schemaKey] 
+                      : getSchemaFunctions(schemaKey) 
                         ? 'Reload Functions' 
                         : 'Load Functions'}
                   </button>
 
-                  {schemaErrors[schemaKey] ? (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <div className="flex items-start space-x-2">
-                        <AlertCircle size={18} className="text-red-600 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-red-800">Failed to load functions</p>
-                          <p className="text-xs text-red-600 mt-1">{schemaErrors[schemaKey]}</p>
+                  {getSchemaError(schemaKey) ? (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-start space-x-2">
+                      <AlertCircle size={18} className="text-red-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-800">Failed to load functions</p>
+                        <p className="text-xs text-red-600 mt-1">{getSchemaError(schemaKey)}</p>
                           <button
                             onClick={() => loadFunctionsFromSchema(schema, true)}
                             className="mt-2 text-xs text-red-700 hover:text-red-800 font-medium underline"
@@ -1083,17 +1026,17 @@ const UCFunctionsTab: React.FC<UCFunctionsTabProps> = ({ showSuccess, showWarnin
                         </div>
                       </div>
                     </div>
-                  ) : loadingSchemas.has(schemaKey) ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
-                      Loading functions...
-                    </div>
-                  ) : schemaFunctions[schemaKey] ? (
+                  ) : isLoading(schemaKey) ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
+                    Loading functions...
+                  </div>
+                ) : getSchemaFunctions(schemaKey) ? (
                     <>
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-sm font-medium text-gray-700">
-                          Functions ({schema.selectedFunctions.length}/{schemaFunctions[schemaKey].length} selected)
-                        </p>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-medium text-gray-700">
+                          Functions ({schema.selectedFunctions.length}/{getSchemaFunctions(schemaKey)?.length || 0} selected)
+                      </p>
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleSelectAll(schemaKey)}
@@ -1112,7 +1055,7 @@ const UCFunctionsTab: React.FC<UCFunctionsTabProps> = ({ showSuccess, showWarnin
                       </div>
 
                       <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {(schemaFunctions[schemaKey] || []).map((func) => (
+                        {(getSchemaFunctions(schemaKey) || []).map((func: any) => (
                           <label
                             key={func.name}
                             className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer"

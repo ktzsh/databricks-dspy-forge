@@ -4,7 +4,7 @@ import { Edit3, Brain, Settings, Trash2, Sparkles } from 'lucide-react';
 import { ModuleNodeData, ModuleType } from '../../types/workflow';
 import TraceIndicator from './TraceIndicator';
 import OptimizationFooter from './OptimizationFooter';
-import { useLMConfig } from '../../contexts/LMConfigContext';
+import { useGlobalConfig } from '../../contexts/GlobalConfigContext';
 
 const moduleTypes: ModuleType[] = [
   'Predict',
@@ -33,7 +33,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
   const [useGlobalMCPServers, setUseGlobalMCPServers] = useState(nodeData.useGlobalMCPServers || false);
   const [useGlobalUCFunctions, setUseGlobalUCFunctions] = useState(nodeData.useGlobalUCFunctions || false);
   const { deleteElements, setNodes } = useReactFlow();
-  const { globalLMConfig } = useLMConfig();
+  const { globalLMConfig } = useGlobalConfig();
 
   const handleSave = () => {
     // Update the node data immutably using setNodes to ensure React Flow detects the change
@@ -78,7 +78,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
     updateParameter(key, '');
   };
 
-  const useGlobalConfig = () => {
+  const applyGlobalConfig = () => {
     if (globalLMConfig) {
       setModel(globalLMConfig.modelName);
     }
@@ -187,7 +187,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
                 <label className="block text-sm font-medium">Model</label>
                 {globalLMConfig && (
                   <button
-                    onClick={useGlobalConfig}
+                    onClick={applyGlobalConfig}
                     className="flex items-center space-x-1 px-2 py-0.5 text-xs bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 transition-colors"
                     type="button"
                   >

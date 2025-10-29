@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Play, MessageSquare, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { useGlobalTools } from '../contexts/GlobalToolsContext';
+import { useGlobalConfig } from '../contexts/GlobalConfigContext';
 
 interface PlaygroundSidebarProps {
   workflowId: string | null;
@@ -25,7 +25,7 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
   const [conversationHistory, setConversationHistory] = useState<Array<Record<string, any>>>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(workflowId);
-  const { globalToolsConfig } = useGlobalTools();
+  const { globalToolsConfig } = useGlobalConfig();
 
   // Update currentWorkflowId when workflowId prop changes
   useEffect(() => {
