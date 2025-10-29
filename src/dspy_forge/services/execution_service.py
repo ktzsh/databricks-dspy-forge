@@ -61,7 +61,7 @@ class WorkflowExecutionEngine:
     def __init__(self):
         self.active_executions: Dict[str, WorkflowExecution] = {}
     
-    async def execute_workflow(self, workflow: Workflow, input_data: Dict[str, Any]) -> WorkflowExecution:
+    async def execute_workflow(self, workflow: Workflow, input_data: Dict[str, Any], global_tools_config: Dict[str, Any] = None) -> WorkflowExecution:
         """Execute a workflow with given input data using CompoundProgram"""
         execution_id = str(uuid.uuid4())
 
@@ -87,6 +87,10 @@ class WorkflowExecutionEngine:
 
             # Pre-load MCP tools asynchronously before creating the program
             await self._preload_mcp_tools(workflow, context)
+            
+            # Pre-load global tools if requested by ReAct modules
+            if global_tools_config:
+                await self._preload_global_tools(workflow, context, global_tools_config)
 
             # Create and execute CompoundProgram
             program = CompoundProgram(workflow, context)
@@ -147,12 +151,111 @@ class WorkflowExecutionEngine:
             (node.data.get('tool_type') == 'MCP_TOOL' or node.data.get('toolType') == 'MCP_TOOL')
         ]
 
-        # Load tools for each MCP node asynchronously
+        # Load tools for each MCP node asynchronously with error handling
         for node in mcp_tool_nodes:
-            template = MCPToolTemplate(node, workflow)
-            tools = await template.list_mcp_tools()
-            context.set_loaded_tools(node.id, tools)
-            logger.info(f"Pre-loaded {len(tools)} MCP tools for node {node.id}")
+            try:
+                template = MCPToolTemplate(node, workflow)
+                tools = await template.list_mcp_tools()
+                context.set_loaded_tools(node.id, tools)
+                logger.info(f"Pre-loaded {len(tools)} MCP tools for node {node.id}")
+            except Exception as e:
+                logger.error(f"Failed to pre-load MCP tools for node {node.id}: {e}", exc_info=True)
+                context.set_loaded_tools(node.id, [])
+
+    async def _preload_global_tools(self, workflow: Workflow, context: ExecutionContext, global_tools_config: Dict[str, Any]):
+        """Pre-load global tools for ReAct modules that request them"""
+        from dspy_forge.components.tool_templates import UCFunctionTemplate
+        
+        # Find all ReAct modules that use global tools
+        react_modules = [
+            node for node in workflow.nodes
+            if node.type == NodeType.MODULE and
+            node.data.get('module_type') == 'ReAct'
+        ]
+        
+        global_mcp_tools = []
+        global_uc_tools = []
+        
+        # Check if any ReAct module requests global MCP servers
+        any_use_global_mcp = any(
+            node.data.get('useGlobalMCPServers') or node.data.get('use_global_mcp_servers')
+            for node in react_modules
+        )
+        
+        # Check if any ReAct module requests global UC functions
+        any_use_global_uc = any(
+            node.data.get('useGlobalUCFunctions') or node.data.get('use_global_uc_functions')
+            for node in react_modules
+        )
+        
+        # Load global MCP tools if requested
+        if any_use_global_mcp:
+            mcp_servers = global_tools_config.get('mcpServers', [])
+            for server_config in mcp_servers:
+                try:
+                    # Create a temporary tool node for loading
+                    from dspy_forge.models.workflow import ToolNode, ToolNodeData
+                    temp_node_data = ToolNodeData(
+                        label='Global MCP',
+                        tool_type='MCP_TOOL',
+                        mcp_url=server_config.get('url'),
+                        mcp_headers=server_config.get('headers', [])
+                    )
+                    temp_node = ToolNode(
+                        id='global_mcp_temp',
+                        type=NodeType.TOOL,
+                        position={'x': 0, 'y': 0},
+                        data=temp_node_data.model_dump(by_alias=True)
+                    )
+                    
+                    template = MCPToolTemplate(temp_node, workflow)
+                    all_tools = await template.list_mcp_tools()
+                    
+                    # Filter to only selected tools
+                    selected_tool_names = set(server_config.get('selectedTools', []))
+                    filtered_tools = [t for t in all_tools if t.name in selected_tool_names]
+                    
+                    global_mcp_tools.extend(filtered_tools)
+                    logger.info(f"Loaded {len(filtered_tools)} global MCP tools from {server_config.get('url')}")
+                except Exception as e:
+                    logger.error(f"Failed to load global MCP tools from {server_config.get('url')}: {e}", exc_info=True)
+        
+        # Load global UC functions if requested
+        if any_use_global_uc:
+            from dspy_forge.utils.tool_utils import load_uc_functions_from_schema
+            
+            uc_schemas = global_tools_config.get('ucSchemas', [])
+            for schema_config in uc_schemas:
+                try:
+                    # Use shared utility (no temporary nodes needed)
+                    all_tools = load_uc_functions_from_schema(
+                        schema_config.get('catalog'),
+                        schema_config.get('schema')
+                    )
+                    
+                    # Filter to only selected functions
+                    selected_function_names = set(schema_config.get('selectedFunctions', []))
+                    filtered_tools = [t for t in all_tools if t.name in selected_function_names]
+                    
+                    global_uc_tools.extend(filtered_tools)
+                    logger.info(f"Loaded {len(filtered_tools)} global UC functions from {schema_config.get('catalog')}.{schema_config.get('schema')}")
+                except Exception as e:
+                    logger.error(f"Failed to load global UC functions from {schema_config.get('catalog')}.{schema_config.get('schema')}: {e}", exc_info=True)
+        
+        # Store global tools in context for ReAct modules to use
+        for react_node in react_modules:
+            tools_for_this_node = []
+            
+            if react_node.data.get('useGlobalMCPServers') or react_node.data.get('use_global_mcp_servers'):
+                tools_for_this_node.extend(global_mcp_tools)
+            
+            if react_node.data.get('useGlobalUCFunctions') or react_node.data.get('use_global_uc_functions'):
+                tools_for_this_node.extend(global_uc_tools)
+            
+            if tools_for_this_node:
+                # Store with a special key for global tools
+                context.set_loaded_tools(f"global_{react_node.id}", tools_for_this_node)
+                logger.info(f"Assigned {len(tools_for_this_node)} global tools to ReAct node {react_node.id}")
 
 
 # Global execution engine instance

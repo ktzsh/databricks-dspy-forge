@@ -14,9 +14,8 @@ const toolTypeLabels: Record<ToolType, string> = {
 const ToolNode: React.FC<NodeProps<ToolNodeData & { traceData?: any; onTraceClick?: (nodeId: string, traceData: any) => void }>> = ({ data, selected, id }) => {
   const { traceData, onTraceClick, ...nodeData } = data;
   const [isEditing, setIsEditing] = useState(false);
-  const [nodeLabel, setNodeLabel] = useState(nodeData.label || nodeData.toolName || 'Tool');
+  const [nodeLabel, setNodeLabel] = useState(nodeData.label || 'Tool');
   const [toolType, setToolType] = useState<ToolType>(nodeData.toolType || 'MCP_TOOL');
-  const [toolName, setToolName] = useState(nodeData.toolName || '');
   const [description, setDescription] = useState(nodeData.description || '');
 
   // MCP-specific state
@@ -26,7 +25,6 @@ const ToolNode: React.FC<NodeProps<ToolNodeData & { traceData?: any; onTraceClic
   // UC Function-specific state
   const [catalog, setCatalog] = useState(nodeData.catalog || '');
   const [schema, setSchema] = useState(nodeData.schema || '');
-  const [functionName, setFunctionName] = useState(nodeData.functionName || '');
   const parameters = nodeData.parameters || {};
 
   const { deleteElements, setNodes } = useReactFlow();
@@ -42,15 +40,11 @@ const ToolNode: React.FC<NodeProps<ToolNodeData & { traceData?: any; onTraceClic
                 ...node.data,
                 label: nodeLabel,
                 toolType: toolType,
-                toolName: toolName,
                 description: description,
-                // MCP fields
                 mcpUrl: toolType === 'MCP_TOOL' ? mcpUrl : undefined,
                 mcpHeaders: toolType === 'MCP_TOOL' ? mcpHeaders : undefined,
-                // UC Function fields
                 catalog: toolType === 'UC_FUNCTION' ? catalog : undefined,
                 schema: toolType === 'UC_FUNCTION' ? schema : undefined,
-                functionName: toolType === 'UC_FUNCTION' ? functionName : undefined,
                 parameters: parameters,
               }
             }
@@ -158,21 +152,6 @@ const ToolNode: React.FC<NodeProps<ToolNodeData & { traceData?: any; onTraceClic
               </select>
             </div>
 
-            {/* Tool Name */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Tool Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={toolName}
-                onChange={(e) => setToolName(e.target.value)}
-                placeholder="e.g., github_search"
-                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                required
-              />
-            </div>
-
             {/* Description */}
             <div>
               <label className="block text-sm font-medium mb-1">Description</label>
@@ -200,6 +179,9 @@ const ToolNode: React.FC<NodeProps<ToolNodeData & { traceData?: any; onTraceClic
                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                     required
                   />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Loads All tools from this server
+                  </div>
                 </div>
 
                 <div>
@@ -282,6 +264,9 @@ const ToolNode: React.FC<NodeProps<ToolNodeData & { traceData?: any; onTraceClic
                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                     required
                   />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Loads All functions from this schema
+                  </div>
                 </div>
 
                 <div>
@@ -296,22 +281,8 @@ const ToolNode: React.FC<NodeProps<ToolNodeData & { traceData?: any; onTraceClic
                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                     required
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Function Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={functionName}
-                    onChange={(e) => setFunctionName(e.target.value)}
-                    placeholder="my_function"
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                    required
-                  />
                   <div className="text-xs text-gray-500 mt-1">
-                    Full name: {catalog && schema && functionName ? `${catalog}.${schema}.${functionName}` : '(incomplete)'}
+                    Full path: {catalog && schema ? `${catalog}.${schema}` : '(incomplete)'}
                   </div>
                 </div>
               </>
@@ -329,14 +300,6 @@ const ToolNode: React.FC<NodeProps<ToolNodeData & { traceData?: any; onTraceClic
           </div>
         ) : (
           <div className="space-y-2">
-            {/* Tool Name Display */}
-            {toolName && (
-              <div className="text-sm">
-                <span className="font-medium">Name:</span>
-                <span className="ml-2 text-gray-600">{toolName}</span>
-              </div>
-            )}
-
             {/* Description Display */}
             {description && (
               <div className="text-sm">
@@ -350,9 +313,12 @@ const ToolNode: React.FC<NodeProps<ToolNodeData & { traceData?: any; onTraceClic
             {/* MCP URL Display */}
             {toolType === 'MCP_TOOL' && mcpUrl && (
               <div className="text-sm">
-                <span className="font-medium">MCP URL:</span>
+                <span className="font-medium">MCP Server URL:</span>
                 <div className="mt-1 p-2 bg-gray-50 rounded text-xs break-all">
                   {mcpUrl}
+                </div>
+                <div className="text-xs text-purple-600 mt-1">
+                  Loads All tools from this server
                 </div>
               </div>
             )}
@@ -374,17 +340,20 @@ const ToolNode: React.FC<NodeProps<ToolNodeData & { traceData?: any; onTraceClic
               </div>
             )}
 
-            {/* UC Function Display */}
-            {toolType === 'UC_FUNCTION' && catalog && schema && functionName && (
+            {/* UC Schema Display */}
+            {toolType === 'UC_FUNCTION' && catalog && schema && (
               <div className="text-sm">
-                <span className="font-medium">Function:</span>
+                <span className="font-medium">Unity Catalog Schema:</span>
                 <div className="mt-1 p-2 bg-gray-50 rounded text-xs font-mono">
-                  {catalog}.{schema}.{functionName}
+                  {catalog}.{schema}
+                </div>
+                <div className="text-xs text-purple-600 mt-1">
+                  Loads All functions from this schema
                 </div>
               </div>
             )}
 
-            {!toolName && (
+            {!mcpUrl && !catalog && (
               <div className="text-sm text-gray-500 text-center py-2">
                 No configuration
               </div>

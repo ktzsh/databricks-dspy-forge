@@ -258,9 +258,9 @@ async def execute_workflow_playground(request: PlaygroundExecutionRequest):
         processed_input = _process_playground_input(input_data, request.conversation_history, workflow)
         logger.debug(f"Processed input: {processed_input}")
         
-        # Execute workflow directly
         logger.debug("Executing workflow")
-        execution = await execution_engine.execute_workflow(workflow, processed_input)
+        global_tools_config = request.global_tools_config or {}
+        execution = await execution_engine.execute_workflow(workflow, processed_input, global_tools_config)
         
         logger.info(f"Execution completed with status: {execution.status}")
         if execution.error:

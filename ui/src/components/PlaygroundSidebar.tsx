@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Play, MessageSquare, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useGlobalConfig } from '../contexts/GlobalConfigContext';
 
 interface PlaygroundSidebarProps {
   workflowId: string | null;
@@ -24,6 +25,7 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
   const [conversationHistory, setConversationHistory] = useState<Array<Record<string, any>>>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(workflowId);
+  const { globalToolsConfig } = useGlobalConfig();
 
   // Update currentWorkflowId when workflowId prop changes
   useEffect(() => {
@@ -108,7 +110,7 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
         }
       }
 
-      // Call the playground execution endpoint with workflow IR, question, and history
+      // Call the playground execution endpoint with workflow IR, question, history, and global tools
       const response = await fetch('/api/v1/execution/playground', {
         method: 'POST',
         headers: {
@@ -118,7 +120,8 @@ const PlaygroundSidebar: React.FC<PlaygroundSidebarProps> = ({ workflowId, workf
           workflow_id: executionWorkflowId,
           workflow_ir: workflowIR,
           question: userInput,
-          conversation_history: conversationHistory
+          conversation_history: conversationHistory,
+          global_tools_config: globalToolsConfig  // Include global tools configuration
         }),
       });
 

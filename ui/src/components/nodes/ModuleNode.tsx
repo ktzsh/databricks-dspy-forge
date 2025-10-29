@@ -4,7 +4,7 @@ import { Edit3, Brain, Settings, Trash2, Sparkles } from 'lucide-react';
 import { ModuleNodeData, ModuleType } from '../../types/workflow';
 import TraceIndicator from './TraceIndicator';
 import OptimizationFooter from './OptimizationFooter';
-import { useLMConfig } from '../../contexts/LMConfigContext';
+import { useGlobalConfig } from '../../contexts/GlobalConfigContext';
 
 const moduleTypes: ModuleType[] = [
   'Predict',
@@ -30,8 +30,10 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
   const [model, setModel] = useState(nodeData.model || '');
   const [instruction, setInstruction] = useState(nodeData.instruction || '');
   const [parameters, setParameters] = useState(nodeData.parameters || {});
+  const [useGlobalMCPServers, setUseGlobalMCPServers] = useState(nodeData.useGlobalMCPServers || false);
+  const [useGlobalUCFunctions, setUseGlobalUCFunctions] = useState(nodeData.useGlobalUCFunctions || false);
   const { deleteElements, setNodes } = useReactFlow();
-  const { globalLMConfig } = useLMConfig();
+  const { globalLMConfig } = useGlobalConfig();
 
   const handleSave = () => {
     // Update the node data immutably using setNodes to ensure React Flow detects the change
@@ -47,6 +49,8 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
                 model: model,
                 instruction: instruction,
                 parameters: parameters,
+                useGlobalMCPServers: useGlobalMCPServers,
+                useGlobalUCFunctions: useGlobalUCFunctions,
               }
             }
           : node
@@ -74,7 +78,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
     updateParameter(key, '');
   };
 
-  const useGlobalConfig = () => {
+  const applyGlobalConfig = () => {
     if (globalLMConfig) {
       setModel(globalLMConfig.modelName);
     }
@@ -183,7 +187,7 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
                 <label className="block text-sm font-medium">Model</label>
                 {globalLMConfig && (
                   <button
-                    onClick={useGlobalConfig}
+                    onClick={applyGlobalConfig}
                     className="flex items-center space-x-1 px-2 py-0.5 text-xs bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 transition-colors"
                     type="button"
                   >
@@ -273,6 +277,49 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
               </div>
             </div>
 
+            {/* Global Tools Configuration - Only for ReAct modules */}
+            {moduleType === 'ReAct' && (
+              <div className="border-t border-gray-200 pt-3 space-y-3">
+                <div className="text-sm font-medium text-gray-700 mb-2">Global Tools</div>
+                
+                {/* Use Global MCP Servers */}
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useGlobalMCPServers}
+                    onChange={(e) => setUseGlobalMCPServers(e.target.checked)}
+                    className="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900">Use Global MCP Servers</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Load tools from MCP servers configured in Global Configuration
+                    </p>
+                  </div>
+                </label>
+
+                {/* Use Global UC Functions */}
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useGlobalUCFunctions}
+                    onChange={(e) => setUseGlobalUCFunctions(e.target.checked)}
+                    className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900">Use Global UC Functions</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Load functions from UC schemas configured in Global Configuration
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
+
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -321,7 +368,28 @@ const ModuleNode: React.FC<NodeProps<ModuleNodeData & { traceData?: any; onTrace
               </div>
             )}
 
-            {!model && !instruction && Object.keys(parameters).length === 0 && (
+            {/* Global Tools Display - Only for ReAct modules */}
+            {moduleType === 'ReAct' && (useGlobalMCPServers || useGlobalUCFunctions) && (
+              <div className="text-sm">
+                <div className="font-medium mb-1">Global Tools</div>
+                <div className="space-y-1">
+                  {useGlobalMCPServers && (
+                    <div className="flex items-center text-xs text-purple-600">
+                      <span className="mr-1">✓</span>
+                      <span>Using Global MCP Servers</span>
+                    </div>
+                  )}
+                  {useGlobalUCFunctions && (
+                    <div className="flex items-center text-xs text-green-600">
+                      <span className="mr-1">✓</span>
+                      <span>Using Global UC Functions</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!model && !instruction && Object.keys(parameters).length === 0 && !useGlobalMCPServers && !useGlobalUCFunctions && (
               <div className="text-sm text-gray-500 text-center py-2">
                 No configuration
               </div>

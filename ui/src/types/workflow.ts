@@ -109,6 +109,9 @@ export interface ModuleNodeData extends BaseNodeData {
   model?: string;
   instruction?: string; // Task description for DSPy signature
   parameters: Record<string, any>;
+  // Global tool configuration (for ReAct modules)
+  useGlobalMCPServers?: boolean;
+  useGlobalUCFunctions?: boolean;
 }
 
 export interface LogicNodeData extends BaseNodeData {

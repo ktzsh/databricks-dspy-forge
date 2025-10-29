@@ -3,14 +3,14 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ReactFlowProvider } from 'reactflow';
 import Dashboard from './components/Dashboard';
 import WorkflowBuilder from './components/WorkflowBuilder';
-import { LMConfigProvider } from './contexts/LMConfigContext';
+import { GlobalConfigProvider } from './contexts/GlobalConfigContext';
 
 import 'reactflow/dist/style.css';
 import './index.css';
 
 function App() {
   return (
-    <LMConfigProvider>
+    <GlobalConfigProvider>
       <Router>
         <div className="App bg-slate-50">
           <Routes>
@@ -26,7 +26,7 @@ function App() {
           </Routes>
         </div>
       </Router>
-    </LMConfigProvider>
+    </GlobalConfigProvider>
   );
 }
 

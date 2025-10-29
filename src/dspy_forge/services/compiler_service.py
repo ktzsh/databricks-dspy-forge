@@ -234,12 +234,19 @@ class WorkflowCompilerService:
 
             code_lines.append("")
 
+            # Check if there are async tool methods (MCP tools)
+            has_async_tools = any('async def' in method for method in tool_methods)
+            
             # Add tool loading methods to the class (after __init__)
             if tool_methods:
                 for tool_method in tool_methods:
                     if tool_method.strip():
                         code_lines.append(tool_method)
                         code_lines.append("")
+            
+            # Generate initialize method if there are async tools
+            if has_async_tools:
+                self._generate_initialize_method(tool_methods, instances, instance_vars, code_lines)
 
             # Generate forward method
             code_lines.append("    def forward(self, " + ", ".join(start_fields) + "):")
@@ -254,7 +261,7 @@ class WorkflowCompilerService:
             code_lines.append(f"        return dspy.Prediction({return_args})")
             
             # Generate main method
-            self._generate_main_method(start_fields, code_lines)
+            self._generate_main_method(start_fields, code_lines, has_async_tools)
             
             compiled_code = '\n'.join(code_lines)
 
@@ -326,18 +333,104 @@ class WorkflowCompilerService:
                     fields.append(field_name)
         return fields
 
-    def _generate_main_method(self, start_fields: List[str], code_lines: List[str]):
+    def _generate_main_method(self, start_fields: List[str], code_lines: List[str], has_async_tools: bool = False):
         """Generate the main execution method"""
         code_lines.append("")
-        code_lines.append("if __name__ == '__main__':")
-        code_lines.append("    # Initialize the compound program")
-        code_lines.append("    program = CompoundProgram()")
+        if has_async_tools:
+            # Generate async main for MCP tools
+            code_lines.append("if __name__ == '__main__':")
+            code_lines.append("    import asyncio")
+            code_lines.append("")
+            code_lines.append("    async def main():")
+            code_lines.append("        # Initialize the compound program")
+            code_lines.append("        program = CompoundProgram()")
+            code_lines.append("        ")
+            code_lines.append("        # Load async tools (MCP)")
+            code_lines.append("        await program.initialize()")
+            code_lines.append("")
+            code_lines.append("        # Example input")
+            example_input = {field: f"example_{field}" for field in start_fields}
+            input_str = ", ".join([f"{k}='{v}'" for k, v in example_input.items()])
+            code_lines.append(f"        result = program({input_str})")
+            code_lines.append("        print('Result:', result)")
+            code_lines.append("")
+            code_lines.append("    asyncio.run(main())")
+        else:
+            # Generate regular main
+            code_lines.append("if __name__ == '__main__':")
+            code_lines.append("    # Initialize the compound program")
+            code_lines.append("    program = CompoundProgram()")
+            code_lines.append("")
+            code_lines.append("    # Example input")
+            example_input = {field: f"example_{field}" for field in start_fields}
+            input_str = ", ".join([f"{k}='{v}'" for k, v in example_input.items()])
+            code_lines.append(f"    result = program({input_str})")
+            code_lines.append("    print('Result:', result)")
+
+    def _generate_initialize_method(self, tool_methods: List[str], instances: List[str], instance_vars: List[str], code_lines: List[str]):
+        """Generate async initialize method to load MCP tools and reinitialize modules"""
+        code_lines.append("    async def initialize(self):")
+        code_lines.append("        \"\"\"Load async tools (MCP) and update modules that use them\"\"\"")
+        
+        # Find all async tool loading methods and call them
+        async_method_calls = []
+        for method in tool_methods:
+            if 'async def' in method:
+                # Extract method name (e.g., "_load_react_1_0_tools")
+                method_lines = method.strip().split('\n')
+                method_def = next((line for line in method_lines if 'async def' in line), None)
+                if method_def:
+                    method_name = method_def.split('async def')[1].split('(')[0].strip()
+                    # Extract variable name from method name (e.g., "react_1_0" from "_load_react_1_0_tools")
+                    if method_name.startswith('_load_') and method_name.endswith('_tools'):
+                        var_name = method_name.replace('_load_', '').replace('_tools', '')
+                        async_method_calls.append((f"tools_{var_name}", method_name))
+        
+        # Call all async loading methods
+        for tool_var, method_name in async_method_calls:
+            code_lines.append(f"        self.{tool_var} = await self.{method_name}()")
+        
         code_lines.append("")
-        code_lines.append("    # Example input")
-        example_input = {field: f"example_{field}" for field in start_fields}
-        input_str = ", ".join([f"{k}='{v}'" for k, v in example_input.items()])
-        code_lines.append(f"    result = program({input_str})")
-        code_lines.append("    print('Result:', result)")
+        
+        # Re-initialize modules that use these tools
+        # Parse instances to find ReAct modules
+        for instance in instances:
+            if 'dspy.ReAct' in instance:
+                # Extract instance variable and signature
+                # Example: "        self.react_1 = dspy.ReAct(ReActSignature_1, tools=all_tools, max_iters=3)"
+                instance_lines = instance.strip().split('\n')
+                for line in instance_lines:
+                    if 'self.' in line and '= dspy.ReAct' in line:
+                        # Extract the instance variable name
+                        instance_var = line.split('self.')[1].split('=')[0].strip()
+                        # Extract the signature name
+                        sig_match = line.split('dspy.ReAct(')[1].split(',')[0].strip()
+                        
+                        # Find which tool variable this instance uses by checking preceding lines
+                        matching_tool_var = None
+                        for tool_var, _ in async_method_calls:
+                            # Check if this instance is associated with this tool variable
+                            # by looking for the tool variable name pattern in instance variable
+                            # e.g., "react_1" matches "tools_react_1_0"
+                            tool_suffix = tool_var.replace('tools_', '').split('_')[0] + '_' + tool_var.replace('tools_', '').split('_')[1]
+                            if tool_suffix in instance_var:
+                                matching_tool_var = tool_var
+                                break
+                        
+                        if matching_tool_var:
+                            # Generate code to collect tools and reinitialize
+                            code_lines.append(f"        # Update {instance_var} with loaded tools")
+                            code_lines.append(f"        all_tools_{instance_var} = []")
+                            code_lines.append(f"        all_tools_{instance_var}.extend(self.{matching_tool_var})")
+                            
+                            # Extract max_iters if present
+                            max_iters = "3"
+                            if "max_iters=" in line:
+                                max_iters = line.split("max_iters=")[1].split(")")[0].split(",")[0].strip()
+                            
+                            code_lines.append(f"        self.{instance_var} = dspy.ReAct({sig_match}, tools=all_tools_{instance_var}, max_iters={max_iters})")
+        
+        code_lines.append("")
 
     def _generate_router_code(
         self,
